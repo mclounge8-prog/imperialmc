@@ -15,21 +15,14 @@ function roleOptions(selected) {
     .join('');
 }
 
-/**
- * Строка в режиме просмотра.
- * oob=true — используется только при создании нового сотрудника:
- * добавляет hx-swap-oob, чтобы вставить строку в конец таблицы,
- * пока основной hx-target формы указывает на блок ошибки.
- */
-export function renderStaffRow(staffMember, { oob = false } = {}) {
-  const oobAttr = oob ? ' hx-swap-oob="beforeend:#staff-list"' : '';
+export function renderStaffRow(staffMember) {
   const statusLabel = staffMember.is_active ? 'Активен' : 'Отключён';
   const statusClass = staffMember.is_active ? 'badge-active' : 'badge-inactive';
   const toggleLabel = staffMember.is_active ? 'Деактивировать' : 'Активировать';
   const safeName = escapeHtml(staffMember.name);
 
   return `
-    <tr id="staff-row-${staffMember.id}"${oobAttr}>
+    <tr id="staff-row-${staffMember.id}">
       <td>${safeName}</td>
       <td>${ROLES[staffMember.role] || staffMember.role}</td>
       <td><span class="badge ${statusClass}">${statusLabel}</span></td>
@@ -40,6 +33,18 @@ export function renderStaffRow(staffMember, { oob = false } = {}) {
       </td>
     </tr>
   `;
+}
+
+/**
+ * Целиком таблица сотрудников с hx-swap-oob="true" — сервер отдаёт свежий,
+ * правильно отсортированный список после создания нового сотрудника, вместо
+ * точечной вставки одной строки в конец (которая расходилась с порядком
+ * ORDER BY created_at DESC при обычной загрузке раздела и "прыгала" при
+ * следующем обновлении страницы).
+ */
+export function renderStaffListOob(staffList) {
+  const rows = staffList.map((s) => renderStaffRow(s)).join('');
+  return `<tbody id="staff-list" hx-swap-oob="true">${rows}</tbody>`;
 }
 
 /** Строка в режиме редактирования. errorMsg — если предыдущая попытка сохранить не прошла валидацию. */

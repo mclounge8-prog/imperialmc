@@ -79,9 +79,12 @@ export function renderRegistrationCode(code, expiresAt) {
   `;
 }
 
-export function renderDevicesSection(devices, venues) {
+export function renderDeviceListInner(devices, venues) {
   const rows = devices.map((d) => renderDeviceRow(d, venues)).join('');
+  return rows || '<p class="empty-hint">Пока нет ни одного зарегистрированного устройства</p>';
+}
 
+export function renderDevicesSection(devices, venues) {
   return `
     <header>
       <h1>Устройства</h1>
@@ -97,13 +100,22 @@ export function renderDevicesSection(devices, venues) {
         hx-swap="innerHTML"
       >Сгенерировать код регистрации</button>
       <div id="registration-code-display"></div>
+      <p class="hint">
+        Список ниже сам подхватит новое устройство, как только планшет введёт код —
+        обновлять страницу не нужно.
+      </p>
     </div>
 
     <div class="subsection">
       <h2>Зарегистрированные устройства</h2>
-      <div class="list" id="devices-list">${
-        rows || '<p class="empty-hint">Пока нет ни одного зарегистрированного устройства</p>'
-      }</div>
+      <div
+        class="list"
+        id="devices-list"
+        hx-get="/devices/list"
+        hx-trigger="every 10s"
+        hx-swap="innerHTML"
+        hx-on::before-request="if (event.detail.elt === this && this.contains(document.activeElement)) { event.preventDefault(); }"
+      >${renderDeviceListInner(devices, venues)}</div>
     </div>
   `;
 }

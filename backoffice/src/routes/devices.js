@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
-import { renderDeviceRow, renderRegistrationCode } from '../views/devicesView.js';
+import { renderDeviceRow, renderRegistrationCode, renderDeviceListInner } from '../views/devicesView.js';
 
 const devices = new Hono();
 devices.use('*', requireAuthApi);
@@ -30,6 +30,17 @@ async function fetchDevice(id) {
   );
   return rows[0] || null;
 }
+
+// Список устройств для периодического опроса (#devices-list) — так новое
+// устройство, зарегистрированное планшетом напрямую через apiDevices.js,
+// появляется в бэкофисе само, без обновления страницы админом.
+devices.get('/list', async (c) => {
+  const { rows: deviceRows } = await pool.query(
+    'SELECT id, name, venue_id, is_active, last_seen_at FROM devices ORDER BY registered_at DESC'
+  );
+  const venues = await fetchVenuesList();
+  return c.html(renderDeviceListInner(deviceRows, venues));
+});
 
 devices.post('/generate-code', async (c) => {
   const code = generateCode();

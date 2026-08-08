@@ -5,11 +5,13 @@ import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
 import {
   renderMenuCategoryAccordionSection,
+  renderMenuUncategorizedAccordionSection,
   renderMenuItemRow,
   renderMenuItemEditRow,
+  renderMenuItemCategorySelect,
   renderMenuVenueContainer,
   renderRecipeEditor,
-  renderRecipeRow,
+  renderRecipeListOob,
 } from '../views/menuView.js';
 
 const menu = new Hono();
@@ -115,8 +117,11 @@ menu.post('/categories', async (c) => {
     'INSERT INTO menu_categories (name, icon) VALUES ($1, $2) RETURNING id, name, icon',
     [name, icon]
   );
+
+  const categories = await fetchMenuCategories();
   return c.html(
-    renderMenuCategoryAccordionSection(rows[0], [], venueId, false, { oob: true })
+    renderMenuCategoryAccordionSection(rows[0], [], venueId, false, { oob: true }) +
+      renderMenuItemCategorySelect(categories, { oob: true })
   );
 });
 
@@ -158,18 +163,41 @@ menu.post('/items', async (c) => {
   const name = String(body.name || '').trim();
   const categoryId = body.category_id ? Number(body.category_id) : null;
   const price = Number(body.price);
+  const venueId = body.venue_id;
 
   if (!name) return c.html('<p>Укажи наименование</p>');
   if (Number.isNaN(price) || price < 0) return c.html('<p>Цена должна быть числом ≥ 0</p>');
 
-  const { rows } = await pool.query(
-    'INSERT INTO menu_items (category_id, name, price) VALUES ($1, $2, $3) RETURNING id',
-    [categoryId, name, price]
-  );
+  await pool.query('INSERT INTO menu_items (category_id, name, price) VALUES ($1, $2, $3)', [
+    categoryId,
+    name,
+    price,
+  ]);
 
-  const created = await fetchMenuItemWithCategory(rows[0].id);
-  const targetId = categoryId ? `menu-category-items-${categoryId}` : 'menu-uncategorized-items';
-  return c.html(renderMenuItemRow(created, { oob: true, targetId }));
+  // Целиком перерисовываем затронутую секцию — позиции внутри неё сразу в
+  // правильном порядке (новые сверху, как при обычной загрузке раздела),
+  // соседние категории не трогаем (их состояние "открыто/закрыто" не сбрасывается).
+  const allItems = await fetchAllMenuItems();
+  if (categoryId) {
+    const { rows: catRows } = await pool.query(
+      'SELECT id, name, icon FROM menu_categories WHERE id = $1',
+      [categoryId]
+    );
+    const categoryItems = allItems.filter((i) => i.category_id === categoryId);
+    const hiddenCategoryIds = await fetchHiddenCategoryIds(venueId);
+    return c.html(
+      renderMenuCategoryAccordionSection(
+        catRows[0],
+        categoryItems,
+        venueId,
+        hiddenCategoryIds.includes(categoryId),
+        { oob: true, oobMode: 'replace', forceOpen: true }
+      )
+    );
+  }
+
+  const uncategorizedItems = allItems.filter((i) => !i.category_id);
+  return c.html(renderMenuUncategorizedAccordionSection(uncategorizedItems, { oob: true, forceOpen: true }));
 });
 
 menu.get('/items/:id/edit', async (c) => {
@@ -285,9 +313,8 @@ menu.post('/items/:id/recipe', async (c) => {
   if (!warehouseItemId) return c.html('<p>Выбери ингредиент</p>');
   if (Number.isNaN(qty) || qty <= 0) return c.html('<p>Количество должно быть больше нуля</p>');
 
-  const { rows } = await pool.query(
-    `INSERT INTO menu_item_recipe (menu_item_id, warehouse_item_id, qty)
-     VALUES ($1, $2, $3) RETURNING id`,
+  await pool.query(
+    `INSERT INTO menu_item_recipe (menu_item_id, warehouse_item_id, qty) VALUES ($1, $2, $3)`,
     [menuItemId, warehouseItemId, qty]
   );
 
@@ -295,11 +322,12 @@ menu.post('/items/:id/recipe', async (c) => {
     `SELECT mir.id, mir.menu_item_id, mir.qty, wi.name AS warehouse_item_name, wi.unit
      FROM menu_item_recipe mir
      JOIN warehouse_items wi ON wi.id = mir.warehouse_item_id
-     WHERE mir.id = $1`,
-    [rows[0].id]
+     WHERE mir.menu_item_id = $1
+     ORDER BY wi.name`,
+    [menuItemId]
   );
 
-  return c.html(renderRecipeRow(recipeRows[0], { oob: true }));
+  return c.html(renderRecipeListOob(recipeRows));
 });
 
 menu.delete('/items/:menuItemId/recipe/:recipeId', async (c) => {

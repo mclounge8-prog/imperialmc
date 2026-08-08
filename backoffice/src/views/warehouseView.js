@@ -22,6 +22,16 @@ function categorySelectOptions(categories, selectedId) {
   return `<option value="">Без категории</option>${options}`;
 }
 
+/**
+ * Select категории в модалке «+ Позиция» — стабильный id, чтобы после
+ * создания новой категории можно было обновить его OOB-вставкой. Без этого
+ * новую категорию нельзя было выбрать для позиции без обновления страницы.
+ */
+export function renderItemCategorySelect(categories, { oob = false } = {}) {
+  const oobAttr = oob ? ' hx-swap-oob="true"' : '';
+  return `<select name="category_id" id="warehouse-item-category-select"${oobAttr}>${categorySelectOptions(categories, null)}</select>`;
+}
+
 /* ---------- Строка остатка (для выбранного заведения) ---------- */
 
 export function renderStockRow(venueId, item, { oob = false, targetId = null } = {}) {
@@ -101,8 +111,17 @@ function renderAccordionTable(bodyId, rowsHtml) {
   `;
 }
 
-export function renderCategoryAccordionSection(venueId, category, items, { oob = false } = {}) {
-  const oobAttr = oob ? ' hx-swap-oob="beforeend:#stock-accordion"' : '';
+export function renderCategoryAccordionSection(venueId, category, items, { oob = false, oobMode = 'append' } = {}) {
+  // 'append' — новая категория, вставляется в конец аккордеона (редкое
+  // действие, порядок подправится при следующей полной загрузке раздела).
+  // 'replace' — категория уже существует на экране (просто добавили в неё
+  // позицию) — целиком заменяем ЕЁ секцию по id, не трогая остальные
+  // (соседние аккордеоны не сворачиваются/не теряют состояние Alpine).
+  const oobAttr = oob
+    ? oobMode === 'replace'
+      ? ' hx-swap-oob="true"'
+      : ' hx-swap-oob="beforeend:#stock-accordion"'
+    : '';
   const safeName = escapeHtml(category.name);
   const bodyId = `category-items-${category.id}`;
   const rows = items.map((i) => renderStockRow(venueId, i)).join('');
@@ -130,10 +149,11 @@ export function renderCategoryAccordionSection(venueId, category, items, { oob =
   `;
 }
 
-function renderUncategorizedAccordionSection(venueId, items) {
+export function renderUncategorizedAccordionSection(venueId, items, { oob = false } = {}) {
+  const oobAttr = oob ? ' hx-swap-oob="true"' : '';
   const rows = items.map((i) => renderStockRow(venueId, i)).join('');
   return `
-    <div class="accordion-section" x-data="{ open: true }">
+    <div class="accordion-section" id="uncategorized-section"${oobAttr} x-data="{ open: true }">
       <div class="accordion-header" role="button" tabindex="0" @click="open = !open">
         <span class="accordion-arrow" :class="{ 'accordion-arrow-open': open }">▸</span>
         <span class="accordion-title">Без категории</span>
@@ -201,7 +221,7 @@ function renderAddItemModal(venueId, categories) {
             hx-on::after-request="if(event.detail.successful) this.reset()"
           >
             <input type="text" name="name" placeholder="Наименование" required>
-            <select name="category_id">${categorySelectOptions(categories, null)}</select>
+            ${renderItemCategorySelect(categories)}
             <select name="unit" required>
               <option value="g">г</option>
               <option value="ml">мл</option>

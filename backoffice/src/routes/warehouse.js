@@ -3,9 +3,11 @@ import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
 import {
   renderCategoryAccordionSection,
+  renderUncategorizedAccordionSection,
   renderStockRow,
   renderCatalogEditRow,
   renderStockAccordion,
+  renderItemCategorySelect,
 } from '../views/warehouseView.js';
 
 const warehouse = new Hono();
@@ -69,7 +71,12 @@ warehouse.post('/categories', async (c) => {
     'INSERT INTO warehouse_categories (name) VALUES ($1) RETURNING id, name',
     [name]
   );
-  return c.html(renderCategoryAccordionSection(venueId, rows[0], [], { oob: true }));
+
+  const categories = await fetchCategories();
+  return c.html(
+    renderCategoryAccordionSection(venueId, rows[0], [], { oob: true }) +
+      renderItemCategorySelect(categories, { oob: true })
+  );
 });
 
 warehouse.delete('/categories/:id', async (c) => {
@@ -104,14 +111,31 @@ warehouse.post('/items', async (c) => {
   if (!name) return c.html('<p>Укажи наименование</p>');
   if (!UNIT_VALUES.includes(unit)) return c.html('<p>Выбери единицу измерения</p>');
 
-  const { rows } = await pool.query(
-    'INSERT INTO warehouse_items (category_id, name, unit) VALUES ($1, $2, $3) RETURNING id',
-    [categoryId, name, unit]
-  );
+  await pool.query('INSERT INTO warehouse_items (category_id, name, unit) VALUES ($1, $2, $3)', [
+    categoryId,
+    name,
+    unit,
+  ]);
 
-  const created = await fetchItemForVenue(venueId, rows[0].id);
-  const targetId = categoryId ? `category-items-${categoryId}` : 'uncategorized-items';
-  return c.html(renderStockRow(venueId, created, { oob: true, targetId }));
+  // Целиком перерисовываем затронутую секцию (а не вставляем строку в конец) —
+  // так позиции внутри неё сразу отсортированы как при обычной загрузке
+  // (по имени), а соседние категории не сворачиваются/не теряют состояние.
+  const items = await fetchItemsForVenue(venueId);
+  if (categoryId) {
+    const { rows: catRows } = await pool.query('SELECT id, name FROM warehouse_categories WHERE id = $1', [
+      categoryId,
+    ]);
+    const categoryItems = items.filter((i) => i.category_id === categoryId);
+    return c.html(
+      renderCategoryAccordionSection(venueId, catRows[0], categoryItems, {
+        oob: true,
+        oobMode: 'replace',
+      })
+    );
+  }
+
+  const uncategorizedItems = items.filter((i) => !i.category_id);
+  return c.html(renderUncategorizedAccordionSection(venueId, uncategorizedItems, { oob: true }));
 });
 
 warehouse.get('/items/:id/edit', async (c) => {

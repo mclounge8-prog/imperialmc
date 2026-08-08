@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
 import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
-import { ROLES, renderStaffRow, renderStaffEditRow } from '../views/staffView.js';
+import { ROLES, renderStaffRow, renderStaffEditRow, renderStaffListOob } from '../views/staffView.js';
 
 const staff = new Hono();
 staff.use('*', requireAuthApi);
@@ -32,13 +32,16 @@ staff.post('/', async (c) => {
   if (!isValidPin(pin)) return c.html('<p>PIN должен быть из 4 цифр</p>');
 
   const pinHash = await bcrypt.hash(pin, 10);
-  const { rows } = await pool.query(
-    `INSERT INTO staff (name, role, pin_hash) VALUES ($1, $2, $3)
-     RETURNING id, name, role, is_active`,
-    [name, role, pinHash]
-  );
+  await pool.query('INSERT INTO staff (name, role, pin_hash) VALUES ($1, $2, $3)', [
+    name,
+    role,
+    pinHash,
+  ]);
 
-  return c.html(renderStaffRow(rows[0], { oob: true }));
+  const { rows: allStaff } = await pool.query(
+    'SELECT id, name, role, is_active FROM staff ORDER BY created_at DESC'
+  );
+  return c.html(renderStaffListOob(allStaff));
 });
 
 // Переключить строку в режим редактирования

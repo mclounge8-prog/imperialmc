@@ -11,6 +11,16 @@ function categoryOptions(categories, selectedId) {
   return `<option value="">Без категории</option>${options}`;
 }
 
+/**
+ * Select категории в модалке «+ Позиция» — стабильный id, чтобы после
+ * создания новой категории обновить его OOB-вставкой (иначе новую категорию
+ * нельзя выбрать для позиции без обновления страницы).
+ */
+export function renderMenuItemCategorySelect(categories, { oob = false } = {}) {
+  const oobAttr = oob ? ' hx-swap-oob="true"' : '';
+  return `<select name="category_id" id="menu-item-category-select"${oobAttr}>${categoryOptions(categories, null)}</select>`;
+}
+
 /* ---------- Строка позиции меню ---------- */
 
 export function renderMenuItemRow(item, { oob = false, targetId = null } = {}) {
@@ -91,9 +101,17 @@ export function renderMenuCategoryAccordionSection(
   items,
   venueId,
   isHidden,
-  { oob = false } = {}
+  { oob = false, oobMode = 'append', forceOpen = false } = {}
 ) {
-  const oobAttr = oob ? ' hx-swap-oob="beforeend:#menu-accordion"' : '';
+  // 'append' — новая категория, в конец аккордеона (редкое действие).
+  // 'replace' — категория уже на экране, целиком заменяем ЕЁ секцию по id
+  // (например, после добавления в неё позиции) — соседние секции не трогаем.
+  const oobAttr = oob
+    ? oobMode === 'replace'
+      ? ' hx-swap-oob="true"'
+      : ' hx-swap-oob="beforeend:#menu-accordion"'
+    : '';
+  const initialOpen = forceOpen ? 'true' : 'false';
   const safeName = escapeHtml(category.name);
   const iconPrefix = category.icon ? `${escapeHtml(category.icon)} ` : '';
   const bodyId = `menu-category-items-${category.id}`;
@@ -113,7 +131,7 @@ export function renderMenuCategoryAccordionSection(
   `;
 
   return `
-    <div class="accordion-section" id="menu-category-section-${category.id}"${oobAttr} x-data="{ open: false }">
+    <div class="accordion-section" id="menu-category-section-${category.id}"${oobAttr} x-data="{ open: ${initialOpen} }">
       <div class="accordion-header" role="button" tabindex="0" @click="open = !open">
         <span class="accordion-arrow" :class="{ 'accordion-arrow-open': open }">▸</span>
         <span class="accordion-title">${iconPrefix}${safeName}</span>
@@ -136,10 +154,12 @@ export function renderMenuCategoryAccordionSection(
   `;
 }
 
-function renderMenuUncategorizedAccordionSection(items) {
+export function renderMenuUncategorizedAccordionSection(items, { oob = false, forceOpen = false } = {}) {
+  const oobAttr = oob ? ' hx-swap-oob="true"' : '';
+  const initialOpen = forceOpen ? 'true' : 'false';
   const rows = items.map((i) => renderMenuItemRow(i)).join('');
   return `
-    <div class="accordion-section" x-data="{ open: false }">
+    <div class="accordion-section" id="menu-uncategorized-section"${oobAttr} x-data="{ open: ${initialOpen} }">
       <div class="accordion-header" role="button" tabindex="0" @click="open = !open">
         <span class="accordion-arrow" :class="{ 'accordion-arrow-open': open }">▸</span>
         <span class="accordion-title">Без категории</span>
@@ -199,7 +219,7 @@ function renderAddMenuCategoryModal(venueId) {
   `;
 }
 
-function renderAddMenuItemModal(categories) {
+function renderAddMenuItemModal(categories, venueId) {
   return `
     <div class="modal-trigger" x-data="{ open: false }" @htmx:after-request="if ($event.detail.successful) open = false">
       <button type="button" class="btn-secondary" @click="open = true">+ Позиция</button>
@@ -213,8 +233,9 @@ function renderAddMenuItemModal(categories) {
             hx-on::after-request="if(event.detail.successful) this.reset()"
           >
             <input type="text" name="name" placeholder="Наименование" required>
-            <select name="category_id">${categoryOptions(categories, null)}</select>
+            ${renderMenuItemCategorySelect(categories)}
             <input type="number" step="0.01" min="0" name="price" placeholder="Цена" required>
+            <input type="hidden" name="venue_id" value="${venueId}">
             <div id="menu-item-form-error" class="error"></div>
             <div class="modal-actions">
               <button type="submit" class="btn-primary">Добавить</button>
@@ -234,7 +255,7 @@ export function renderMenuVenueContainer(venueId, categories, hiddenCategoryIds,
         <h2>Категории и позиции</h2>
         <div class="subsection-actions">
           ${renderAddMenuCategoryModal(venueId)}
-          ${renderAddMenuItemModal(categories)}
+          ${renderAddMenuItemModal(categories, venueId)}
         </div>
       </div>
       <p class="hint">
@@ -289,13 +310,12 @@ export function renderMenuSection(venues, selectedVenueId, categories, hiddenCat
 
 // ---------- Рецептура ----------
 
-export function renderRecipeRow(recipe, { oob = false } = {}) {
-  const oobAttr = oob ? ' hx-swap-oob="beforeend:#recipe-list"' : '';
+export function renderRecipeRow(recipe) {
   const safeName = escapeHtml(recipe.warehouse_item_name);
   const unitLabel = UNITS[recipe.unit] || recipe.unit;
 
   return `
-    <tr id="recipe-row-${recipe.id}"${oobAttr}>
+    <tr id="recipe-row-${recipe.id}">
       <td>${safeName}</td>
       <td>${Number(recipe.qty)} ${unitLabel}</td>
       <td class="row-actions">
@@ -303,6 +323,16 @@ export function renderRecipeRow(recipe, { oob = false } = {}) {
       </td>
     </tr>
   `;
+}
+
+/**
+ * Целиком таблица рецептуры с hx-swap-oob="true" — после добавления новой
+ * позиции сервер отдаёт свежий список, отсортированный как при обычной
+ * загрузке (по названию ингредиента), вместо вставки строки в конец.
+ */
+export function renderRecipeListOob(recipeRows) {
+  const rows = recipeRows.map((r) => renderRecipeRow(r)).join('');
+  return `<tbody id="recipe-list" hx-swap-oob="true">${rows}</tbody>`;
 }
 
 export function renderRecipeEditor(menuItem, recipeRows, warehouseItems) {

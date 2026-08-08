@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #121214;
   --surface: #1b1b1f;
   --surface-2: #24242a;
@@ -149,6 +150,46 @@ form button:focus-visible {
 form.htmx-request button[type="submit"] {
   opacity: 0.6;
   pointer-events: none;
+}
+
+/* ---------- Индикация "идёт запрос" для ЛЮБОГО htmx-элемента ----------
+   Не только кнопки внутри <form> (правило выше), а вообще все кнопки/чекбоксы/
+   select с hx-get/post/put/delete — без этого клик по "Удалить"/"Активировать"/
+   переключателю визуально ничего не делал до ответа сервера, и легко было
+   кликнуть повторно. */
+[hx-get].htmx-request,
+[hx-post].htmx-request,
+[hx-put].htmx-request,
+[hx-delete].htmx-request {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* Чекбоксы/радио — нативные, но хотя бы в цвет бренда, а не в системный синий/серый */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent-2);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* ---------- Плавное появление новых строк/карточек (OOB-вставки) ----------
+   htmx сам навешивает класс .htmx-added на элементы, вставленные через
+   hx-swap-oob, и снимает его через кадр после вставки — transition нужно
+   повесить на базовое состояние, а не на .htmx-added. */
+.data-table tbody tr,
+.venue-card,
+.list-row,
+.accordion-section {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.data-table tbody tr.htmx-added,
+.venue-card.htmx-added,
+.list-row.htmx-added,
+.accordion-section.htmx-added {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 .error {

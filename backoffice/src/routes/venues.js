@@ -1,7 +1,12 @@
 import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
-import { renderVenueCard, renderVenueEditCard, renderVenueStaffPanel } from '../views/venuesView.js';
+import {
+  renderVenueCard,
+  renderVenueEditCard,
+  renderVenueStaffPanel,
+  renderVenueListOob,
+} from '../views/venuesView.js';
 
 const venues = new Hono();
 venues.use('*', requireAuthApi);
@@ -22,6 +27,17 @@ async function fetchAssignedStaffNames(venueId) {
   return rows.map((r) => r.name);
 }
 
+async function fetchAllVenueCards() {
+  const { rows: venueRows } = await pool.query('SELECT id, name, address FROM venues ORDER BY name');
+  const cards = [];
+  for (const venue of venueRows) {
+    // eslint-disable-next-line no-await-in-loop
+    const assignedNames = await fetchAssignedStaffNames(venue.id);
+    cards.push({ venue, assignedNames });
+  }
+  return cards;
+}
+
 venues.post('/', async (c) => {
   const body = await c.req.parseBody();
   const name = String(body.name || '').trim();
@@ -29,12 +45,10 @@ venues.post('/', async (c) => {
 
   if (!name) return c.html('<p>Укажи название заведения</p>');
 
-  const { rows } = await pool.query(
-    'INSERT INTO venues (name, address) VALUES ($1, $2) RETURNING id, name, address',
-    [name, address || null]
-  );
+  await pool.query('INSERT INTO venues (name, address) VALUES ($1, $2)', [name, address || null]);
 
-  return c.html(renderVenueCard(rows[0], [], { oob: true }));
+  const cards = await fetchAllVenueCards();
+  return c.html(renderVenueListOob(cards));
 });
 
 venues.get('/:id/edit', async (c) => {

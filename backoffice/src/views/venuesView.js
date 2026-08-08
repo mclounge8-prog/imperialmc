@@ -1,7 +1,6 @@
 import { escapeHtml } from './escapeHtml.js';
 
-export function renderVenueCard(venue, assignedNames, { oob = false } = {}) {
-  const oobAttr = oob ? ' hx-swap-oob="beforeend:#venues-list"' : '';
+export function renderVenueCard(venue, assignedNames) {
   const safeName = escapeHtml(venue.name);
   const safeAddress = venue.address ? escapeHtml(venue.address) : '—';
   const summaryText = assignedNames.length
@@ -9,7 +8,7 @@ export function renderVenueCard(venue, assignedNames, { oob = false } = {}) {
     : 'Сотрудники не назначены';
 
   return `
-    <div class="venue-card" id="venue-card-${venue.id}"${oobAttr}>
+    <div class="venue-card" id="venue-card-${venue.id}">
       <div class="venue-main">
         <div class="venue-info">
           <div class="venue-name">${safeName}</div>
@@ -79,8 +78,22 @@ export function renderVenueStaffPanel(venue, staffList, assignedStaffIds, { with
   return checklist + summaryOob;
 }
 
+export function renderVenueListRows(venueCards) {
+  return venueCards.map(({ venue, assignedNames }) => renderVenueCard(venue, assignedNames)).join('');
+}
+
+/**
+ * Целиком список заведений с hx-swap-oob="true" — после создания нового
+ * заведения сервер отдаёт свежий отсортированный по имени список, вместо
+ * вставки карточки в конец (которая расходилась с алфавитным порядком при
+ * обычной загрузке раздела).
+ */
+export function renderVenueListOob(venueCards) {
+  return `<div class="venues-list" id="venues-list" hx-swap-oob="true">${renderVenueListRows(venueCards)}</div>`;
+}
+
 export function renderVenuesSection(venueCards) {
-  const cards = venueCards.map(({ venue, assignedNames }) => renderVenueCard(venue, assignedNames)).join('');
+  const cards = renderVenueListRows(venueCards);
 
   return `
     <header>
