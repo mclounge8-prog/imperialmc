@@ -95,7 +95,7 @@ export default function ShiftReceiptsScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.title}>Смена не открыта</Text>
-        <Text style={styles.hint}>Откройте смену в разделе «Открытие смены», чтобы увидеть её чеки.</Text>
+        <Text style={styles.hint}>Откройте смену переключателем в «Настройках», чтобы увидеть её чеки.</Text>
       </View>
     );
   }

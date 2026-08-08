@@ -21,13 +21,7 @@ export default function TerminalHeaderRight() {
   // Справочник состава и настройки доступны с любого экрана, кроме самих себя —
   // иначе можно было бы навигировать на текущий же экран, что бессмысленно
   const showReferenceButton = route.name !== 'MenuReference';
-  const showSettingsButton = ![
-    'Settings',
-    'OpenShift',
-    'CloseShift',
-    'XReport',
-    'ShiftReceipts',
-  ].includes(route.name);
+  const showSettingsButton = !['Settings', 'XReport', 'ShiftReceipts'].includes(route.name);
 
   return (
     <View style={styles.container}>

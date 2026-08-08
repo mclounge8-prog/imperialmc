@@ -16,8 +16,6 @@ type SettingsRow = {
 };
 
 const ROWS: SettingsRow[] = [
-  { key: 'OpenShift', icon: '🟢', title: 'Открытие смены', subtitle: 'Начать новую кассовую смену' },
-  { key: 'CloseShift', icon: '🔴', title: 'Закрытие смены', subtitle: 'Завершить текущую смену' },
   { key: 'XReport', icon: '📊', title: 'X-отчёт', subtitle: 'Сводка по текущей смене без закрытия' },
   { key: 'ShiftReceipts', icon: '🧾', title: 'Чеки', subtitle: 'Чеки текущей смены' },
 ];
@@ -29,7 +27,7 @@ export default function SettingsScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <ShiftToggle />
 
-      <Text style={styles.sectionLabel}>Смена и чеки</Text>
+      <Text style={styles.sectionLabel}>Отчёты по смене</Text>
       <View style={styles.card}>
         {ROWS.map((row, idx) => (
           <Pressable

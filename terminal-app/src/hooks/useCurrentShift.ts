@@ -4,9 +4,9 @@ import type { Shift } from '../api/client';
 import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
 
-// Общая загрузка текущей (открытой) смены заведения — используется экранами
-// «Открытие смены», «Закрытие смены» и «X-отчёт», у которых один и тот же
-// источник данных, но разное представление/действия сверху.
+// Общая загрузка текущей (открытой) смены заведения — используется ползунком
+// смены и экраном «X-отчёт», у которых один и тот же источник данных, но
+// разное представление/действия сверху.
 export function useCurrentShift() {
   const { session } = useSession();
   const { status } = useDevice();

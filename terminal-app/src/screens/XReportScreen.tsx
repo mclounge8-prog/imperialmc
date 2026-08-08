@@ -43,7 +43,7 @@ export default function XReportScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.title}>Смена не открыта</Text>
-        <Text style={styles.hint}>Откройте смену в разделе «Открытие смены», чтобы увидеть отчёт.</Text>
+        <Text style={styles.hint}>Откройте смену переключателем в «Настройках», чтобы увидеть отчёт.</Text>
       </View>
     );
   }
