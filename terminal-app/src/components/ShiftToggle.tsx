@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -38,6 +38,15 @@ export default function ShiftToggle() {
   const dragStartValue = useRef(0);
   const initializedRef = useRef(false);
 
+  // PanResponder создаётся один раз (useRef) и не пересоздаётся при каждом
+  // рендере — а значит его обработчики иначе "запомнили" бы toggling/maxTravel/
+  // isOpen из САМОГО ПЕРВОГО рендера (когда трек ещё не измерен, maxTravel = 0)
+  // и никогда не реагировали бы на реальные изменения. liveRef обновляется
+  // синхронно на каждом рендере — обработчики читают его в момент жеста,
+  // а не в момент создания.
+  const liveRef = useRef({ isOpen, maxTravel, toggling, session, venue });
+  liveRef.current = { isOpen, maxTravel, toggling, session, venue };
+
   // Первичная установка положения ползунка, когда уже известна и ширина
   // трека, и текущий статус смены — без анимации, это не пользовательское
   // действие, а просто отображение начального состояния.
@@ -57,11 +66,12 @@ export default function ShiftToggle() {
   };
 
   const handleOpen = async () => {
-    if (!session || !venue) return;
+    const { session: liveSession, venue: liveVenue } = liveRef.current;
+    if (!liveSession || !liveVenue) return;
     setActionError(null);
     setToggling(true);
     try {
-      const opened = await openShift(venue.id, session.token);
+      const opened = await openShift(liveVenue.id, liveSession.token);
       setShift(opened);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Не удалось открыть смену');
@@ -72,48 +82,57 @@ export default function ShiftToggle() {
   };
 
   const handleClose = async () => {
-    if (!session || !venue) return;
+    const { session: liveSession, venue: liveVenue, maxTravel: liveMaxTravel } = liveRef.current;
+    if (!liveSession || !liveVenue) return;
     setActionError(null);
     setToggling(true);
     try {
-      await closeShift(venue.id, session.token);
+      await closeShift(liveVenue.id, liveSession.token);
       setShift(null);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Не удалось закрыть смену');
-      snapTo(maxTravel);
+      snapTo(liveMaxTravel);
     } finally {
       setToggling(false);
     }
   };
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => !toggling && maxTravel > 0,
-      onMoveShouldSetPanResponder: () => !toggling && maxTravel > 0,
-      onPanResponderGrant: () => {
-        dragStartValue.current = isOpen ? maxTravel : 0;
-      },
-      onPanResponderMove: (_evt, gestureState) => {
-        const next = Math.max(0, Math.min(maxTravel, dragStartValue.current + gestureState.dx));
-        pan.setValue(next);
-      },
-      onPanResponderRelease: (_evt, gestureState) => {
-        const raw = dragStartValue.current + gestureState.dx;
-        const clamped = Math.max(0, Math.min(maxTravel, raw));
-        const progress = maxTravel > 0 ? clamped / maxTravel : 0;
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => !liveRef.current.toggling && liveRef.current.maxTravel > 0,
+        onMoveShouldSetPanResponder: () => !liveRef.current.toggling && liveRef.current.maxTravel > 0,
+        onPanResponderGrant: () => {
+          dragStartValue.current = liveRef.current.isOpen ? liveRef.current.maxTravel : 0;
+        },
+        onPanResponderMove: (_evt, gestureState) => {
+          const mt = liveRef.current.maxTravel;
+          const next = Math.max(0, Math.min(mt, dragStartValue.current + gestureState.dx));
+          pan.setValue(next);
+        },
+        onPanResponderRelease: (_evt, gestureState) => {
+          const mt = liveRef.current.maxTravel;
+          const openNow = liveRef.current.isOpen;
+          const raw = dragStartValue.current + gestureState.dx;
+          const clamped = Math.max(0, Math.min(mt, raw));
+          const progress = mt > 0 ? clamped / mt : 0;
 
-        if (!isOpen && progress >= COMPLETE_RATIO) {
-          snapTo(maxTravel);
-          handleOpen();
-        } else if (isOpen && progress <= 1 - COMPLETE_RATIO) {
-          snapTo(0);
-          handleClose();
-        } else {
-          snapTo(isOpen ? maxTravel : 0);
-        }
-      },
-    })
-  ).current;
+          if (!openNow && progress >= COMPLETE_RATIO) {
+            snapTo(mt);
+            handleOpen();
+          } else if (openNow && progress <= 1 - COMPLETE_RATIO) {
+            snapTo(0);
+            handleClose();
+          } else {
+            snapTo(openNow ? mt : 0);
+          }
+        },
+      }),
+    // Создаём один раз (пустые deps) — все нужные данные обработчики берут
+    // из liveRef.current в момент жеста, а не из замыкания при создании.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   const handleTrackLayout = (e: LayoutChangeEvent) => {
     setTrackWidth(e.nativeEvent.layout.width);
@@ -172,6 +191,7 @@ export default function ShiftToggle() {
               isOpen ? styles.knobOpen : styles.knobClosed,
               { transform: [{ translateX: pan }] },
             ]}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             {...panResponder.panHandlers}
           >
             {toggling ? (
@@ -224,6 +244,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     borderRadius: TRACK_HEIGHT / 2,
+    zIndex: 0,
   },
   fillClosed: { backgroundColor: 'rgba(63, 99, 230, 0.16)' },
   fillOpen: { backgroundColor: 'rgba(63, 99, 230, 0.35)' },
@@ -232,6 +253,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
+    zIndex: 1,
   },
   knob: {
     position: 'absolute',
@@ -248,7 +270,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    elevation: 8,
+    zIndex: 2,
   },
   knobClosed: { borderColor: colors.border },
   knobOpen: { borderColor: colors.accent2 },
