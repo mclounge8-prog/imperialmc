@@ -1,0 +1,19 @@
+node_modules/
+.env
+*.log
+npm-debug.log*
+
+# macOS
+.DS_Store
+__MACOSX/
+
+# React Native
+terminal-app/ios/Pods/
+terminal-app/ios/build/
+terminal-app/android/.gradle/
+terminal-app/android/app/build/
+*.jsbundle
+
+# Backoffice runtime uploads
+backoffice/public/uploads/*
+!backoffice/public/uploads/.gitkeep

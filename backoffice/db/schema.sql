@@ -1,0 +1,266 @@
+-- ============================================================
+-- Imperial MC — бэкофис MVP: базовая схема БД (PostgreSQL)
+-- ============================================================
+
+-- Администраторы бэкофиса (вход по логину/паролю в веб-панель)
+CREATE TABLE IF NOT EXISTS admin_users (
+  id            SERIAL PRIMARY KEY,
+  username      VARCHAR(50) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role          VARCHAR(20) NOT NULL DEFAULT 'admin', -- admin, manager
+  created_at    TIMESTAMPTZ DEFAULT now()
+);
+
+-- Заведения (точки продаж) — у каждой свой склад (остатки), свои столы, назначенные сотрудники
+CREATE TABLE IF NOT EXISTS venues (
+  id         SERIAL PRIMARY KEY,
+  name       VARCHAR(150) NOT NULL,
+  address    VARCHAR(255),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Сотрудники (вход на Android-терминал по PIN-коду)
+CREATE TABLE IF NOT EXISTS staff (
+  id          SERIAL PRIMARY KEY,
+  name        VARCHAR(100) NOT NULL,
+  role        VARCHAR(30) NOT NULL,        -- bartender, hookah_master, waiter
+  pin_hash    VARCHAR(255) NOT NULL,
+  is_active   BOOLEAN DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+-- Сотрудник ↔ заведение: один сотрудник может быть назначен на несколько точек сразу
+CREATE TABLE IF NOT EXISTS staff_venues (
+  staff_id INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  venue_id INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  PRIMARY KEY (staff_id, venue_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_staff_venues_venue ON staff_venues(venue_id);
+
+-- Зоны заведения (зал, терраса и т.д.) — привязаны к конкретному заведению
+CREATE TABLE IF NOT EXISTS zones (
+  id        SERIAL PRIMARY KEY,
+  venue_id  INT REFERENCES venues(id) ON DELETE CASCADE,
+  name      VARCHAR(100) NOT NULL
+);
+
+-- Столы
+CREATE TABLE IF NOT EXISTS tables (
+  id        SERIAL PRIMARY KEY,
+  zone_id   INT REFERENCES zones(id) ON DELETE CASCADE,
+  name      VARCHAR(50) NOT NULL,           -- напр. "Стол 5"
+  capacity  INT DEFAULT 4,
+  pos_x     INT DEFAULT 0,                  -- координаты под визуальную схему зала
+  pos_y     INT DEFAULT 0,
+  status    VARCHAR(20) NOT NULL DEFAULT 'free' -- free, occupied, dirty
+);
+
+-- Категории складской номенклатуры (Табак, Уголь, Бар-ингредиенты...) — общие на все заведения
+CREATE TABLE IF NOT EXISTS warehouse_categories (
+  id    SERIAL PRIMARY KEY,
+  name  VARCHAR(100) NOT NULL
+);
+
+-- Складская номенклатура (каталог, общий для всех заведений — конкретный остаток
+-- см. venue_warehouse_stock ниже, там же и списание при продаже)
+CREATE TABLE IF NOT EXISTS warehouse_items (
+  id             SERIAL PRIMARY KEY,
+  category_id    INT REFERENCES warehouse_categories(id),
+  name           VARCHAR(150) NOT NULL,     -- напр. "Табак Tangiers Мята"
+  unit           VARCHAR(10) NOT NULL,      -- g, ml, pcs
+  created_at     TIMESTAMPTZ DEFAULT now()
+);
+
+-- Остаток конкретной складской позиции в конкретном заведении —
+-- источник истины для отображения в бэкофисе и для списания при продаже
+CREATE TABLE IF NOT EXISTS venue_warehouse_stock (
+  venue_id          INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  warehouse_item_id INT NOT NULL REFERENCES warehouse_items(id) ON DELETE CASCADE,
+  stock_qty         NUMERIC(12,3) NOT NULL DEFAULT 0,
+  min_stock_qty     NUMERIC(12,3) NOT NULL DEFAULT 0,
+  PRIMARY KEY (venue_id, warehouse_item_id)
+);
+
+-- Категории меню (Кальяны, Бар...)
+CREATE TABLE IF NOT EXISTS menu_categories (
+  id          SERIAL PRIMARY KEY,
+  name        VARCHAR(100) NOT NULL,
+  icon        VARCHAR(10),
+  sort_order  INT DEFAULT 0
+);
+
+-- Позиции меню (то, что продаётся гостю) — общие для всех заведений
+CREATE TABLE IF NOT EXISTS menu_items (
+  id           SERIAL PRIMARY KEY,
+  category_id  INT REFERENCES menu_categories(id),
+  name         VARCHAR(150) NOT NULL,
+  price        NUMERIC(10,2) NOT NULL,
+  image_url    VARCHAR(500),
+  is_active    BOOLEAN DEFAULT true,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+
+-- Рецептура: что и сколько списывается со склада при продаже 1 позиции меню.
+-- Ссылается на общий каталог warehouse_items — фактическое списание при заказе
+-- применяется к остатку конкретного заведения (venue_warehouse_stock).
+CREATE TABLE IF NOT EXISTS menu_item_recipe (
+  id                 SERIAL PRIMARY KEY,
+  menu_item_id       INT REFERENCES menu_items(id) ON DELETE CASCADE,
+  warehouse_item_id  INT REFERENCES warehouse_items(id),
+  qty                NUMERIC(10,3) NOT NULL -- напр. 20.000 (г табака на 1 кальян)
+);
+
+-- Заказы: table_id = NULL означает "быстрый заказ" (не привязан к столу).
+-- venue_id определяется через стол (стол → зона → заведение) при открытии,
+-- либо указывается явно для быстрого заказа — нужен, чтобы знать, чей склад списывать.
+CREATE TABLE IF NOT EXISTS orders (
+  id          SERIAL PRIMARY KEY,
+  table_id    INT REFERENCES tables(id) ON DELETE SET NULL,
+  venue_id    INT REFERENCES venues(id) ON DELETE SET NULL,
+  status      VARCHAR(20) NOT NULL DEFAULT 'open', -- open, paid, cancelled
+  opened_by   INT REFERENCES staff(id) ON DELETE SET NULL,
+  opened_at   TIMESTAMPTZ DEFAULT now(),
+  closed_at   TIMESTAMPTZ
+);
+
+-- Гости внутри заказа — отдельные "чеки" для разделения счёта. У каждого заказа
+-- по умолчанию один гость ("Гость 1"), добавление новых — по кнопке на терминале.
+-- Гости внутри заказа — отдельные "чеки" для разделения счёта. У каждого заказа
+-- по умолчанию один гость ("Гость 1"), добавление новых — по кнопке на терминале.
+-- Статус — своя оплата/закрытие на гостя: весь заказ (и стол) закрывается только
+-- когда рассчитаны ВСЕ гости, а не когда закрыт один из нескольких.
+CREATE TABLE IF NOT EXISTS order_guests (
+  id         SERIAL PRIMARY KEY,
+  order_id   INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  label      VARCHAR(50) NOT NULL,
+  status     VARCHAR(20) NOT NULL DEFAULT 'open', -- open, paid, cancelled
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Позиции заказа: название и цена копируются на момент продажи —
+-- если потом поменяют цену в меню, старые чеки не должны "задним числом" измениться
+CREATE TABLE IF NOT EXISTS order_items (
+  id            SERIAL PRIMARY KEY,
+  order_id      INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  guest_id      INT REFERENCES order_guests(id) ON DELETE SET NULL,
+  menu_item_id  INT REFERENCES menu_items(id) ON DELETE SET NULL,
+  name          VARCHAR(150) NOT NULL,
+  price         NUMERIC(10,2) NOT NULL,
+  qty           INT NOT NULL DEFAULT 1,
+  created_at    TIMESTAMPTZ DEFAULT now()
+);
+
+-- ============================================================
+-- Чеки — постоянная историческая запись каждого рассчитанного гостя/чека.
+-- Снапшотит venue/стол/гостя/сотрудника/позиции на момент расчёта: если потом
+-- переименуют категорию, удалят стол или сотрудника — история чеков не исказится
+-- и не сломается задним числом. Это основа для будущей статистики продаж.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS receipts (
+  id           SERIAL PRIMARY KEY,
+  venue_id     INT NOT NULL REFERENCES venues(id),
+  order_id     INT REFERENCES orders(id) ON DELETE SET NULL,
+  guest_id     INT REFERENCES order_guests(id) ON DELETE SET NULL,
+  table_id     INT REFERENCES tables(id) ON DELETE SET NULL,
+  table_name   VARCHAR(50),   -- снапшот — стол мог быть переименован/удалён позже
+  guest_label  VARCHAR(50),   -- снапшот "Гость 1" и т.п.
+  staff_id     INT REFERENCES staff(id) ON DELETE SET NULL,
+  staff_name   VARCHAR(100),  -- снапшот имени сотрудника, рассчитавшего чек
+  status       VARCHAR(20) NOT NULL, -- paid, cancelled
+  subtotal     NUMERIC(10,2) NOT NULL,
+  discount     NUMERIC(10,2) NOT NULL DEFAULT 0, -- задел под будущие скидки
+  total        NUMERIC(10,2) NOT NULL,
+  opened_at    TIMESTAMPTZ,           -- когда открыли стол/заказ
+  closed_at    TIMESTAMPTZ NOT NULL DEFAULT now() -- когда рассчитали этот чек
+);
+
+-- Позиции чека — снапшот того, что было продано (не ссылка на живой order_items,
+-- который может измениться или быть удалён)
+CREATE TABLE IF NOT EXISTS receipt_items (
+  id             SERIAL PRIMARY KEY,
+  receipt_id     INT NOT NULL REFERENCES receipts(id) ON DELETE CASCADE,
+  menu_item_id   INT REFERENCES menu_items(id) ON DELETE SET NULL,
+  name           VARCHAR(150) NOT NULL,
+  category_id    INT REFERENCES menu_categories(id) ON DELETE SET NULL,
+  category_name  VARCHAR(100), -- снапшот — для отчётов по категориям даже если её переименуют/удалят
+  price          NUMERIC(10,2) NOT NULL,
+  qty            INT NOT NULL,
+  line_total     NUMERIC(10,2) NOT NULL
+);
+
+-- Способы оплаты чека — отдельной таблицей, а не полем в receipts: сразу
+-- поддерживает разделённую оплату (часть наличными + часть картой одним чеком)
+-- без будущей переделки схемы. Банковские поля — задел под реальную интеграцию
+-- с эквайринговым терминалом (Атол/банк), пока не заполняются автоматически.
+CREATE TABLE IF NOT EXISTS receipt_payments (
+  id           SERIAL PRIMARY KEY,
+  receipt_id   INT NOT NULL REFERENCES receipts(id) ON DELETE CASCADE,
+  method       VARCHAR(20) NOT NULL, -- cash, card, other
+  amount       NUMERIC(10,2) NOT NULL,
+  card_last4   VARCHAR(4),
+  card_brand   VARCHAR(30),  -- Visa, Mastercard, МИР...
+  auth_code    VARCHAR(20),  -- код авторизации банка
+  rrn          VARCHAR(20),  -- Reference Retrieval Number эквайера
+  terminal_id  VARCHAR(30),
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_receipts_venue_closed ON receipts(venue_id, closed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_receipt_items_receipt ON receipt_items(receipt_id);
+CREATE INDEX IF NOT EXISTS idx_receipt_payments_receipt ON receipt_payments(receipt_id);
+
+-- Видимость категорий меню по заведениям: присутствие строки = категория СКРЫТА
+-- в этом заведении. По умолчанию (нет строки) — категория видна везде.
+-- Опрокидывать удобнее так: у большинства заведений большинство категорий нужны,
+-- проще явно отметить исключения, чем включать всё по одной.
+CREATE TABLE IF NOT EXISTS venue_hidden_menu_categories (
+  venue_id    INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  category_id INT NOT NULL REFERENCES menu_categories(id) ON DELETE CASCADE,
+  PRIMARY KEY (venue_id, category_id)
+);
+
+-- Устройства (Android-терминалы), зарегистрированные через код из бэкофиса.
+-- Управление централизованное: назначение на заведение и активация/деактивация —
+-- через бэкофис, без физического доступа к самому планшету.
+CREATE TABLE IF NOT EXISTS devices (
+  id            SERIAL PRIMARY KEY,
+  name          VARCHAR(100),
+  venue_id      INT REFERENCES venues(id) ON DELETE SET NULL,
+  token_hash    VARCHAR(255) NOT NULL,
+  is_active     BOOLEAN NOT NULL DEFAULT true,
+  registered_at TIMESTAMPTZ DEFAULT now(),
+  last_seen_at  TIMESTAMPTZ
+);
+
+-- Одноразовые короткие коды для регистрации нового устройства
+CREATE TABLE IF NOT EXISTS device_registration_codes (
+  code       VARCHAR(10) PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at    TIMESTAMPTZ
+);
+
+-- Индексы для частых выборок
+CREATE INDEX IF NOT EXISTS idx_orders_table_status ON orders(table_id, status);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_tables_zone ON tables(zone_id);
+CREATE INDEX IF NOT EXISTS idx_zones_venue ON zones(venue_id);
+CREATE INDEX IF NOT EXISTS idx_menu_items_category ON menu_items(category_id);
+CREATE INDEX IF NOT EXISTS idx_warehouse_items_category ON warehouse_items(category_id);
+CREATE INDEX IF NOT EXISTS idx_recipe_menu_item ON menu_item_recipe(menu_item_id);
+
+-- ============================================================
+-- Миграции для БД, где эти таблицы уже существовали из прошлых версий
+-- (CREATE TABLE IF NOT EXISTS их не трогает, поэтому добавляем явно —
+-- ALTER здесь идемпотентны, безопасно перезапускать сколько угодно раз)
+-- ============================================================
+ALTER TABLE zones ADD COLUMN IF NOT EXISTS venue_id INT REFERENCES venues(id) ON DELETE CASCADE;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS venue_id INT REFERENCES venues(id) ON DELETE SET NULL;
+ALTER TABLE warehouse_items DROP COLUMN IF EXISTS stock_qty;
+ALTER TABLE warehouse_items DROP COLUMN IF EXISTS min_stock_qty;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS guest_id INT REFERENCES order_guests(id) ON DELETE SET NULL;
+ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS icon VARCHAR(10);
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);
+ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'open';

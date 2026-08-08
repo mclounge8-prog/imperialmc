@@ -1,0 +1,1247 @@
+:root {
+  --bg: #121214;
+  --surface: #1b1b1f;
+  --surface-2: #24242a;
+  --border: #34343c;
+  --text: #f1f1f3;
+  --text-muted: #98979f;
+  --accent: #2647c7;
+  --accent-2: #3f63e6;
+  --danger: #e14c4c;
+  --radius: 10px;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Экран входа ---------- */
+
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 24px;
+}
+
+.brand-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark img {
+  width: 220px;
+  height: auto;
+}
+
+.brand-mark .underline {
+  width: 48px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent-2);
+  box-shadow: 0 0 12px 2px rgba(63, 99, 230, 0.6);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .brand-mark .underline {
+    animation: accent-glow 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes accent-glow {
+  0%, 100% { box-shadow: 0 0 10px 2px rgba(63, 99, 230, 0.4); opacity: 0.85; }
+  50%      { box-shadow: 0 0 18px 4px rgba(63, 99, 230, 0.75); opacity: 1; }
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 36px 32px;
+}
+
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  margin: 0 0 6px;
+}
+
+.login-card h1 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 28px;
+  color: var(--text);
+}
+
+form label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+form input {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  padding: 11px 12px;
+  margin-bottom: 18px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+form input:focus-visible {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 3px rgba(63, 99, 230, 0.22);
+}
+
+form button {
+  width: 100%;
+  background: var(--accent);
+  color: #f1f1f3;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px 0;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+form button:hover {
+  background: var(--accent-2);
+}
+
+form button:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+
+/* Пока форма в htmx-запросе — блокируем кнопку без единой строчки своего JS */
+form.htmx-request button[type="submit"] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.error {
+  min-height: 18px;
+  color: var(--danger);
+  font-size: 13px;
+  margin: 12px 0 0;
+}
+
+.error p {
+  margin: 0;
+}
+
+/* ---------- Дэшборд ---------- */
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar .brand {
+  display: flex;
+  align-items: center;
+  margin-bottom: 28px;
+  padding: 0 4px;
+}
+
+.sidebar .brand img {
+  width: 100%;
+  max-width: 160px;
+  height: auto;
+}
+
+.nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 2px;
+}
+
+.nav-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.nav-item.active {
+  background: var(--surface-2);
+  color: var(--accent-2);
+  font-weight: 500;
+}
+
+.sidebar .whoami {
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 10px 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.sidebar .logout {
+  color: var(--text-muted);
+  font-size: 13px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  padding: 6px 10px 0;
+}
+
+.sidebar .logout:hover {
+  color: var(--danger);
+}
+
+.main {
+  flex: 1;
+  padding: 32px 40px;
+}
+
+.main header {
+  margin-bottom: 28px;
+}
+
+.main header h1 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.main header p {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.empty-state {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 48px 32px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.empty-state p {
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+
+.empty-state button {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.empty-state button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- Формы и таблицы разделов (CRUD) ---------- */
+
+.section-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.section-form input,
+.section-form select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 9px 10px;
+}
+
+.section-form input[name="name"] {
+  flex: 1;
+  min-width: 160px;
+}
+
+.section-form select {
+  min-width: 140px;
+}
+
+.section-form input[name="pin"] {
+  width: 130px;
+}
+
+.section-form button {
+  background: var(--accent);
+  color: #f1f1f3;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.section-form button:hover {
+  background: var(--accent-2);
+}
+
+.section-form .error {
+  width: 100%;
+  color: var(--danger);
+  font-size: 13px;
+  margin: 0;
+}
+
+.section-form .error p {
+  margin: 0;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.data-table th {
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 13px;
+  background: var(--surface-2);
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table td input,
+.data-table td select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge-active {
+  background: rgba(63, 99, 230, 0.15);
+  color: var(--accent-2);
+}
+
+.badge-inactive {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+.row-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.row-actions button {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.row-actions button:hover {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+}
+
+.row-actions button.danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.subsection {
+  margin-bottom: 32px;
+}
+
+.subsection h2 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  min-height: 1px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 6px 5px 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.chip-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 7px;
+  border-radius: 50%;
+}
+
+.chip-remove:hover {
+  color: var(--danger);
+  background: rgba(225, 76, 76, 0.12);
+}
+
+.section-form-compact {
+  max-width: 360px;
+}
+
+.badge-warning {
+  background: rgba(225, 76, 76, 0.15);
+  color: var(--danger);
+}
+
+.badge-ok {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+.back-link {
+  background: none;
+  border: none;
+  color: var(--accent-2);
+  font-family: var(--font-body);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 20px;
+  display: inline-block;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.chip-label {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.empty-hint {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.floor-plan {
+  position: relative;
+  width: 100%;
+  max-width: 840px;
+  height: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+}
+
+.table-tile {
+  position: absolute;
+  width: 92px;
+  height: 72px;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: grab;
+  user-select: none;
+  padding: 4px;
+  text-align: center;
+}
+
+.table-tile:active {
+  cursor: grabbing;
+}
+
+.table-tile.status-free {
+  border-color: var(--accent-2);
+  background: rgba(63, 99, 230, 0.1);
+}
+
+.table-tile.status-occupied {
+  border-color: var(--danger);
+  background: rgba(225, 76, 76, 0.1);
+}
+
+.table-tile.status-dirty {
+  border-color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.table-tile .table-name {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.table-tile .table-capacity {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.table-edit-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 5px;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.table-edit-btn:hover {
+  color: var(--accent-2);
+  background: var(--surface);
+}
+
+.table-edit-panel {
+  position: absolute;
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  width: 180px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.table-edit-panel input,
+.table-edit-panel select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.table-edit-panel .edit-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.table-edit-panel button {
+  flex: 1;
+  font-size: 12px;
+  padding: 6px 0;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.table-edit-panel button.primary {
+  background: var(--accent);
+  color: #f1f1f3;
+  border: none;
+}
+
+.table-edit-panel button.primary:hover {
+  background: var(--accent-2);
+}
+
+.table-edit-panel button.danger {
+  color: var(--danger);
+}
+
+.table-edit-panel button.danger:hover {
+  border-color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar .brand,
+  .sidebar .whoami,
+  .sidebar .logout {
+    display: none;
+  }
+  .main {
+    padding: 24px;
+  }
+}
+
+/* ---------- Заведения ---------- */
+
+.venues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.venue-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.venue-main {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.venue-info {
+  flex: 1;
+  min-width: 160px;
+}
+
+.venue-name {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.venue-address {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.venue-staff-summary {
+  flex: 1.6;
+  min-width: 200px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.venue-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.venue-staff-panel:not(:empty) {
+  margin-top: 12px;
+}
+
+.staff-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.staff-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.venue-edit-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.venue-edit-form input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 8px 10px;
+  flex: 1;
+  min-width: 160px;
+}
+
+/* ---------- Общий паттерн "список" (замена чипам для категорий/переключателей) ---------- */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.list-row-name {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.venue-select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 9px 12px;
+  min-width: 220px;
+}
+
+.stock-section {
+  margin-bottom: 20px;
+}
+
+.stock-section-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent-2);
+  margin: 0 0 8px;
+}
+
+.stock-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.data-table td input[type="number"] {
+  width: 90px;
+}
+
+.zone-select-btn {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  flex: 1;
+}
+
+.zone-select-btn:hover {
+  color: var(--accent-2);
+}
+
+/* ---------- Устройства ---------- */
+
+.section-form-button-standalone {
+  background: var(--accent);
+  color: #f1f1f3;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.section-form-button-standalone:hover {
+  background: var(--accent-2);
+}
+
+.reg-code-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  max-width: 320px;
+}
+
+.reg-code {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: var(--accent-2);
+  margin-bottom: 8px;
+}
+
+.device-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.device-info {
+  flex: 1.5;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.device-name-input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 6px 8px;
+}
+
+.device-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.device-row select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 8px 10px;
+  min-width: 160px;
+}
+
+/* ---------- Аккордеон (спойлер категории) ---------- */
+
+.subsection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.subsection-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-secondary {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #f1f1f3;
+  border: none;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: var(--accent-2);
+}
+
+.btn-danger {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--danger);
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  border-color: var(--danger);
+}
+
+.accordion-section {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.accordion-header:hover {
+  background: var(--surface-2);
+}
+
+.accordion-arrow {
+  color: var(--text-muted);
+  font-size: 12px;
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.accordion-arrow-open {
+  transform: rotate(90deg);
+}
+
+.accordion-title {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.accordion-count {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.accordion-body {
+  border-top: 1px solid var(--border);
+  padding: 12px;
+}
+
+.accordion-body .data-table {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* ---------- Модалки (Alpine — открытие/закрытие без сервера) ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 24px;
+}
+
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.modal-box h3 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 16px;
+}
+
+.modal-box form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-box input,
+.modal-box select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.modal-actions button {
+  flex: 1;
+}
+
+/* ---------- Фото позиции меню ---------- */
+
+.item-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+
+.item-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  border: 1px dashed var(--border);
+}
+
+.upload-label {
+  cursor: pointer;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.visibility-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ---------- Отчёты / Чеки ---------- */
+
+.report-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.report-tab {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.report-tab-active {
+  color: var(--text);
+  border-color: var(--accent-2);
+  background: var(--surface-2);
+}
+
+.filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.filters-bar select,
+.filters-bar input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 9px 12px;
+}
+
+.receipt-total {
+  color: var(--text);
+  font-size: 16px;
+  margin-top: 12px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.pagination-info {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.pagination-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.pagination-buttons button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
