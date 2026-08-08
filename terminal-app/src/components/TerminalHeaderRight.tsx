@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
+import { ICON_BUTTON_SIZE } from '../theme/sizes';
 import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
 import type { RootStackParamList } from '../../App';
@@ -28,6 +29,7 @@ export default function TerminalHeaderRight() {
       {showReferenceButton && (
         <Pressable
           style={styles.referenceButton}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           onPress={() => navigation.navigate('MenuReference')}
         >
           <Text style={styles.referenceButtonText}>📋 Состав</Text>
@@ -47,12 +49,16 @@ export default function TerminalHeaderRight() {
         <Pressable
           style={styles.gearButton}
           onPress={() => navigation.navigate('Settings')}
-          hitSlop={6}
+          hitSlop={8}
         >
           <Text style={styles.gearButtonText}>⚙️</Text>
         </Pressable>
       )}
-      <Pressable style={styles.button} onPress={logout}>
+      <Pressable
+        style={styles.button}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        onPress={logout}
+      >
         <Text style={styles.buttonText}>Выйти</Text>
       </Pressable>
     </View>
@@ -63,20 +69,22 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     marginRight: 8,
-    maxWidth: 340,
+    maxWidth: 420,
   },
   referenceButton: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 6,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minHeight: ICON_BUTTON_SIZE,
+    justifyContent: 'center',
   },
   referenceButtonText: {
     color: colors.accent2,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   textBlock: {
@@ -93,24 +101,27 @@ const styles = StyleSheet.create({
   button: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 6,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minHeight: ICON_BUTTON_SIZE,
+    justifyContent: 'center',
   },
   buttonText: {
     color: colors.danger,
-    fontSize: 12,
+    fontSize: 14,
+    fontWeight: '600',
   },
   gearButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 6,
+    width: ICON_BUTTON_SIZE,
+    height: ICON_BUTTON_SIZE,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   gearButtonText: {
-    fontSize: 15,
+    fontSize: 20,
   },
 });

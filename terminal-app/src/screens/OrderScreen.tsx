@@ -12,6 +12,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
+import { ICON_BUTTON_SIZE } from '../theme/sizes';
 import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
 import MenuBrowser from '../components/MenuBrowser';
@@ -417,6 +418,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                   <Pressable
                     style={styles.qtyButton}
                     disabled={busy}
+                    hitSlop={6}
                     onPress={() => handleRemoveItem(item.id)}
                   >
                     <Text style={styles.qtyButtonText}>−</Text>
@@ -425,6 +427,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                   <Pressable
                     style={styles.qtyButton}
                     disabled={busy || !item.menuItemId}
+                    hitSlop={6}
                     onPress={() => item.menuItemId && handleAddItem(item.menuItemId, selectedGuest.id)}
                   >
                     <Text style={styles.qtyButtonText}>+</Text>
@@ -433,6 +436,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                 <Pressable
                   style={styles.iconButton}
                   disabled={busy}
+                  hitSlop={4}
                   onPress={() =>
                     setMoveTarget({ itemId: item.id, itemName: item.name, currentGuestId: selectedGuest.id })
                   }
@@ -442,6 +446,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                 <Pressable
                   style={styles.iconButton}
                   disabled={busy}
+                  hitSlop={4}
                   onPress={() => handleDeleteItemFully(item.id, item.name)}
                 >
                   <Text style={styles.deleteItemButtonText}>🗑</Text>
@@ -792,34 +797,34 @@ const styles = StyleSheet.create({
   qtyStepper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     backgroundColor: colors.surface2,
-    borderRadius: 14,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
   },
   qtyButton: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: ICON_BUTTON_SIZE,
+    height: ICON_BUTTON_SIZE,
+    borderRadius: ICON_BUTTON_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  qtyButtonText: { color: colors.text, fontSize: 16, fontWeight: '700', lineHeight: 18 },
-  qtyValue: { color: colors.text, fontSize: 13, fontWeight: '600', minWidth: 16, textAlign: 'center' },
+  qtyButtonText: { color: colors.text, fontSize: 22, fontWeight: '700', lineHeight: 24 },
+  qtyValue: { color: colors.text, fontSize: 15, fontWeight: '600', minWidth: 22, textAlign: 'center' },
   iconButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: ICON_BUTTON_SIZE,
+    height: ICON_BUTTON_SIZE,
+    borderRadius: ICON_BUTTON_SIZE / 2,
     backgroundColor: colors.surface2,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconButtonText: { color: colors.textMuted, fontSize: 16, lineHeight: 16, fontWeight: '700' },
-  deleteItemButtonText: { fontSize: 14 },
+  iconButtonText: { color: colors.textMuted, fontSize: 22, lineHeight: 22, fontWeight: '700' },
+  deleteItemButtonText: { fontSize: 20 },
 
   totalRow: {
     flexDirection: 'row',
@@ -833,31 +838,35 @@ const styles = StyleSheet.create({
   totalLabel: { color: colors.textMuted, fontSize: 15 },
   totalValue: { color: colors.text, fontSize: 22, fontWeight: '700' },
 
-  actions: { gap: 10 },
+  actions: { gap: 12 },
   payButtonWrapper: { width: '100%' },
   transferButton: {
-    borderRadius: 10,
-    paddingVertical: 12,
+    borderRadius: 12,
+    minHeight: 54,
+    paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  transferButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  transferButtonText: { color: colors.text, fontSize: 16, fontWeight: '600' },
   actionButton: {
     width: '100%',
-    borderRadius: 10,
+    minHeight: 54,
+    borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   actionButtonDisabled: { opacity: 0.5 },
-  payButtonText: { color: '#f1f1f3', fontSize: 16, fontWeight: '600' },
+  payButtonText: { color: '#f1f1f3', fontSize: 17, fontWeight: '700' },
   closeButton: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  closeButtonText: { color: colors.textMuted, fontSize: 14 },
+  closeButtonText: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
 
   modalBackdrop: {
     flex: 1,

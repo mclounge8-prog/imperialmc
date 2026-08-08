@@ -172,17 +172,23 @@ export default function ShiftToggle() {
           : 'Протащите ползунок вправо, чтобы начать смену'}
       </Text>
 
-      <View
-        style={[styles.track, isOpen ? styles.trackOpen : styles.trackClosed]}
-        onLayout={handleTrackLayout}
-      >
-        <Animated.View
-          style={[styles.trackFill, { width: fillWidth }, isOpen ? styles.fillOpen : styles.fillClosed]}
-        />
+      {/*
+        Трек и бегунок — НЕ вложены друг в друга: трек со скруглением и
+        overflow:hidden обрезает всё, что внутри него (в т.ч. тень бегунка на
+        iOS и слой elevation на Android — из-за этого бегунок визуально
+        "проваливался" под трек). Поэтому бегунок — отдельный слой поверх
+        wrapper'а, а не ребёнок обрезаемого трека.
+      */}
+      <View style={styles.trackWrapper} onLayout={handleTrackLayout}>
+        <View style={[styles.track, isOpen ? styles.trackOpen : styles.trackClosed]}>
+          <Animated.View
+            style={[styles.trackFill, { width: fillWidth }, isOpen ? styles.fillOpen : styles.fillClosed]}
+          />
 
-        <Animated.Text style={[styles.trackHint, { opacity: hintOpacity }]} numberOfLines={1}>
-          {isOpen ? '‹‹ потяните, чтобы закрыть' : 'потяните, чтобы открыть ››'}
-        </Animated.Text>
+          <Animated.Text style={[styles.trackHint, { opacity: hintOpacity }]} numberOfLines={1}>
+            {isOpen ? '‹‹ потяните, чтобы закрыть' : 'потяните, чтобы открыть ››'}
+          </Animated.Text>
+        </View>
 
         {trackWidth > 0 && (
           <Animated.View
@@ -223,8 +229,16 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center', minHeight: 96 },
   statusTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   statusSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2, marginBottom: 14 },
-  track: {
+  trackWrapper: {
     height: TRACK_HEIGHT,
+    position: 'relative',
+  },
+  track: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     borderRadius: TRACK_HEIGHT / 2,
     borderWidth: 1,
     overflow: 'hidden',
