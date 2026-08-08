@@ -16,6 +16,7 @@ import apiTerminalRoutes from './routes/apiTerminal.js';
 import apiOrdersRoutes from './routes/apiOrders.js';
 import apiDevicesRoutes from './routes/apiDevices.js';
 import reportsRoutes from './routes/reports.js';
+import statsRoutes from './routes/stats.js';
 import { requireAuthPage } from './middleware/auth.js';
 import { renderDashboardShell } from './views/dashboardShell.js';
 
@@ -34,10 +35,11 @@ app.route('/api', apiTerminalRoutes); // JSON API для Android-термина�
 app.route('/api', apiOrdersRoutes); // JSON API заказов: открытие/позиции/оплата/закрытие
 app.route('/api/devices', apiDevicesRoutes); // JSON API устройств: регистрация по коду, статус
 app.route('/reports', reportsRoutes); // Отчёты: чеки с фильтрами по заведению/датам
+app.route('/stats', statsRoutes); // Главный экран: сводная статистика продаж (графики)
 
 app.get('/dashboard', requireAuthPage, async (c) => {
   const admin = c.get('admin');
-  const initialKey = 'venues';
+  const initialKey = 'dashboard';
   const html = renderDashboardShell({
     username: admin.username,
     initialKey,

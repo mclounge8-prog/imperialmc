@@ -9,6 +9,7 @@ import { renderVenuesSection } from '../views/venuesView.js';
 import { renderDevicesSection } from '../views/devicesView.js';
 import { renderReceiptsSection } from '../views/reportsView.js';
 import { fetchReceiptsPage, defaultDateRange, PAGE_SIZE } from './reports.js';
+import { renderDashboardFragment } from './stats.js';
 import { pool } from '../db.js';
 
 /**
@@ -18,6 +19,10 @@ import { pool } from '../db.js';
  * сразу показывались реальные данные, а не статичная заглушка.
  */
 export async function renderFragmentHtml(key) {
+  if (key === 'dashboard') {
+    return renderDashboardFragment(null);
+  }
+
   if (key === 'venues') {
     const { rows: venueRows } = await pool.query(
       'SELECT id, name, address FROM venues ORDER BY name'
