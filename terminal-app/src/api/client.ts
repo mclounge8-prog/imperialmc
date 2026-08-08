@@ -335,3 +335,72 @@ export async function transferOrderTable(
   });
   return order;
 }
+
+/* ---------- Смены (открытие/закрытие, X-отчёт, чеки смены) ---------- */
+
+export type PaymentBreakdown = {
+  cash: number;
+  card: number;
+  other: number;
+};
+
+export type Shift = {
+  id: number;
+  venueId: number;
+  status: 'open' | 'closed';
+  openedAt: string;
+  openedByName: string | null;
+  closedAt: string | null;
+  closedByName: string | null;
+  receiptsCount: number;
+  guestsCount: number;
+  revenueTotal: number;
+  avgCheck: number;
+  paymentBreakdown: PaymentBreakdown;
+};
+
+export type ShiftReceipt = {
+  id: number;
+  tableName: string | null;
+  guestLabel: string | null;
+  staffName: string | null;
+  status: 'paid' | 'cancelled';
+  total: number;
+  closedAt: string;
+  paymentMethods: string[];
+};
+
+export async function fetchCurrentShift(venueId: number, token: string): Promise<Shift | null> {
+  const { shift } = await authorizedRequest<{ shift: Shift | null }>(
+    `/api/shifts/current?venueId=${venueId}`,
+    token
+  );
+  return shift;
+}
+
+export async function openShift(venueId: number, token: string): Promise<Shift> {
+  const { shift } = await authorizedRequest<{ shift: Shift }>('/api/shifts/open', token, {
+    method: 'POST',
+    body: { venue_id: venueId },
+  });
+  return shift;
+}
+
+export async function closeShift(venueId: number, token: string): Promise<Shift> {
+  const { shift } = await authorizedRequest<{ shift: Shift }>('/api/shifts/close', token, {
+    method: 'POST',
+    body: { venue_id: venueId },
+  });
+  return shift;
+}
+
+export async function fetchShiftReceipts(
+  venueId: number,
+  token: string
+): Promise<{ shiftId: number | null; receipts: ShiftReceipt[] }> {
+  const { shift, receipts } = await authorizedRequest<{ shift: { id: number } | null; receipts: ShiftReceipt[] }>(
+    `/api/shifts/receipts?venueId=${venueId}`,
+    token
+  );
+  return { shiftId: shift ? shift.id : null, receipts };
+}

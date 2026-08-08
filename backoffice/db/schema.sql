@@ -152,6 +152,30 @@ CREATE TABLE IF NOT EXISTS order_items (
 );
 
 -- ============================================================
+-- Смены (кассовые смены) — задел под будущую интеграцию с кассами АТОЛ:
+-- там открытие/закрытие смены и X/Z-отчёты обязательны по 54-ФЗ. Пока это
+-- просто группировка чеков во времени для терминала (без реальной фискализации).
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS shifts (
+  id             SERIAL PRIMARY KEY,
+  venue_id       INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  status         VARCHAR(20) NOT NULL DEFAULT 'open', -- open, closed
+  opened_by      INT REFERENCES staff(id) ON DELETE SET NULL,
+  opened_by_name VARCHAR(100),  -- снапшот имени на момент открытия
+  opened_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_by      INT REFERENCES staff(id) ON DELETE SET NULL,
+  closed_by_name VARCHAR(100),  -- снапшот имени на момент закрытия
+  closed_at      TIMESTAMPTZ,
+  receipts_count INT,           -- снапшот на момент закрытия (для открытой считаем live)
+  revenue_total  NUMERIC(10,2)  -- снапшот на момент закрытия
+);
+
+CREATE INDEX IF NOT EXISTS idx_shifts_venue_status ON shifts(venue_id, status);
+-- На уровне БД гарантируем, что у заведения не может быть двух открытых смен одновременно
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shifts_one_open_per_venue ON shifts(venue_id) WHERE status = 'open';
+
+-- ============================================================
 -- Чеки — постоянная историческая запись каждого рассчитанного гостя/чека.
 -- Снапшотит venue/стол/гостя/сотрудника/позиции на момент расчёта: если потом
 -- переименуют категорию, удалят стол или сотрудника — история чеков не исказится
@@ -264,3 +288,5 @@ ALTER TABLE order_items ADD COLUMN IF NOT EXISTS guest_id INT REFERENCES order_g
 ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS icon VARCHAR(10);
 ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);
 ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'open';
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS shift_id INT REFERENCES shifts(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_receipts_shift ON receipts(shift_id);

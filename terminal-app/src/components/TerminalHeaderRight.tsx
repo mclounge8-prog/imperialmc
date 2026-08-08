@@ -18,9 +18,16 @@ export default function TerminalHeaderRight() {
 
   if (!session) return null;
 
-  // Справочник состава доступен с любого экрана, кроме самого себя — иначе можно
-  // было бы навигировать на текущий же экран, что бессмысленно
+  // Справочник состава и настройки доступны с любого экрана, кроме самих себя —
+  // иначе можно было бы навигировать на текущий же экран, что бессмысленно
   const showReferenceButton = route.name !== 'MenuReference';
+  const showSettingsButton = ![
+    'Settings',
+    'OpenShift',
+    'CloseShift',
+    'XReport',
+    'ShiftReceipts',
+  ].includes(route.name);
 
   return (
     <View style={styles.container}>
@@ -42,6 +49,15 @@ export default function TerminalHeaderRight() {
           {session.staff.name}
         </Text>
       </View>
+      {showSettingsButton && (
+        <Pressable
+          style={styles.gearButton}
+          onPress={() => navigation.navigate('Settings')}
+          hitSlop={6}
+        >
+          <Text style={styles.gearButtonText}>⚙️</Text>
+        </Pressable>
+      )}
       <Pressable style={styles.button} onPress={logout}>
         <Text style={styles.buttonText}>Выйти</Text>
       </Pressable>
@@ -90,5 +106,17 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.danger,
     fontSize: 12,
+  },
+  gearButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gearButtonText: {
+    fontSize: 15,
   },
 });

@@ -262,14 +262,27 @@ async function fetchGuestItemsSnapshot(guestId, client) {
   return rows;
 }
 
+// Текущая открытая смена заведения — если её нет, чек всё равно создаётся
+// (продажи пока не блокируются отсутствием смены, это будущая доработка под
+// фискализацию АТОЛ), просто shift_id останется NULL и чек не попадёт в
+// «Чеки смены»/X-отчёт на терминале, только в общие «Отчёты» в бэкофисе.
+async function fetchOpenShiftId(client, venueId) {
+  if (!venueId) return null;
+  const { rows } = await client.query("SELECT id FROM shifts WHERE venue_id = $1 AND status = 'open'", [
+    venueId,
+  ]);
+  return rows[0] ? rows[0].id : null;
+}
+
 async function createReceipt(client, { guest, staff, status, items, payments }) {
   const subtotal = items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
+  const shiftId = await fetchOpenShiftId(client, guest.venue_id);
 
   const { rows: receiptRows } = await client.query(
     `INSERT INTO receipts
        (venue_id, order_id, guest_id, table_id, table_name, guest_label,
-        staff_id, staff_name, status, subtotal, discount, total, opened_at, closed_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $10, $11, now())
+        staff_id, staff_name, status, subtotal, discount, total, opened_at, closed_at, shift_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $10, $11, now(), $12)
      RETURNING id`,
     [
       guest.venue_id,
@@ -283,6 +296,7 @@ async function createReceipt(client, { guest, staff, status, items, payments }) 
       status,
       subtotal,
       guest.opened_at,
+      shiftId,
     ]
   );
   const receiptId = receiptRows[0].id;

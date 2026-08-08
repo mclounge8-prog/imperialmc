@@ -11,6 +11,11 @@ import DeviceStatusScreen from './src/screens/DeviceStatusScreen';
 import TablesScreen from './src/screens/TablesScreen';
 import OrderScreen from './src/screens/OrderScreen';
 import MenuReferenceScreen from './src/screens/MenuReferenceScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
+import OpenShiftScreen from './src/screens/OpenShiftScreen';
+import CloseShiftScreen from './src/screens/CloseShiftScreen';
+import XReportScreen from './src/screens/XReportScreen';
+import ShiftReceiptsScreen from './src/screens/ShiftReceiptsScreen';
 import TerminalHeaderRight from './src/components/TerminalHeaderRight';
 import { colors } from './src/theme/colors';
 
@@ -21,6 +26,11 @@ export type RootStackParamList = {
   Tables: undefined;
   Order: { orderId?: number; tableId: number | null; tableName: string };
   MenuReference: undefined;
+  Settings: undefined;
+  OpenShift: undefined;
+  CloseShift: undefined;
+  XReport: undefined;
+  ShiftReceipts: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -86,6 +96,23 @@ function RootNavigator() {
             name="MenuReference"
             component={MenuReferenceScreen}
             options={{ title: 'Справочник меню' }}
+          />
+          <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Настройки' }} />
+          <Stack.Screen
+            name="OpenShift"
+            component={OpenShiftScreen}
+            options={{ title: 'Открытие смены' }}
+          />
+          <Stack.Screen
+            name="CloseShift"
+            component={CloseShiftScreen}
+            options={{ title: 'Закрытие смены' }}
+          />
+          <Stack.Screen name="XReport" component={XReportScreen} options={{ title: 'X-отчёт' }} />
+          <Stack.Screen
+            name="ShiftReceipts"
+            component={ShiftReceiptsScreen}
+            options={{ title: 'Чеки смены' }}
           />
         </>
       )}
