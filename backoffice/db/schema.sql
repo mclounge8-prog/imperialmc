@@ -397,3 +397,20 @@ WHERE mir.menu_item_id IS NOT NULL
     SELECT 1 FROM menu_item_modifiers mim
     WHERE mim.menu_item_id = mir.menu_item_id AND mim.modifier_id = m.id
   );
+
+-- Доливка снапшотов для УЖЕ СУЩЕСТВУЮЩИХ позиций заказов (в т.ч. открытых на
+-- момент этого деплоя) — без неё удаление такой позиции после обновления не
+-- вернёт списанное сырьё на склад, потому что новый код читает остаток для
+-- возврата из order_item_modifiers, а не из старой рецептуры. Берём текущую
+-- (на момент миграции) рецептуру блюда как лучшее доступное приближение —
+-- точного состава на момент добавления в заказ мы не храним. WHERE NOT EXISTS
+-- делает запрос безопасным для повторного прогона.
+INSERT INTO order_item_modifiers (order_item_id, modifier_id, name, price, warehouse_item_id, qty)
+SELECT oi.id, m.id, wi.name, 0, wi.id, mir.qty
+FROM order_items oi
+JOIN menu_item_recipe mir ON mir.menu_item_id = oi.menu_item_id
+JOIN warehouse_items wi ON wi.id = mir.warehouse_item_id
+JOIN modifiers m ON m.warehouse_item_id = wi.id AND m.group_id IS NULL
+WHERE NOT EXISTS (
+  SELECT 1 FROM order_item_modifiers oim WHERE oim.order_item_id = oi.id
+);
