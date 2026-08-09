@@ -11,6 +11,8 @@ import { renderReceiptsSection } from '../views/reportsView.js';
 import { fetchReceiptsPage, defaultDateRange, PAGE_SIZE } from './reports.js';
 import { renderDashboardFragment } from './stats.js';
 import { renderModifiersFragment } from './modifiers.js';
+import { fetchAllVenues } from '../utils/venues.js';
+import { readSelectedVenueId, resolveSelectedVenue, writeLastSection } from '../utils/preferences.js';
 import { pool } from '../db.js';
 
 /**
@@ -18,8 +20,13 @@ import { pool } from '../db.js';
  * Общая точка входа: используется и роутом /fragments/:section (htmx-переключение
  * вкладок), и начальной загрузкой /dashboard в index.js — чтобы при первом заходе
  * сразу показывались реальные данные, а не статичная заглушка.
+ *
+ * c (контекст Hono) нужен для чтения cookie с выбранным заведением — склад,
+ * меню и столы теперь работают с ОДНИМ общим выбором заведения (шапка), а не
+ * каждый со своим, который сбрасывался на первое по списку при каждом
+ * переключении раздела.
  */
-export async function renderFragmentHtml(key) {
+export async function renderFragmentHtml(key, c) {
   if (key === 'dashboard') {
     return renderDashboardFragment(null);
   }
@@ -51,8 +58,8 @@ export async function renderFragmentHtml(key) {
   }
 
   if (key === 'warehouse') {
-    const { rows: venueRows } = await pool.query('SELECT id, name FROM venues ORDER BY name');
-    const selectedVenue = venueRows[0] || null;
+    const venueRows = await fetchAllVenues();
+    const selectedVenue = resolveSelectedVenue(venueRows, readSelectedVenueId(c));
     const { rows: categories } = await pool.query(
       'SELECT id, name FROM warehouse_categories ORDER BY name'
     );
@@ -78,8 +85,8 @@ export async function renderFragmentHtml(key) {
   }
 
   if (key === 'menu') {
-    const { rows: venueRows } = await pool.query('SELECT id, name FROM venues ORDER BY name');
-    const selectedVenue = venueRows[0] || null;
+    const venueRows = await fetchAllVenues();
+    const selectedVenue = resolveSelectedVenue(venueRows, readSelectedVenueId(c));
     const { rows: categories } = await pool.query(
       'SELECT id, name, icon FROM menu_categories ORDER BY sort_order, name'
     );
@@ -107,8 +114,8 @@ export async function renderFragmentHtml(key) {
   }
 
   if (key === 'tables') {
-    const { rows: venueRows } = await pool.query('SELECT id, name FROM venues ORDER BY name');
-    const selectedVenue = venueRows[0] || null;
+    const venueRows = await fetchAllVenues();
+    const selectedVenue = resolveSelectedVenue(venueRows, readSelectedVenueId(c));
     let zones = [];
     let selectedZone = null;
     let tableRows = [];
@@ -166,12 +173,16 @@ const dashboard = new Hono();
 
 dashboard.get('/fragments/:section', requireAuthApi, async (c) => {
   const key = c.req.param('section');
-  const html = await renderFragmentHtml(key);
+  const html = await renderFragmentHtml(key, c);
 
   if (!html) {
     c.status(404);
     return c.text('Раздел не найден');
   }
+
+  // Запоминаем, где именно был админ — используется при полной перезагрузке
+  // страницы (F5), чтобы оставаться на месте, а не сбрасываться на «Главную».
+  writeLastSection(c, key);
 
   return c.html(html);
 });

@@ -152,27 +152,13 @@ export function renderTablesSection(venues, selectedVenueId, zones, selectedZone
     `;
   }
 
-  const venueOptions = venues
-    .map((v) => `<option value="${v.id}"${String(v.id) === String(selectedVenueId) ? ' selected' : ''}>${escapeHtml(v.name)}</option>`)
-    .join('');
+  const selectedVenue = venues.find((v) => String(v.id) === String(selectedVenueId));
 
   return `
     <header>
       <h1>Столы</h1>
-      <p>Расстановка столов по залу</p>
+      <p>Расстановка столов по залу${selectedVenue ? ` — ${escapeHtml(selectedVenue.name)}` : ''}. Заведение переключается в шапке слева.</p>
     </header>
-
-    <div class="subsection">
-      <h2>Заведение</h2>
-      <select
-        class="venue-select"
-        name="venueId"
-        hx-get="/tables/venue-view"
-        hx-trigger="change"
-        hx-target="#tables-venue-container"
-        hx-swap="innerHTML"
-      >${venueOptions}</select>
-    </div>
 
     <div id="tables-venue-container">
       ${renderVenueZonesAndFloorPlan(selectedVenueId, zones, selectedZone, tableList)}

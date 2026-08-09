@@ -76,7 +76,7 @@ modifiers.post('/groups', async (c) => {
 
   const groups = await fetchModifierGroups();
   return c.html(
-    renderGroupAccordionSection(rows[0], [], { oob: true }) + renderGroupSelectOob(groups)
+    renderGroupAccordionSection(rows[0], [], { oob: true, forceOpen: true }) + renderGroupSelectOob(groups)
   );
 });
 
@@ -114,12 +114,16 @@ modifiers.post('/', async (c) => {
     );
     const groupModifiers = allModifiers.filter((m) => m.group_id === groupId);
     return c.html(
-      renderGroupAccordionSection(groupRows[0], groupModifiers, { oob: true, oobMode: 'replace' })
+      renderGroupAccordionSection(groupRows[0], groupModifiers, {
+        oob: true,
+        oobMode: 'replace',
+        forceOpen: true,
+      })
     );
   }
 
   const ungrouped = allModifiers.filter((m) => !m.group_id);
-  return c.html(renderUngroupedAccordionSection(ungrouped, { oob: true }));
+  return c.html(renderUngroupedAccordionSection(ungrouped, { oob: true, forceOpen: true }));
 });
 
 modifiers.get('/:id/edit', async (c) => {

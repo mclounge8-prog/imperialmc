@@ -111,7 +111,12 @@ function renderAccordionTable(bodyId, rowsHtml) {
   `;
 }
 
-export function renderCategoryAccordionSection(venueId, category, items, { oob = false, oobMode = 'append' } = {}) {
+export function renderCategoryAccordionSection(
+  venueId,
+  category,
+  items,
+  { oob = false, oobMode = 'append', forceOpen = false } = {}
+) {
   // 'append' — новая категория, вставляется в конец аккордеона (редкое
   // действие, порядок подправится при следующей полной загрузке раздела).
   // 'replace' — категория уже существует на экране (просто добавили в неё
@@ -122,12 +127,17 @@ export function renderCategoryAccordionSection(venueId, category, items, { oob =
       ? ' hx-swap-oob="true"'
       : ' hx-swap-oob="beforeend:#stock-accordion"'
     : '';
+  // По умолчанию свёрнуты — при 20+ категориях полностью развёрнутый список
+  // остатков превращается в нечитаемую стену таблиц. Открываем только то, что
+  // только что создали/куда только что что-то добавили (forceOpen) — так
+  // результат действия сразу видно, а всё остальное не мешает.
+  const initialOpen = forceOpen ? 'true' : 'false';
   const safeName = escapeHtml(category.name);
   const bodyId = `category-items-${category.id}`;
   const rows = items.map((i) => renderStockRow(venueId, i)).join('');
 
   return `
-    <div class="accordion-section" id="category-section-${category.id}"${oobAttr} x-data="{ open: true }">
+    <div class="accordion-section" id="category-section-${category.id}"${oobAttr} x-data="{ open: ${initialOpen} }">
       <div class="accordion-header" role="button" tabindex="0" @click="open = !open">
         <span class="accordion-arrow" :class="{ 'accordion-arrow-open': open }">▸</span>
         <span class="accordion-title">${safeName}</span>
@@ -149,11 +159,12 @@ export function renderCategoryAccordionSection(venueId, category, items, { oob =
   `;
 }
 
-export function renderUncategorizedAccordionSection(venueId, items, { oob = false } = {}) {
+export function renderUncategorizedAccordionSection(venueId, items, { oob = false, forceOpen = false } = {}) {
   const oobAttr = oob ? ' hx-swap-oob="true"' : '';
+  const initialOpen = forceOpen ? 'true' : 'false';
   const rows = items.map((i) => renderStockRow(venueId, i)).join('');
   return `
-    <div class="accordion-section" id="uncategorized-section"${oobAttr} x-data="{ open: true }">
+    <div class="accordion-section" id="uncategorized-section"${oobAttr} x-data="{ open: ${initialOpen} }">
       <div class="accordion-header" role="button" tabindex="0" @click="open = !open">
         <span class="accordion-arrow" :class="{ 'accordion-arrow-open': open }">▸</span>
         <span class="accordion-title">Без категории</span>
@@ -253,27 +264,13 @@ export function renderWarehouseSection(venues, selectedVenueId, categories, item
     `;
   }
 
-  const venueOptions = venues
-    .map((v) => `<option value="${v.id}"${String(v.id) === String(selectedVenueId) ? ' selected' : ''}>${escapeHtml(v.name)}</option>`)
-    .join('');
+  const selectedVenue = venues.find((v) => String(v.id) === String(selectedVenueId));
 
   return `
     <header>
       <h1>Склад</h1>
-      <p>Номенклатура сырья и остатки по заведению</p>
+      <p>Номенклатура сырья и остатки по заведению${selectedVenue ? ` — ${escapeHtml(selectedVenue.name)}` : ''}. Заведение переключается в шапке слева.</p>
     </header>
-
-    <div class="subsection">
-      <h2>Заведение</h2>
-      <select
-        class="venue-select"
-        name="venueId"
-        hx-get="/warehouse/stock"
-        hx-trigger="change"
-        hx-target="#stock-container"
-        hx-swap="innerHTML"
-      >${venueOptions}</select>
-    </div>
 
     <div class="subsection">
       <div class="subsection-header">
@@ -286,8 +283,14 @@ export function renderWarehouseSection(venues, selectedVenueId, categories, item
       <p class="hint">
         Каталог (названия, категории, единицы измерения) один общий на все заведения.
         Меняется по заведениям только количество — колонки «Остаток» и «Мин.» ниже
-        относятся именно к выбранному выше заведению.
+        относятся именно к выбранному в шапке заведению.
       </p>
+      <input
+        type="search"
+        class="search-input"
+        placeholder="Поиск по названию…"
+        oninput="filterCatalogSearch(this, 'stock-container')"
+      >
       <div id="stock-container">${renderStockAccordion(selectedVenueId, categories, items)}</div>
     </div>
   `;

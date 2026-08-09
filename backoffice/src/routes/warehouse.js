@@ -74,7 +74,7 @@ warehouse.post('/categories', async (c) => {
 
   const categories = await fetchCategories();
   return c.html(
-    renderCategoryAccordionSection(venueId, rows[0], [], { oob: true }) +
+    renderCategoryAccordionSection(venueId, rows[0], [], { oob: true, forceOpen: true }) +
       renderItemCategorySelect(categories, { oob: true })
   );
 });
@@ -130,12 +130,15 @@ warehouse.post('/items', async (c) => {
       renderCategoryAccordionSection(venueId, catRows[0], categoryItems, {
         oob: true,
         oobMode: 'replace',
+        forceOpen: true,
       })
     );
   }
 
   const uncategorizedItems = items.filter((i) => !i.category_id);
-  return c.html(renderUncategorizedAccordionSection(venueId, uncategorizedItems, { oob: true }));
+  return c.html(
+    renderUncategorizedAccordionSection(venueId, uncategorizedItems, { oob: true, forceOpen: true })
+  );
 });
 
 warehouse.get('/items/:id/edit', async (c) => {

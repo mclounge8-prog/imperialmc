@@ -19,8 +19,12 @@ import apiShiftsRoutes from './routes/apiShifts.js';
 import reportsRoutes from './routes/reports.js';
 import statsRoutes from './routes/stats.js';
 import modifiersRoutes from './routes/modifiers.js';
+import preferencesRoutes from './routes/preferences.js';
 import { requireAuthPage } from './middleware/auth.js';
 import { renderDashboardShell } from './views/dashboardShell.js';
+import { sections } from './views/sections.js';
+import { fetchAllVenues } from './utils/venues.js';
+import { readLastSection, readSelectedVenueId, resolveSelectedVenue } from './utils/preferences.js';
 
 const app = new Hono();
 
@@ -40,14 +44,25 @@ app.route('/api/devices', apiDevicesRoutes); // JSON API устройств: р�
 app.route('/api/shifts', apiShiftsRoutes); // JSON API смен: открытие/закрытие, X-отчёт, чеки смены
 app.route('/reports', reportsRoutes); // Отчёты: чеки с фильтрами по заведению/датам
 app.route('/stats', statsRoutes); // Главный экран: сводная статистика продаж (графики)
+app.route('/preferences', preferencesRoutes); // Общий выбор заведения в шапке (cookie)
 
 app.get('/dashboard', requireAuthPage, async (c) => {
   const admin = c.get('admin');
-  const initialKey = 'dashboard';
+  // Остаёмся в том разделе, где были последний раз — иначе обновление
+  // страницы (F5) сбрасывало на «Главную» независимо от текущего хэша в URL
+  // (хэш никогда не отправляется на сервер, только cookie может это помнить).
+  const lastSection = readLastSection(c);
+  const initialKey = lastSection && sections[lastSection] ? lastSection : 'dashboard';
+
+  const venues = await fetchAllVenues();
+  const selectedVenue = resolveSelectedVenue(venues, readSelectedVenueId(c));
+
   const html = renderDashboardShell({
     username: admin.username,
     initialKey,
-    initialSectionHtml: await renderFragmentHtml(initialKey),
+    initialSectionHtml: await renderFragmentHtml(initialKey, c),
+    venues,
+    selectedVenueId: selectedVenue ? selectedVenue.id : null,
   });
   return c.html(html);
 });

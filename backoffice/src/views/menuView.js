@@ -260,10 +260,16 @@ export function renderMenuVenueContainer(venueId, categories, hiddenCategoryIds,
       </div>
       <p class="hint">
         Сами позиции и категории общие для всех заведений. Галочка «Показывать здесь»
-        у каждой категории — это видимость именно для выбранного выше заведения:
+        у каждой категории — это видимость именно для выбранного в шапке заведения:
         выключишь — гости этой точки не увидят категорию на терминале, а на других
         точках она останется как была.
       </p>
+      <input
+        type="search"
+        class="search-input"
+        placeholder="Поиск по названию…"
+        oninput="filterCatalogSearch(this, 'menu-accordion')"
+      >
       ${renderMenuAccordion(venueId, categories, hiddenCategoryIds, items)}
     </div>
   `;
@@ -280,27 +286,13 @@ export function renderMenuSection(venues, selectedVenueId, categories, hiddenCat
     `;
   }
 
-  const venueOptions = venues
-    .map((v) => `<option value="${v.id}"${String(v.id) === String(selectedVenueId) ? ' selected' : ''}>${escapeHtml(v.name)}</option>`)
-    .join('');
+  const selectedVenue = venues.find((v) => String(v.id) === String(selectedVenueId));
 
   return `
     <header>
       <h1>Меню</h1>
-      <p>Позиции меню — общие, видимость категорий — по заведению</p>
+      <p>Позиции меню — общие, видимость категорий — по заведению${selectedVenue ? ` — ${escapeHtml(selectedVenue.name)}` : ''}. Заведение переключается в шапке слева.</p>
     </header>
-
-    <div class="subsection">
-      <h2>Заведение</h2>
-      <select
-        class="venue-select"
-        name="venueId"
-        hx-get="/menu/venue-view"
-        hx-trigger="change"
-        hx-target="#menu-venue-container"
-        hx-swap="innerHTML"
-      >${venueOptions}</select>
-    </div>
 
     <div id="menu-venue-container">
       ${renderMenuVenueContainer(selectedVenueId, categories, hiddenCategoryIds, items)}

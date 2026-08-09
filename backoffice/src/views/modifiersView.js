@@ -80,12 +80,17 @@ function renderModifierTable(bodyId, rowsHtml) {
   `;
 }
 
-export function renderGroupAccordionSection(group, modifiers, { oob = false, oobMode = 'append' } = {}) {
+export function renderGroupAccordionSection(
+  group,
+  modifiers,
+  { oob = false, oobMode = 'append', forceOpen = false } = {}
+) {
   const oobAttr = oob
     ? oobMode === 'replace'
       ? ' hx-swap-oob="true"'
       : ' hx-swap-oob="beforeend:#modifiers-accordion"'
     : '';
+  const initialOpen = forceOpen ? 'true' : 'false';
   const safeName = escapeHtml(group.name);
   const bodyId = `modifier-group-items-${group.id}`;
   const rows = modifiers.map((m) => renderModifierRow(m)).join('');
@@ -97,7 +102,7 @@ export function renderGroupAccordionSection(group, modifiers, { oob = false, oob
         : 'выбор не ограничен';
 
   return `
-    <div class="accordion-section" id="modifier-group-section-${group.id}"${oobAttr} x-data="{ open: true }">
+    <div class="accordion-section" id="modifier-group-section-${group.id}"${oobAttr} x-data="{ open: ${initialOpen} }">
       <div class="accordion-header" role="button" tabindex="0" @click="open = !open">
         <span class="accordion-arrow" :class="{ 'accordion-arrow-open': open }">▸</span>
         <span class="accordion-title">${safeName}</span>
@@ -120,11 +125,12 @@ export function renderGroupAccordionSection(group, modifiers, { oob = false, oob
   `;
 }
 
-export function renderUngroupedAccordionSection(modifiers, { oob = false } = {}) {
+export function renderUngroupedAccordionSection(modifiers, { oob = false, forceOpen = false } = {}) {
   const oobAttr = oob ? ' hx-swap-oob="true"' : '';
+  const initialOpen = forceOpen ? 'true' : 'false';
   const rows = modifiers.map((m) => renderModifierRow(m)).join('');
   return `
-    <div class="accordion-section" id="modifier-ungrouped-section"${oobAttr} x-data="{ open: true }">
+    <div class="accordion-section" id="modifier-ungrouped-section"${oobAttr} x-data="{ open: ${initialOpen} }">
       <div class="accordion-header" role="button" tabindex="0" @click="open = !open">
         <span class="accordion-arrow" :class="{ 'accordion-arrow-open': open }">▸</span>
         <span class="accordion-title">Обычные ингредиенты (без группы)</span>
@@ -236,6 +242,12 @@ export function renderModifiersSection(groups, ungroupedModifiers, allModifiers,
           ${renderAddModifierModal(groups, warehouseItems)}
         </div>
       </div>
+      <input
+        type="search"
+        class="search-input"
+        placeholder="Поиск по названию…"
+        oninput="filterCatalogSearch(this, 'modifiers-accordion')"
+      >
       ${renderModifiersAccordion(groups, ungroupedModifiers, allModifiers)}
     </div>
   `;
