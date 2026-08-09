@@ -58,7 +58,7 @@ export function renderMenuItemRow(item, { oob = false, targetId = null } = {}) {
       <td><span class="badge ${statusClass}">${statusLabel}</span></td>
       <td class="row-actions">
         <button hx-get="/menu/items/${item.id}/edit" hx-target="#menu-row-${item.id}" hx-swap="outerHTML">Изменить</button>
-        <button hx-get="/menu/items/${item.id}/recipe" hx-target="#main-content" hx-push-url="/dashboard#menu">Рецептура (${recipeCount})</button>
+        <button hx-get="/menu/items/${item.id}/modifiers" hx-target="#main-content" hx-push-url="/dashboard#menu">Модификаторы (${recipeCount})</button>
         <button hx-post="/menu/items/${item.id}/toggle" hx-target="#menu-row-${item.id}" hx-swap="outerHTML">${toggleLabel}</button>
         <button class="danger" hx-delete="/menu/items/${item.id}" hx-target="#menu-row-${item.id}" hx-swap="outerHTML" hx-confirm="Удалить «${safeName}» из меню?">Удалить</button>
       </td>
@@ -310,41 +310,91 @@ export function renderMenuSection(venues, selectedVenueId, categories, hiddenCat
 
 // ---------- Рецептура ----------
 
-export function renderRecipeRow(recipe) {
-  const safeName = escapeHtml(recipe.warehouse_item_name);
-  const unitLabel = UNITS[recipe.unit] || recipe.unit;
+/* ---------- Модификаторы позиции меню (заменяет старую рецептуру) ---------- */
+
+function attachModifierSelectOptions(availableModifiers) {
+  if (availableModifiers.length === 0) {
+    return '<option value="">Все модификаторы каталога уже прикреплены</option>';
+  }
+  const grouped = new Map();
+  for (const m of availableModifiers) {
+    const label = m.group_name || 'Обычные ингредиенты';
+    if (!grouped.has(label)) grouped.set(label, []);
+    grouped.get(label).push(m);
+  }
+  return [...grouped.entries()]
+    .map(([label, mods]) => {
+      const options = mods
+        .map(
+          (m) =>
+            `<option value="${m.id}">${escapeHtml(m.name)}${Number(m.price) > 0 ? ` (+${Number(m.price).toFixed(2)} ₽)` : ''}</option>`
+        )
+        .join('');
+      return `<optgroup label="${escapeHtml(label)}">${options}</optgroup>`;
+    })
+    .join('');
+}
+
+export function renderAttachModifierSelect(availableModifiers, { oob = false } = {}) {
+  const oobAttr = oob ? ' hx-swap-oob="true"' : '';
+  return `<select name="modifier_id" id="attach-modifier-select"${oobAttr} required><option value="">Модификатор…</option>${attachModifierSelectOptions(availableModifiers)}</select>`;
+}
+
+export function renderModifierAttachmentRow(menuItemId, attachment) {
+  const safeName = escapeHtml(attachment.name);
+  const warehouseInfo = attachment.warehouse_item_name
+    ? ` · списывает ${Number(attachment.qty)} ${UNITS[attachment.warehouse_item_unit] || attachment.warehouse_item_unit || ''} «${escapeHtml(attachment.warehouse_item_name)}»`
+    : '';
+  const priceInfo = Number(attachment.price) > 0 ? `+${Number(attachment.price).toFixed(2)} ₽` : 'бесплатно';
 
   return `
-    <tr id="recipe-row-${recipe.id}">
+    <tr id="attachment-row-${attachment.id}">
       <td>${safeName}</td>
-      <td>${Number(recipe.qty)} ${unitLabel}</td>
+      <td>${escapeHtml(attachment.group_name || 'Обычный ингредиент')}</td>
+      <td>${priceInfo}${warehouseInfo}</td>
+      <td>
+        <label class="visibility-toggle">
+          <input
+            type="checkbox"
+            ${attachment.is_default ? 'checked' : ''}
+            hx-put="/menu/items/${menuItemId}/modifiers/${attachment.id}"
+            hx-vals='{"is_default": "${!attachment.is_default}"}'
+            hx-target="#attachment-row-${attachment.id}"
+            hx-swap="outerHTML"
+          >
+          включён по умолчанию
+        </label>
+      </td>
       <td class="row-actions">
-        <button class="danger" hx-delete="/menu/items/${recipe.menu_item_id}/recipe/${recipe.id}" hx-target="#recipe-row-${recipe.id}" hx-swap="outerHTML" hx-confirm="Убрать «${safeName}» из рецептуры?">Удалить</button>
+        <button
+          class="danger"
+          hx-delete="/menu/items/${menuItemId}/modifiers/${attachment.id}"
+          hx-target="#menu-item-modifiers-list"
+          hx-swap="outerHTML"
+          hx-confirm="Отсоединить «${safeName}» от этой позиции?"
+        >Отсоединить</button>
       </td>
     </tr>
   `;
 }
 
-/**
- * Целиком таблица рецептуры с hx-swap-oob="true" — после добавления новой
- * позиции сервер отдаёт свежий список, отсортированный как при обычной
- * загрузке (по названию ингредиента), вместо вставки строки в конец.
- */
-export function renderRecipeListOob(recipeRows) {
-  const rows = recipeRows.map((r) => renderRecipeRow(r)).join('');
-  return `<tbody id="recipe-list" hx-swap-oob="true">${rows}</tbody>`;
+export function renderModifierAttachmentsList(menuItemId, attachments) {
+  const rows = attachments.map((a) => renderModifierAttachmentRow(menuItemId, a)).join('');
+  return `
+    <table class="data-table" id="menu-item-modifiers-list">
+      <thead>
+        <tr><th>Название</th><th>Группа</th><th>Цена / списание</th><th>По умолчанию</th><th>Действия</th></tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="5" class="empty-hint">Пока не прикреплено ни одного модификатора</td></tr>'}</tbody>
+    </table>
+  `;
 }
 
-export function renderRecipeEditor(menuItem, recipeRows, warehouseItems) {
-  const rows = recipeRows.map((r) => renderRecipeRow(r)).join('');
-  const ingredientOptions = warehouseItems
-    .map((wi) => `<option value="${wi.id}">${escapeHtml(wi.name)} (${UNITS[wi.unit] || wi.unit})</option>`)
-    .join('');
-
+export function renderModifierAttachmentsEditor(menuItem, attachments, availableModifiers) {
   return `
     <header>
-      <h1>Рецептура: ${escapeHtml(menuItem.name)}</h1>
-      <p>Что списывается со склада при продаже одной позиции</p>
+      <h1>Модификаторы: ${escapeHtml(menuItem.name)}</h1>
+      <p>Ингредиенты и платные добавки этой позиции — то, что гость может убрать/добавить на терминале</p>
     </header>
 
     <button
@@ -354,31 +404,34 @@ export function renderRecipeEditor(menuItem, recipeRows, warehouseItems) {
       hx-push-url="/dashboard#menu"
     >← Назад к меню</button>
 
-    <form
-      class="section-form"
-      hx-post="/menu/items/${menuItem.id}/recipe"
-      hx-target="#recipe-form-error"
-      hx-swap="innerHTML"
-      hx-on::after-request="if(event.detail.successful) this.reset()"
-    >
-      <select name="warehouse_item_id" required>
-        <option value="">Ингредиент…</option>
-        ${ingredientOptions}
-      </select>
-      <input type="number" step="0.001" min="0.001" name="qty" placeholder="Количество" required>
-      <button type="submit">Добавить в рецептуру</button>
-      <div id="recipe-form-error" class="error"></div>
-    </form>
+    <div class="subsection">
+      <p class="hint">
+        «Включён по умолчанию» — модификатор автоматически входит в блюдо и
+        бесплатен (обычный ингредиент), но его можно снять на терминале при
+        оформлении заказа. Не включённые по умолчанию — платные добавки,
+        которые гость добавляет сам. Сами модификаторы (название, цена,
+        списание со склада, группа с ограничением выбора) заводятся один раз
+        в разделе «Модификаторы» и переиспользуются на любых позициях меню.
+      </p>
+      <form
+        class="section-form"
+        hx-post="/menu/items/${menuItem.id}/modifiers"
+        hx-target="#attach-modifier-error"
+        hx-swap="innerHTML"
+        hx-on::after-request="if(event.detail.successful) this.reset()"
+      >
+        ${renderAttachModifierSelect(availableModifiers)}
+        <label class="visibility-toggle">
+          <input type="checkbox" name="is_default" value="on">
+          включить по умолчанию
+        </label>
+        <button type="submit">Прикрепить</button>
+        <div id="attach-modifier-error" class="error"></div>
+      </form>
+    </div>
 
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Ингредиент</th>
-          <th>Количество</th>
-          <th>Действия</th>
-        </tr>
-      </thead>
-      <tbody id="recipe-list">${rows}</tbody>
-    </table>
+    <div class="subsection">
+      ${renderModifierAttachmentsList(menuItem.id, attachments)}
+    </div>
   `;
 }

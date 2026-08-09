@@ -18,6 +18,7 @@ import { useDevice } from '../context/DeviceContext';
 import MenuBrowser from '../components/MenuBrowser';
 import CompositionModal from '../components/CompositionModal';
 import type { CompositionTarget } from '../components/CompositionModal';
+import ItemCustomizeModal from '../components/ItemCustomizeModal';
 import {
   fetchMenu,
   fetchTables,
@@ -33,7 +34,7 @@ import {
   payGuest,
   cancelGuest,
 } from '../api/client';
-import type { MenuResponse, Order, OrderGuest, PaymentMethod, Zone } from '../api/client';
+import type { MenuItem, MenuResponse, Order, OrderGuest, OrderItem, PaymentMethod, Zone } from '../api/client';
 import type { RootStackParamList } from '../../App';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Order'>;
@@ -92,6 +93,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   const [cashEntryMode, setCashEntryMode] = useState(false);
   const [cashReceivedText, setCashReceivedText] = useState('');
   const [compositionTarget, setCompositionTarget] = useState<CompositionTarget>(null);
+  const [customizeTarget, setCustomizeTarget] = useState<MenuItem | null>(null);
 
   const showAlert = useCallback((title: string, message: string, buttons?: AlertButton[]) => {
     setAlertState({ title, message, buttons: buttons ?? [{ text: 'ОК' }] });
@@ -142,18 +144,75 @@ export default function OrderScreen({ route, navigation }: Props) {
     }
   };
 
-  const handleAddItem = async (menuItemId: number, guestId?: number) => {
+  const handleAddItem = async (menuItemId: number, guestId?: number, modifierIds?: number[]) => {
     const targetGuestId = guestId ?? selectedGuestId;
     if (!session || !order || !targetGuestId || busy) return;
     setBusy(true);
     try {
-      const updated = await addOrderItem(order.id, menuItemId, targetGuestId, session.token);
+      const updated = await addOrderItem(order.id, menuItemId, targetGuestId, session.token, modifierIds);
       setOrder(updated);
     } catch (e) {
       showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось добавить позицию');
     } finally {
       setBusy(false);
     }
+  };
+
+  // Тап по позиции меню: если у неё есть модификаторы (хоть обычные
+  // ингредиенты, хоть платные добавки) — сначала спрашиваем состав, чтобы
+  // можно было снять/добавить прямо сейчас, а не создавать отдельную позицию
+  // меню под каждое сочетание. Если модификаторов нет вообще — добавляем
+  // сразу, без лишнего экрана.
+  const handleMenuItemPress = (item: MenuItem) => {
+    if (item.modifierGroups.length === 0) {
+      handleAddItem(item.id);
+      return;
+    }
+    setCustomizeTarget(item);
+  };
+
+  const handleConfirmCustomize = (modifierIds: number[]) => {
+    if (!customizeTarget) return;
+    handleAddItem(customizeTarget.id, undefined, modifierIds);
+    setCustomizeTarget(null);
+  };
+
+  // "+" на уже добавленной позиции — плюсует количество с ТЕМ ЖЕ составом,
+  // что уже выбран в этой строке, а не открывает настройку заново
+  const handleRepeatItem = (item: OrderItem, guestId: number) => {
+    if (!item.menuItemId) return;
+    const modifierIds = item.modifiers
+      .map((m) => m.modifierId)
+      .filter((id): id is number => id !== null);
+    handleAddItem(item.menuItemId, guestId, modifierIds);
+  };
+
+  // Показывает, что реально отличается от дефолтного состава блюда — какие
+  // ингредиенты сняты, какие платные добавки включены. Именно это решает
+  // задачу "шаурма без огурцов + картофель фри" без создания отдельной позиции.
+  const buildModifierSummary = (item: OrderItem): string => {
+    const menuItem = menu
+      ? [...menu.categories.flatMap((c) => c.items), ...menu.uncategorized].find(
+          (mi) => mi.id === item.menuItemId
+        )
+      : undefined;
+    if (!menuItem) {
+      return item.modifiers.map((m) => m.name).join(', ');
+    }
+    const appliedIds = new Set(item.modifiers.map((m) => m.modifierId));
+    const removed: string[] = [];
+    const added: string[] = [];
+    for (const group of menuItem.modifierGroups) {
+      for (const opt of group.options) {
+        const isApplied = appliedIds.has(opt.modifierId);
+        if (opt.isDefault && !isApplied) removed.push(opt.name);
+        if (!opt.isDefault && isApplied) added.push(opt.name);
+      }
+    }
+    const parts: string[] = [];
+    if (removed.length > 0) parts.push(`без: ${removed.join(', ')}`);
+    if (added.length > 0) parts.push(`+ ${added.join(', ')}`);
+    return parts.join(' · ');
   };
 
   const handleRemoveItem = async (itemId: number) => {
@@ -350,7 +409,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.menuPaneWrapper}>
-        <MenuBrowser menu={menu} busy={busy} onItemPress={(item) => handleAddItem(item.id)} />
+        <MenuBrowser menu={menu} busy={busy} onItemPress={handleMenuItemPress} />
       </View>
 
       {/* Правая часть — гости и их чеки */}
@@ -405,13 +464,14 @@ export default function OrderScreen({ route, navigation }: Props) {
               <View key={item.id} style={styles.orderItemRow}>
                 <View style={styles.orderItemInfo}>
                   <Text style={styles.orderItemName}>{item.name}</Text>
-                  {item.recipe.length > 0 && (
-                    <Pressable onPress={() => setCompositionTarget({ name: item.name, recipe: item.recipe })}>
-                      <Text style={styles.compositionLink}>
-                        Состав ({item.recipe.length}) ›
+                  {(() => {
+                    const summary = buildModifierSummary(item);
+                    return summary ? (
+                      <Text style={styles.modifierSummary} numberOfLines={2}>
+                        {summary}
                       </Text>
-                    </Pressable>
-                  )}
+                    ) : null;
+                  })()}
                 </View>
                 <Text style={styles.orderItemPrice}>{item.lineTotal.toFixed(2)} ₽</Text>
                 <View style={styles.qtyStepper}>
@@ -428,7 +488,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                     style={styles.qtyButton}
                     disabled={busy || !item.menuItemId}
                     hitSlop={6}
-                    onPress={() => item.menuItemId && handleAddItem(item.menuItemId, selectedGuest.id)}
+                    onPress={() => item.menuItemId && handleRepeatItem(item, selectedGuest.id)}
                   >
                     <Text style={styles.qtyButtonText}>+</Text>
                   </Pressable>
@@ -666,6 +726,14 @@ export default function OrderScreen({ route, navigation }: Props) {
           при 6-7 ингредиентах инлайн не помещается и выглядит громоздко */}
       <CompositionModal target={compositionTarget} onClose={() => setCompositionTarget(null)} />
 
+      {/* Настройка состава при добавлении позиции — снять дефолтные ингредиенты,
+          докупить платные модификаторы, до того, как позиция попадёт в чек */}
+      <ItemCustomizeModal
+        item={customizeTarget}
+        onClose={() => setCustomizeTarget(null)}
+        onConfirm={handleConfirmCustomize}
+      />
+
       {/* Общий алерт — свой, в теме приложения, вместо системного Alert.alert */}
       <Modal
         visible={alertState !== null}
@@ -793,6 +861,7 @@ const styles = StyleSheet.create({
   orderItemInfo: { flex: 1 },
   orderItemName: { color: colors.text, fontSize: 14, fontWeight: '500' },
   compositionLink: { color: colors.accent2, fontSize: 11, marginTop: 2, fontWeight: '600' },
+  modifierSummary: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
   orderItemPrice: { color: colors.text, fontSize: 14, fontWeight: '600' },
   qtyStepper: {
     flexDirection: 'row',

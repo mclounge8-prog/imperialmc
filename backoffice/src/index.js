@@ -18,6 +18,7 @@ import apiDevicesRoutes from './routes/apiDevices.js';
 import apiShiftsRoutes from './routes/apiShifts.js';
 import reportsRoutes from './routes/reports.js';
 import statsRoutes from './routes/stats.js';
+import modifiersRoutes from './routes/modifiers.js';
 import { requireAuthPage } from './middleware/auth.js';
 import { renderDashboardShell } from './views/dashboardShell.js';
 
@@ -27,6 +28,7 @@ app.route('/api/auth', authRoutes);
 app.route('/', dashboardRoutes); // отдаёт /fragments/:section (защищено)
 app.route('/staff', staffRoutes); // CRUD сотрудников
 app.route('/warehouse', warehouseRoutes); // CRUD склада (категории + номенклатура)
+app.route('/modifiers', modifiersRoutes); // CRUD каталога модификаторов (группы + сами модификаторы)
 app.route('/menu', menuRoutes); // CRUD меню (категории + позиции + рецептура)
 app.route('/tables', tablesRoutes); // CRUD столов (зоны + визуальная схема зала)
 app.route('/venues', venuesRoutes); // CRUD заведений + назначение сотрудников

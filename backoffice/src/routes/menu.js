@@ -10,8 +10,10 @@ import {
   renderMenuItemEditRow,
   renderMenuItemCategorySelect,
   renderMenuVenueContainer,
-  renderRecipeEditor,
-  renderRecipeListOob,
+  renderModifierAttachmentsEditor,
+  renderModifierAttachmentsList,
+  renderModifierAttachmentRow,
+  renderAttachModifierSelect,
 } from '../views/menuView.js';
 
 const menu = new Hono();
@@ -35,7 +37,7 @@ async function fetchHiddenCategoryIds(venueId) {
 async function fetchAllMenuItems() {
   const { rows } = await pool.query(
     `SELECT mi.id, mi.name, mi.category_id, mi.price, mi.image_url, mi.is_active,
-            (SELECT COUNT(*) FROM menu_item_recipe WHERE menu_item_id = mi.id) AS recipe_count
+            (SELECT COUNT(*) FROM menu_item_modifiers WHERE menu_item_id = mi.id) AS recipe_count
      FROM menu_items mi
      ORDER BY mi.created_at DESC`
   );
@@ -45,13 +47,46 @@ async function fetchAllMenuItems() {
 async function fetchMenuItemWithCategory(id) {
   const { rows } = await pool.query(
     `SELECT mi.id, mi.name, mi.category_id, mi.price, mi.image_url, mi.is_active, mc.name AS category_name,
-            (SELECT COUNT(*) FROM menu_item_recipe WHERE menu_item_id = mi.id) AS recipe_count
+            (SELECT COUNT(*) FROM menu_item_modifiers WHERE menu_item_id = mi.id) AS recipe_count
      FROM menu_items mi
      LEFT JOIN menu_categories mc ON mi.category_id = mc.id
      WHERE mi.id = $1`,
     [id]
   );
   return rows[0] || null;
+}
+
+async function fetchMenuItemModifierAttachments(menuItemId) {
+  const { rows } = await pool.query(
+    `SELECT mim.id, mim.modifier_id, mim.is_default,
+            m.name, m.group_id, mg.name AS group_name,
+            COALESCE(mim.price_override, m.price) AS price,
+            COALESCE(mim.qty_override, m.qty) AS qty,
+            m.warehouse_item_id, wi.name AS warehouse_item_name, wi.unit AS warehouse_item_unit
+     FROM menu_item_modifiers mim
+     JOIN modifiers m ON m.id = mim.modifier_id
+     LEFT JOIN modifier_groups mg ON mg.id = m.group_id
+     LEFT JOIN warehouse_items wi ON wi.id = m.warehouse_item_id
+     WHERE mim.menu_item_id = $1
+     ORDER BY mg.name NULLS FIRST, m.name`,
+    [menuItemId]
+  );
+  return rows;
+}
+
+async function fetchAvailableModifiersToAttach(menuItemId) {
+  const { rows } = await pool.query(
+    `SELECT m.id, m.name, m.price, m.group_id, mg.name AS group_name
+     FROM modifiers m
+     LEFT JOIN modifier_groups mg ON mg.id = m.group_id
+     WHERE NOT EXISTS (
+       SELECT 1 FROM menu_item_modifiers mim
+       WHERE mim.menu_item_id = $1 AND mim.modifier_id = m.id
+     )
+     ORDER BY mg.name NULLS FIRST, m.name`,
+    [menuItemId]
+  );
+  return rows;
 }
 
 // ---------- Переключение заведения (видимость категорий смотрится для него) ----------
@@ -279,60 +314,75 @@ menu.delete('/items/:id', async (c) => {
   return c.body(null);
 });
 
-// ---------- Рецептура ----------
+// ---------- Модификаторы позиции (замена старой рецептуры) ----------
 
-menu.get('/items/:id/recipe', async (c) => {
+menu.get('/items/:id/modifiers', async (c) => {
   const menuItem = await fetchMenuItemWithCategory(c.req.param('id'));
   if (!menuItem) {
     c.status(404);
     return c.text('Позиция не найдена');
   }
-
-  const { rows: recipeRows } = await pool.query(
-    `SELECT mir.id, mir.menu_item_id, mir.qty, wi.name AS warehouse_item_name, wi.unit
-     FROM menu_item_recipe mir
-     JOIN warehouse_items wi ON wi.id = mir.warehouse_item_id
-     WHERE mir.menu_item_id = $1
-     ORDER BY wi.name`,
-    [menuItem.id]
-  );
-
-  const { rows: warehouseItems } = await pool.query(
-    'SELECT id, name, unit FROM warehouse_items ORDER BY name'
-  );
-
-  return c.html(renderRecipeEditor(menuItem, recipeRows, warehouseItems));
+  const attachments = await fetchMenuItemModifierAttachments(menuItem.id);
+  const available = await fetchAvailableModifiersToAttach(menuItem.id);
+  return c.html(renderModifierAttachmentsEditor(menuItem, attachments, available));
 });
 
-menu.post('/items/:id/recipe', async (c) => {
+menu.post('/items/:id/modifiers', async (c) => {
   const menuItemId = c.req.param('id');
   const body = await c.req.parseBody();
-  const warehouseItemId = body.warehouse_item_id ? Number(body.warehouse_item_id) : null;
-  const qty = Number(body.qty);
+  const modifierId = body.modifier_id ? Number(body.modifier_id) : null;
+  const isDefault = body.is_default === 'on' || body.is_default === 'true';
 
-  if (!warehouseItemId) return c.html('<p>Выбери ингредиент</p>');
-  if (Number.isNaN(qty) || qty <= 0) return c.html('<p>Количество должно быть больше нуля</p>');
+  if (!modifierId) return c.html('<p>Выбери модификатор</p>');
 
   await pool.query(
-    `INSERT INTO menu_item_recipe (menu_item_id, warehouse_item_id, qty) VALUES ($1, $2, $3)`,
-    [menuItemId, warehouseItemId, qty]
+    `INSERT INTO menu_item_modifiers (menu_item_id, modifier_id, is_default)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (menu_item_id, modifier_id) DO NOTHING`,
+    [menuItemId, modifierId, isDefault]
   );
 
-  const { rows: recipeRows } = await pool.query(
-    `SELECT mir.id, mir.menu_item_id, mir.qty, wi.name AS warehouse_item_name, wi.unit
-     FROM menu_item_recipe mir
-     JOIN warehouse_items wi ON wi.id = mir.warehouse_item_id
-     WHERE mir.menu_item_id = $1
-     ORDER BY wi.name`,
-    [menuItemId]
+  const attachments = await fetchMenuItemModifierAttachments(menuItemId);
+  const available = await fetchAvailableModifiersToAttach(menuItemId);
+  return c.html(
+    renderModifierAttachmentsList(menuItemId, attachments) +
+      renderAttachModifierSelect(available, { oob: true })
   );
-
-  return c.html(renderRecipeListOob(recipeRows));
 });
 
-menu.delete('/items/:menuItemId/recipe/:recipeId', async (c) => {
-  await pool.query('DELETE FROM menu_item_recipe WHERE id = $1', [c.req.param('recipeId')]);
-  return c.body(null);
+menu.put('/items/:menuItemId/modifiers/:attachmentId', async (c) => {
+  const { menuItemId, attachmentId } = c.req.param();
+  const body = await c.req.parseBody();
+  const isDefault = body.is_default === 'on' || body.is_default === 'true';
+
+  await pool.query('UPDATE menu_item_modifiers SET is_default = $1 WHERE id = $2 AND menu_item_id = $3', [
+    isDefault,
+    attachmentId,
+    menuItemId,
+  ]);
+
+  const attachments = await fetchMenuItemModifierAttachments(menuItemId);
+  const updated = attachments.find((a) => String(a.id) === String(attachmentId));
+  if (!updated) {
+    c.status(404);
+    return c.text('Модификатор не прикреплён к этой позиции');
+  }
+  return c.html(renderModifierAttachmentRow(menuItemId, updated));
+});
+
+menu.delete('/items/:menuItemId/modifiers/:attachmentId', async (c) => {
+  const { menuItemId, attachmentId } = c.req.param();
+  await pool.query('DELETE FROM menu_item_modifiers WHERE id = $1 AND menu_item_id = $2', [
+    attachmentId,
+    menuItemId,
+  ]);
+
+  const attachments = await fetchMenuItemModifierAttachments(menuItemId);
+  const available = await fetchAvailableModifiersToAttach(menuItemId);
+  return c.html(
+    renderModifierAttachmentsList(menuItemId, attachments) +
+      renderAttachModifierSelect(available, { oob: true })
+  );
 });
 
 // ---------- Изображение позиции ----------

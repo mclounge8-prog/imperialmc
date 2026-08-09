@@ -1,21 +1,15 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
-import type { OrderItemRecipeEntry } from '../api/client';
+import type { ModifierGroup } from '../api/client';
 
-const UNIT_LABELS: Record<string, string> = {
-  g: 'г',
-  ml: 'мл',
-  pcs: 'шт',
-};
-
-export function formatUnit(unit: string): string {
-  return UNIT_LABELS[unit] || unit;
+function formatMoney(value: number): string {
+  return `${value.toFixed(0)} ₽`;
 }
 
 export type CompositionTarget = {
   name: string;
-  recipe: OrderItemRecipeEntry[];
+  modifierGroups: ModifierGroup[];
 } | null;
 
 type Props = {
@@ -24,21 +18,31 @@ type Props = {
 };
 
 export default function CompositionModal({ target, onClose }: Props) {
+  const groups = target?.modifierGroups ?? [];
+
   return (
     <Modal visible={target !== null} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.modalBackdrop} onPress={onClose}>
         <Pressable style={styles.modalBox} onPress={(e) => e.stopPropagation()}>
           <Text style={styles.modalTitle}>Состав: {target?.name}</Text>
-          {target && target.recipe.length === 0 ? (
-            <Text style={styles.emptyText}>Рецептура не задана</Text>
+          {groups.length === 0 ? (
+            <Text style={styles.emptyText}>Состав не задан</Text>
           ) : (
             <ScrollView style={styles.compositionList}>
-              {target?.recipe.map((r, i) => (
-                <View key={i} style={styles.compositionRow}>
-                  <Text style={styles.compositionName}>{r.name}</Text>
-                  <Text style={styles.compositionQty}>
-                    {r.qty} {formatUnit(r.unit)}
-                  </Text>
+              {groups.map((group) => (
+                <View key={group.id ?? 'ungrouped'} style={styles.groupBlock}>
+                  <Text style={styles.groupTitle}>{group.name}</Text>
+                  {group.options.map((opt) => (
+                    <View key={opt.modifierId} style={styles.compositionRow}>
+                      <Text style={styles.compositionName}>
+                        {opt.isDefault ? '✓ ' : '+ '}
+                        {opt.name}
+                      </Text>
+                      <Text style={styles.compositionPrice}>
+                        {opt.price > 0 ? formatMoney(opt.price) : opt.isDefault ? 'входит' : 'бесплатно'}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
               ))}
             </ScrollView>
@@ -71,17 +75,25 @@ const styles = StyleSheet.create({
   },
   modalTitle: { color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
   emptyText: { color: colors.textMuted, fontSize: 13, marginTop: 12, marginBottom: 4 },
-  compositionList: { maxHeight: 320, width: '100%', marginTop: 12 },
+  compositionList: { maxHeight: 380, width: '100%', marginTop: 8 },
+  groupBlock: { marginTop: 10 },
+  groupTitle: {
+    color: colors.accent2,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
   compositionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   compositionName: { color: colors.text, fontSize: 14, flex: 1, marginRight: 12 },
-  compositionQty: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  compositionPrice: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
   modalCancel: {
     marginTop: 14,
     paddingVertical: 10,

@@ -62,18 +62,25 @@ async function fetchOrderDetail(orderId) {
 
   const itemsById = [];
   for (const item of itemRows) {
-    let recipe = [];
-    if (item.menu_item_id) {
-      // eslint-disable-next-line no-await-in-loop
-      const { rows: recipeRows } = await pool.query(
-        `SELECT wi.name, mir.qty, wi.unit
-         FROM menu_item_recipe mir
-         JOIN warehouse_items wi ON wi.id = mir.warehouse_item_id
-         WHERE mir.menu_item_id = $1`,
-        [item.menu_item_id]
-      );
-      recipe = recipeRows.map((r) => ({ name: r.name, qty: Number(r.qty), unit: r.unit }));
-    }
+    // Модификаторы конкретно ЭТОЙ позиции заказа (снапшот на момент добавления) —
+    // не общая рецептура блюда из каталога, а то, что реально выбрано: какие
+    // ингредиенты сняты, какие платные добавки включены.
+    // eslint-disable-next-line no-await-in-loop
+    const { rows: modRows } = await pool.query(
+      `SELECT oim.modifier_id, oim.name, oim.price, oim.qty, wi.unit
+       FROM order_item_modifiers oim
+       LEFT JOIN warehouse_items wi ON wi.id = oim.warehouse_item_id
+       WHERE oim.order_item_id = $1
+       ORDER BY oim.id`,
+      [item.id]
+    );
+    const modifiers = modRows.map((r) => ({
+      modifierId: r.modifier_id,
+      name: r.name,
+      price: Number(r.price),
+      qty: Number(r.qty),
+      unit: r.unit,
+    }));
     itemsById.push({
       id: item.id,
       guestId: item.guest_id,
@@ -82,7 +89,7 @@ async function fetchOrderDetail(orderId) {
       price: Number(item.price),
       qty: item.qty,
       lineTotal: Number(item.price) * item.qty,
-      recipe,
+      modifiers,
     });
   }
 
@@ -252,13 +259,21 @@ async function fetchGuestForSettlement(orderId, guestId, client) {
 
 async function fetchGuestItemsSnapshot(guestId, client) {
   const { rows } = await client.query(
-    `SELECT oi.menu_item_id, oi.name, oi.price, oi.qty, mi.category_id, mc.name AS category_name
+    `SELECT oi.id, oi.menu_item_id, oi.name, oi.price, oi.qty, mi.category_id, mc.name AS category_name
      FROM order_items oi
      LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id
      LEFT JOIN menu_categories mc ON mc.id = mi.category_id
      WHERE oi.guest_id = $1`,
     [guestId]
   );
+  for (const item of rows) {
+    // eslint-disable-next-line no-await-in-loop
+    const { rows: modRows } = await client.query(
+      'SELECT name, price FROM order_item_modifiers WHERE order_item_id = $1 ORDER BY id',
+      [item.id]
+    );
+    item.modifiers = modRows;
+  }
   return rows;
 }
 
@@ -303,9 +318,10 @@ async function createReceipt(client, { guest, staff, status, items, payments }) 
 
   for (const item of items) {
     // eslint-disable-next-line no-await-in-loop
-    await client.query(
+    const { rows: receiptItemRows } = await client.query(
       `INSERT INTO receipt_items (receipt_id, menu_item_id, name, category_id, category_name, price, qty, line_total)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
       [
         receiptId,
         item.menu_item_id,
@@ -317,6 +333,15 @@ async function createReceipt(client, { guest, staff, status, items, payments }) 
         Number(item.price) * item.qty,
       ]
     );
+    const receiptItemId = receiptItemRows[0].id;
+
+    for (const mod of item.modifiers || []) {
+      // eslint-disable-next-line no-await-in-loop
+      await client.query(
+        'INSERT INTO receipt_item_modifiers (receipt_item_id, name, price) VALUES ($1, $2, $3)',
+        [receiptItemId, mod.name, mod.price]
+      );
+    }
   }
 
   for (const p of payments) {
@@ -428,13 +453,98 @@ apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, asy
   return c.json({ order });
 });
 
-// Добавить позицию конкретному гостю: увеличивает qty, если у этого же гостя уже есть
-// такая позиция; списывает рецептуру со склада заведения — атомарно
+// ---------- Модификаторы позиции заказа: расчёт цены, ограничения групп,
+// списание/возврат со склада заведения. Заменяет старую жёсткую рецептуру —
+// состав каждой позиции теперь выбирается на месте, а не фиксирован раз и
+// навсегда в каталоге. ----------
+
+async function fetchMenuItemAttachmentsForOrder(client, menuItemId) {
+  const { rows } = await client.query(
+    `SELECT mim.modifier_id, mim.is_default,
+            m.name, m.group_id, mg.name AS group_name, mg.min_select, mg.max_select,
+            COALESCE(mim.price_override, m.price) AS price,
+            COALESCE(mim.qty_override, m.qty) AS qty,
+            m.warehouse_item_id
+     FROM menu_item_modifiers mim
+     JOIN modifiers m ON m.id = mim.modifier_id
+     LEFT JOIN modifier_groups mg ON mg.id = m.group_id
+     WHERE mim.menu_item_id = $1`,
+    [menuItemId]
+  );
+  return rows;
+}
+
+async function fetchOrderItemModifierIds(client, orderItemId) {
+  const { rows } = await client.query(
+    'SELECT modifier_id FROM order_item_modifiers WHERE order_item_id = $1 AND modifier_id IS NOT NULL',
+    [orderItemId]
+  );
+  return rows.map((r) => r.modifier_id);
+}
+
+async function fetchOrderItemModifierSnapshots(client, orderItemId) {
+  const { rows } = await client.query(
+    'SELECT warehouse_item_id, qty FROM order_item_modifiers WHERE order_item_id = $1',
+    [orderItemId]
+  );
+  return rows;
+}
+
+// Одинаковый ли набор модификаторов (порядок не важен) — используется, чтобы
+// решить, увеличивать ли количество у существующей строки заказа или завести
+// новую (одна и та же позиция с РАЗНЫМ составом — это разные строки, у них
+// разная цена и разный список для списания).
+function sameModifierSet(a, b) {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort((x, y) => x - y);
+  const sortedB = [...b].sort((x, y) => x - y);
+  return sortedA.every((v, i) => v === sortedB[i]);
+}
+
+async function applyStockDelta(client, venueId, warehouseItemId, deltaQty) {
+  if (!venueId || !warehouseItemId || deltaQty === 0) return;
+  await client.query(
+    `INSERT INTO venue_warehouse_stock (venue_id, warehouse_item_id, stock_qty, min_stock_qty)
+     VALUES ($1, $2, $3::numeric, 0)
+     ON CONFLICT (venue_id, warehouse_item_id)
+     DO UPDATE SET stock_qty = venue_warehouse_stock.stock_qty + $3::numeric`,
+    [venueId, warehouseItemId, deltaQty]
+  );
+}
+
+async function deductModifiersStock(client, venueId, modifierSnapshots, multiplier) {
+  for (const m of modifierSnapshots) {
+    if (m.warehouse_item_id && Number(m.qty) > 0) {
+      // eslint-disable-next-line no-await-in-loop
+      await applyStockDelta(client, venueId, m.warehouse_item_id, -Number(m.qty) * multiplier);
+    }
+  }
+}
+
+async function returnModifiersStock(client, venueId, modifierSnapshots, multiplier) {
+  for (const m of modifierSnapshots) {
+    if (m.warehouse_item_id && Number(m.qty) > 0) {
+      // eslint-disable-next-line no-await-in-loop
+      await applyStockDelta(client, venueId, m.warehouse_item_id, Number(m.qty) * multiplier);
+    }
+  }
+}
+
+// Добавить позицию конкретному гостю. Принимает необязательный modifier_ids —
+// список выбранных на терминале модификаторов (id из каталога modifiers).
+// Если не передан — берутся модификаторы "по умолчанию" этой позиции (как
+// раньше вела себя фиксированная рецептура). Увеличивает qty, если у этого же
+// гостя уже есть точно такая же позиция с ТАКИМ ЖЕ составом; иначе — новая
+// строка со своей ценой. Списывает со склада атомарно.
 apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
   const orderId = c.req.param('orderId');
   const body = await c.req.json().catch(() => null);
   const menuItemId = body && body.menu_item_id ? Number(body.menu_item_id) : null;
   const guestId = body && body.guest_id ? Number(body.guest_id) : null;
+  const requestedModifierIds =
+    body && Array.isArray(body.modifier_ids)
+      ? body.modifier_ids.map(Number).filter((n) => Number.isFinite(n))
+      : null;
 
   if (!menuItemId || !guestId) {
     c.status(400);
@@ -467,35 +577,87 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
     }
     const menuItem = menuRows[0];
 
-    const { rows: existingItem } = await client.query(
-      'SELECT id, qty FROM order_items WHERE order_id = $1 AND guest_id = $2 AND menu_item_id = $3',
+    const attachments = await fetchMenuItemAttachmentsForOrder(client, menuItemId);
+    const attachmentByModifierId = new Map(attachments.map((a) => [a.modifier_id, a]));
+
+    let selectedModifierIds;
+    if (requestedModifierIds) {
+      const hasInvalid = requestedModifierIds.some((id) => !attachmentByModifierId.has(id));
+      if (hasInvalid) {
+        await client.query('ROLLBACK');
+        c.status(400);
+        return c.json({ error: 'Выбран модификатор, не относящийся к этой позиции' });
+      }
+      selectedModifierIds = requestedModifierIds;
+    } else {
+      selectedModifierIds = attachments.filter((a) => a.is_default).map((a) => a.modifier_id);
+    }
+
+    // Ограничения групп (напр. "Лаваш" — ровно 1 вариант, "Соусы" — не больше 2)
+    const countsByGroup = new Map();
+    for (const modId of selectedModifierIds) {
+      const groupId = attachmentByModifierId.get(modId).group_id;
+      if (!groupId) continue;
+      countsByGroup.set(groupId, (countsByGroup.get(groupId) || 0) + 1);
+    }
+    const groupsInvolved = new Map();
+    for (const a of attachments) {
+      if (a.group_id && !groupsInvolved.has(a.group_id)) {
+        groupsInvolved.set(a.group_id, { name: a.group_name, min: a.min_select, max: a.max_select });
+      }
+    }
+    for (const [groupId, info] of groupsInvolved) {
+      const count = countsByGroup.get(groupId) || 0;
+      if (info.max != null && count > info.max) {
+        await client.query('ROLLBACK');
+        c.status(400);
+        return c.json({ error: `В группе «${info.name}» можно выбрать не больше ${info.max}` });
+      }
+      if (info.min > 0 && count < info.min) {
+        await client.query('ROLLBACK');
+        c.status(400);
+        return c.json({ error: `В группе «${info.name}» нужно выбрать хотя бы ${info.min}` });
+      }
+    }
+
+    const selectedAttachments = selectedModifierIds.map((id) => attachmentByModifierId.get(id));
+    const extraPrice = selectedAttachments.reduce((sum, a) => sum + Number(a.price), 0);
+    const unitPrice = Number(menuItem.price) + extraPrice;
+
+    const { rows: candidateItems } = await client.query(
+      'SELECT id FROM order_items WHERE order_id = $1 AND guest_id = $2 AND menu_item_id = $3',
       [orderId, guestId, menuItemId]
     );
+    let matchedItemId = null;
+    for (const candidate of candidateItems) {
+      // eslint-disable-next-line no-await-in-loop
+      const existingIds = await fetchOrderItemModifierIds(client, candidate.id);
+      if (sameModifierSet(existingIds, selectedModifierIds)) {
+        matchedItemId = candidate.id;
+        break;
+      }
+    }
 
-    if (existingItem[0]) {
-      await client.query('UPDATE order_items SET qty = qty + 1 WHERE id = $1', [existingItem[0].id]);
+    if (matchedItemId) {
+      await client.query('UPDATE order_items SET qty = qty + 1 WHERE id = $1', [matchedItemId]);
     } else {
-      await client.query(
-        'INSERT INTO order_items (order_id, guest_id, menu_item_id, name, price, qty) VALUES ($1, $2, $3, $4, $5, 1)',
-        [orderId, guestId, menuItemId, menuItem.name, menuItem.price]
+      const { rows: inserted } = await client.query(
+        'INSERT INTO order_items (order_id, guest_id, menu_item_id, name, price, qty) VALUES ($1, $2, $3, $4, $5, 1) RETURNING id',
+        [orderId, guestId, menuItemId, menuItem.name, unitPrice]
       );
+      const newItemId = inserted[0].id;
+      for (const a of selectedAttachments) {
+        // eslint-disable-next-line no-await-in-loop
+        await client.query(
+          `INSERT INTO order_item_modifiers (order_item_id, modifier_id, name, price, warehouse_item_id, qty)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [newItemId, a.modifier_id, a.name, a.price, a.warehouse_item_id, a.qty]
+        );
+      }
     }
 
     if (venueId) {
-      const { rows: recipeRows } = await client.query(
-        'SELECT warehouse_item_id, qty FROM menu_item_recipe WHERE menu_item_id = $1',
-        [menuItemId]
-      );
-      for (const r of recipeRows) {
-        // eslint-disable-next-line no-await-in-loop
-        await client.query(
-          `INSERT INTO venue_warehouse_stock (venue_id, warehouse_item_id, stock_qty, min_stock_qty)
-           VALUES ($1, $2, -$3::numeric, 0)
-           ON CONFLICT (venue_id, warehouse_item_id)
-           DO UPDATE SET stock_qty = venue_warehouse_stock.stock_qty - $3::numeric`,
-          [venueId, r.warehouse_item_id, r.qty]
-        );
-      }
+      await deductModifiersStock(client, venueId, selectedAttachments, 1);
     }
 
     await client.query('COMMIT');
@@ -533,12 +695,22 @@ apiOrders.put('/orders/:orderId/items/:itemId/guest', requireStaffToken, async (
   }
 
   if (item.menu_item_id) {
+    const itemModifierIds = await fetchOrderItemModifierIds(pool, item.id);
     const { rows: existing } = await pool.query(
       'SELECT id, qty FROM order_items WHERE order_id = $1 AND guest_id = $2 AND menu_item_id = $3 AND id != $4',
       [orderId, targetGuestId, item.menu_item_id, itemId]
     );
-    if (existing[0]) {
-      await pool.query('UPDATE order_items SET qty = qty + $1 WHERE id = $2', [item.qty, existing[0].id]);
+    let matched = null;
+    for (const candidate of existing) {
+      // eslint-disable-next-line no-await-in-loop
+      const candidateModifierIds = await fetchOrderItemModifierIds(pool, candidate.id);
+      if (sameModifierSet(candidateModifierIds, itemModifierIds)) {
+        matched = candidate;
+        break;
+      }
+    }
+    if (matched) {
+      await pool.query('UPDATE order_items SET qty = qty + $1 WHERE id = $2', [item.qty, matched.id]);
       await pool.query('DELETE FROM order_items WHERE id = $1', [itemId]);
     } else {
       await pool.query('UPDATE order_items SET guest_id = $1 WHERE id = $2', [targetGuestId, itemId]);
@@ -576,20 +748,8 @@ apiOrders.delete('/orders/:orderId/items/:itemId', requireStaffToken, async (c) 
     }
 
     if (item.menu_item_id && venueId) {
-      const { rows: recipeRows } = await client.query(
-        'SELECT warehouse_item_id, qty FROM menu_item_recipe WHERE menu_item_id = $1',
-        [item.menu_item_id]
-      );
-      for (const r of recipeRows) {
-        // eslint-disable-next-line no-await-in-loop
-        await client.query(
-          `INSERT INTO venue_warehouse_stock (venue_id, warehouse_item_id, stock_qty, min_stock_qty)
-           VALUES ($1, $2, $3::numeric, 0)
-           ON CONFLICT (venue_id, warehouse_item_id)
-           DO UPDATE SET stock_qty = venue_warehouse_stock.stock_qty + $3::numeric`,
-          [venueId, r.warehouse_item_id, r.qty]
-        );
-      }
+      const modifierSnapshots = await fetchOrderItemModifierSnapshots(client, item.id);
+      await returnModifiersStock(client, venueId, modifierSnapshots, 1);
     }
 
     if (item.qty > 1) {
@@ -636,21 +796,8 @@ apiOrders.delete('/orders/:orderId/items/:itemId/full', requireStaffToken, async
     }
 
     if (item.menu_item_id && venueId) {
-      const { rows: recipeRows } = await client.query(
-        'SELECT warehouse_item_id, qty FROM menu_item_recipe WHERE menu_item_id = $1',
-        [item.menu_item_id]
-      );
-      for (const r of recipeRows) {
-        const totalQty = Number(r.qty) * item.qty;
-        // eslint-disable-next-line no-await-in-loop
-        await client.query(
-          `INSERT INTO venue_warehouse_stock (venue_id, warehouse_item_id, stock_qty, min_stock_qty)
-           VALUES ($1, $2, $3::numeric, 0)
-           ON CONFLICT (venue_id, warehouse_item_id)
-           DO UPDATE SET stock_qty = venue_warehouse_stock.stock_qty + $3::numeric`,
-          [venueId, r.warehouse_item_id, totalQty]
-        );
-      }
+      const modifierSnapshots = await fetchOrderItemModifierSnapshots(client, item.id);
+      await returnModifiersStock(client, venueId, modifierSnapshots, item.qty);
     }
 
     await client.query('DELETE FROM order_items WHERE id = $1', [item.id]);

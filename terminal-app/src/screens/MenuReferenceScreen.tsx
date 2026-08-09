@@ -63,7 +63,7 @@ export default function MenuReferenceScreen() {
       </View>
       <MenuBrowser
         menu={menu}
-        onItemPress={(item) => setCompositionTarget({ name: item.name, recipe: item.recipe })}
+        onItemPress={(item) => setCompositionTarget({ name: item.name, modifierGroups: item.modifierGroups })}
       />
       <CompositionModal target={compositionTarget} onClose={() => setCompositionTarget(null)} />
     </View>

@@ -76,17 +76,49 @@ apiTerminal.get('/menu', requireStaffToken, async (c) => {
     'SELECT id, category_id, name, price, image_url FROM menu_items WHERE is_active = true ORDER BY name'
   );
 
-  // Рецептура сразу для всех позиций одним запросом (не N+1) — нужна терминалу
-  // для справочника состава независимо от того, есть ли активный заказ
-  const { rows: recipeRows } = await pool.query(
-    `SELECT mir.menu_item_id, wi.name, mir.qty, wi.unit
-     FROM menu_item_recipe mir
-     JOIN warehouse_items wi ON wi.id = mir.warehouse_item_id`
+  // Модификаторы сразу для всех позиций одним запросом (не N+1) — терминалу
+  // нужны и для справочника состава, и для экрана настройки при добавлении
+  // в заказ (что включено по умолчанию, что можно докупить, ограничения групп).
+  const { rows: modifierRows } = await pool.query(
+    `SELECT mim.menu_item_id, mim.modifier_id, mim.is_default,
+            m.name, m.group_id, mg.name AS group_name, mg.min_select, mg.max_select,
+            COALESCE(mim.price_override, m.price) AS price
+     FROM menu_item_modifiers mim
+     JOIN modifiers m ON m.id = mim.modifier_id
+     LEFT JOIN modifier_groups mg ON mg.id = m.group_id
+     ORDER BY mg.name NULLS FIRST, m.name`
   );
-  const recipeByItem = new Map();
-  for (const r of recipeRows) {
-    if (!recipeByItem.has(r.menu_item_id)) recipeByItem.set(r.menu_item_id, []);
-    recipeByItem.get(r.menu_item_id).push({ name: r.name, qty: Number(r.qty), unit: r.unit });
+
+  const modifierRowsByItem = new Map();
+  for (const row of modifierRows) {
+    if (!modifierRowsByItem.has(row.menu_item_id)) modifierRowsByItem.set(row.menu_item_id, []);
+    modifierRowsByItem.get(row.menu_item_id).push(row);
+  }
+
+  // Ингредиенты без группы (обычные, без ограничения выбора) собираются в один
+  // синтетический "Состав" — реальные группы (с лимитом выбора) идут отдельно.
+  function buildModifierGroups(itemId) {
+    const rows = modifierRowsByItem.get(itemId) || [];
+    const groups = new Map();
+    for (const row of rows) {
+      const key = row.group_id || 'ungrouped';
+      if (!groups.has(key)) {
+        groups.set(key, {
+          id: row.group_id || null,
+          name: row.group_id ? row.group_name : 'Состав',
+          minSelect: row.group_id ? row.min_select : 0,
+          maxSelect: row.group_id ? row.max_select : null,
+          options: [],
+        });
+      }
+      groups.get(key).options.push({
+        modifierId: row.modifier_id,
+        name: row.name,
+        price: Number(row.price),
+        isDefault: row.is_default,
+      });
+    }
+    return [...groups.values()];
   }
 
   const mapItem = (item) => ({
@@ -94,7 +126,7 @@ apiTerminal.get('/menu', requireStaffToken, async (c) => {
     name: item.name,
     price: Number(item.price),
     imageUrl: item.image_url,
-    recipe: recipeByItem.get(item.id) || [],
+    modifierGroups: buildModifierGroups(item.id),
   });
 
   const categoriesWithItems = categories.map((cat) => ({

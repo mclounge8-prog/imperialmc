@@ -101,15 +101,94 @@ CREATE TABLE IF NOT EXISTS menu_items (
   created_at   TIMESTAMPTZ DEFAULT now()
 );
 
--- Рецептура: что и сколько списывается со склада при продаже 1 позиции меню.
--- Ссылается на общий каталог warehouse_items — фактическое списание при заказе
--- применяется к остатку конкретного заведения (venue_warehouse_stock).
+-- Рецептура (legacy): что и сколько списывается со склада при продаже 1 позиции
+-- меню. Больше не используется приложением — данные один раз перенесены в
+-- modifiers/menu_item_modifiers ниже (см. миграцию в конце файла), таблица
+-- оставлена только как историческая читаемая копия, на неё больше не пишут.
 CREATE TABLE IF NOT EXISTS menu_item_recipe (
   id                 SERIAL PRIMARY KEY,
   menu_item_id       INT REFERENCES menu_items(id) ON DELETE CASCADE,
   warehouse_item_id  INT REFERENCES warehouse_items(id),
   qty                NUMERIC(10,3) NOT NULL -- напр. 20.000 (г табака на 1 кальян)
 );
+
+-- ============================================================
+-- Модификаторы — единая система ингредиентов и добавок для позиций меню.
+-- Заменяет старую рецептуру: теперь у каждого пункта состава есть цена
+-- (0 для обычного ингредиента, >0 для платной добавки) и его можно
+-- включать/выключать прямо на терминале при оформлении заказа, а не только
+-- через жёсткую тех-карту.
+-- ============================================================
+
+-- Группы — задают ограничение выбора для набора модификаторов конкретной
+-- позиции (напр. "Лаваш": ровно 1 вариант; "Соусы": не больше 2).
+-- Обычные ингредиенты блюда группе не принадлежат (group_id IS NULL у
+-- modifiers) — на них ограничение выбора не действует, это просто список
+-- галочек "входит / не входит".
+CREATE TABLE IF NOT EXISTS modifier_groups (
+  id         SERIAL PRIMARY KEY,
+  name       VARCHAR(100) NOT NULL,
+  min_select INT NOT NULL DEFAULT 0,
+  max_select INT, -- NULL = без ограничения сверху
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Каталог модификаторов — общий на все позиции меню (переиспользуется,
+-- как warehouse_items), с ценой по умолчанию и опциональным списанием со
+-- склада. Конкретная позиция меню может переопределить цену/количество
+-- списания через menu_item_modifiers ниже.
+CREATE TABLE IF NOT EXISTS modifiers (
+  id                SERIAL PRIMARY KEY,
+  group_id          INT REFERENCES modifier_groups(id) ON DELETE SET NULL,
+  name              VARCHAR(150) NOT NULL,
+  price             NUMERIC(10,2) NOT NULL DEFAULT 0,
+  warehouse_item_id INT REFERENCES warehouse_items(id) ON DELETE SET NULL,
+  qty               NUMERIC(10,3) NOT NULL DEFAULT 0, -- списание при выборе; 0 = не списывается
+  created_at        TIMESTAMPTZ DEFAULT now()
+);
+
+-- Привязка модификатора к конкретной позиции меню: is_default — включён
+-- автоматически при добавлении позиции в заказ (можно снять на терминале),
+-- *_override — переопределение цены/количества списания именно для этой
+-- позиции (NULL — берётся значение по умолчанию из modifiers).
+CREATE TABLE IF NOT EXISTS menu_item_modifiers (
+  id             SERIAL PRIMARY KEY,
+  menu_item_id   INT NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  modifier_id    INT NOT NULL REFERENCES modifiers(id) ON DELETE CASCADE,
+  is_default     BOOLEAN NOT NULL DEFAULT false,
+  price_override NUMERIC(10,2),
+  qty_override   NUMERIC(10,3),
+  sort_order     INT NOT NULL DEFAULT 0,
+  UNIQUE (menu_item_id, modifier_id)
+);
+
+-- Снапшот выбранных модификаторов конкретной позиции живого заказа — цена,
+-- название и данные для списания зафиксированы на момент добавления в заказ
+-- (тот же принцип, что и в order_items: изменения каталога потом не должны
+-- задним числом менять уже оформленный заказ).
+CREATE TABLE IF NOT EXISTS order_item_modifiers (
+  id                SERIAL PRIMARY KEY,
+  order_item_id     INT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+  modifier_id       INT REFERENCES modifiers(id) ON DELETE SET NULL,
+  name              VARCHAR(150) NOT NULL,
+  price             NUMERIC(10,2) NOT NULL DEFAULT 0,
+  warehouse_item_id INT REFERENCES warehouse_items(id) ON DELETE SET NULL,
+  qty               NUMERIC(10,3) NOT NULL DEFAULT 0
+);
+
+-- Снапшот модификаторов уже рассчитанного чека — для истории/будущих отчётов
+-- по составу продаж (тот же принцип, что и receipt_items).
+CREATE TABLE IF NOT EXISTS receipt_item_modifiers (
+  id               SERIAL PRIMARY KEY,
+  receipt_item_id  INT NOT NULL REFERENCES receipt_items(id) ON DELETE CASCADE,
+  name             VARCHAR(150) NOT NULL,
+  price            NUMERIC(10,2) NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_modifiers_group ON modifiers(group_id);
+CREATE INDEX IF NOT EXISTS idx_menu_item_modifiers_item ON menu_item_modifiers(menu_item_id);
+CREATE INDEX IF NOT EXISTS idx_order_item_modifiers_item ON order_item_modifiers(order_item_id);
+CREATE INDEX IF NOT EXISTS idx_receipt_item_modifiers_item ON receipt_item_modifiers(receipt_item_id);
 
 -- Заказы: table_id = NULL означает "быстрый заказ" (не привязан к столу).
 -- venue_id определяется через стол (стол → зона → заведение) при открытии,
@@ -290,3 +369,31 @@ ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);
 ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'open';
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS shift_id INT REFERENCES shifts(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_receipts_shift ON receipts(shift_id);
+
+-- ============================================================
+-- Разовый перенос старой рецептуры (menu_item_recipe) в новую систему
+-- модификаторов — сама рецептура становится обычными "включёнными по
+-- умолчанию" ингредиентами без группы (без ограничения выбора), с ценой 0
+-- и с тем же количеством списания, что было раньше (сохраняем через
+-- qty_override, а не через каталожное значение — у одного и того же сырья
+-- расход мог отличаться по разным позициям меню). Оба запроса безопасно
+-- перезапускать: WHERE NOT EXISTS не даёт создать дубликаты при повторном
+-- прогоне этого файла на уже мигрированной базе.
+-- ============================================================
+INSERT INTO modifiers (name, warehouse_item_id, price, qty)
+SELECT DISTINCT wi.name, wi.id, 0, 0
+FROM menu_item_recipe mir
+JOIN warehouse_items wi ON wi.id = mir.warehouse_item_id
+WHERE NOT EXISTS (
+  SELECT 1 FROM modifiers m WHERE m.warehouse_item_id = wi.id AND m.group_id IS NULL
+);
+
+INSERT INTO menu_item_modifiers (menu_item_id, modifier_id, is_default, qty_override)
+SELECT mir.menu_item_id, m.id, true, mir.qty
+FROM menu_item_recipe mir
+JOIN modifiers m ON m.warehouse_item_id = mir.warehouse_item_id AND m.group_id IS NULL
+WHERE mir.menu_item_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM menu_item_modifiers mim
+    WHERE mim.menu_item_id = mir.menu_item_id AND mim.modifier_id = m.id
+  );

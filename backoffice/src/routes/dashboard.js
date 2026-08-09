@@ -10,6 +10,7 @@ import { renderDevicesSection } from '../views/devicesView.js';
 import { renderReceiptsSection } from '../views/reportsView.js';
 import { fetchReceiptsPage, defaultDateRange, PAGE_SIZE } from './reports.js';
 import { renderDashboardFragment } from './stats.js';
+import { renderModifiersFragment } from './modifiers.js';
 import { pool } from '../db.js';
 
 /**
@@ -70,6 +71,10 @@ export async function renderFragmentHtml(key) {
       items = rows;
     }
     return renderWarehouseSection(venueRows, selectedVenue ? selectedVenue.id : null, categories, items);
+  }
+
+  if (key === 'modifiers') {
+    return renderModifiersFragment();
   }
 
   if (key === 'menu') {

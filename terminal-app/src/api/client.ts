@@ -113,12 +113,30 @@ export type TablesResponse = {
   zones: Zone[];
 };
 
+export type ModifierOption = {
+  modifierId: number;
+  name: string;
+  price: number;
+  isDefault: boolean;
+};
+
+// Группа модификаторов позиции меню. id === null — синтетическая группа
+// "Состав" (обычные ингредиенты без ограничения выбора); группы с id —
+// настоящие ограничения (напр. "Лаваш" — ровно 1 вариант из maxSelect).
+export type ModifierGroup = {
+  id: number | null;
+  name: string;
+  minSelect: number;
+  maxSelect: number | null;
+  options: ModifierOption[];
+};
+
 export type MenuItem = {
   id: number;
   name: string;
   price: number;
   imageUrl: string | null;
-  recipe: OrderItemRecipeEntry[];
+  modifierGroups: ModifierGroup[];
 };
 
 export type MenuCategory = {
@@ -133,10 +151,14 @@ export type MenuResponse = {
   uncategorized: MenuItem[];
 };
 
-export type OrderItemRecipeEntry = {
+// Снапшот одного выбранного модификатора КОНКРЕТНОЙ позиции заказа (что
+// реально выбрано при добавлении — не общий каталог, не рецептура блюда)
+export type OrderItemModifier = {
+  modifierId: number | null;
   name: string;
+  price: number;
   qty: number;
-  unit: string;
+  unit: string | null;
 };
 
 export type OrderItem = {
@@ -146,7 +168,7 @@ export type OrderItem = {
   price: number;
   qty: number;
   lineTotal: number;
-  recipe: OrderItemRecipeEntry[];
+  modifiers: OrderItemModifier[];
 };
 
 export type OrderGuest = {
@@ -249,11 +271,16 @@ export async function addOrderItem(
   orderId: number,
   menuItemId: number,
   guestId: number,
-  token: string
+  token: string,
+  modifierIds?: number[]
 ): Promise<Order> {
   const { order } = await authorizedRequest<OrderEnvelope>(`/api/orders/${orderId}/items`, token, {
     method: 'POST',
-    body: { menu_item_id: menuItemId, guest_id: guestId },
+    body: {
+      menu_item_id: menuItemId,
+      guest_id: guestId,
+      ...(modifierIds !== undefined ? { modifier_ids: modifierIds } : {}),
+    },
   });
   return order;
 }
