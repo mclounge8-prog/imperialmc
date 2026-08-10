@@ -1,0 +1,47 @@
+node_modules/
+.env
+*.log
+npm-debug.log*
+
+# macOS
+.DS_Store
+__MACOSX/
+
+# React Native — Xcode / iOS
+terminal-app/ios/build/
+terminal-app/ios/Pods/
+terminal-app/ios/**/*.pbxuser
+terminal-app/ios/**/xcuserdata
+terminal-app/ios/**/*.xcuserstate
+terminal-app/ios/**/DerivedData
+**/.xcode.env.local
+
+# React Native — Android / IntelliJ
+terminal-app/android/build/
+terminal-app/android/app/build/
+terminal-app/android/.idea
+terminal-app/android/.gradle/
+terminal-app/android/local.properties
+terminal-app/android/*.iml
+terminal-app/android/app/*.iml
+terminal-app/android/**/*.hprof
+terminal-app/android/**/.cxx/
+terminal-app/android/**/*.keystore
+!terminal-app/android/app/debug.keystore
+terminal-app/android/**/.kotlin/
+
+# React Native — Metro / bundler / tests
+*.jsbundle
+terminal-app/.metro-health-check*
+terminal-app/coverage/
+
+# Ruby / CocoaPods / fastlane
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots
+**/fastlane/test_output
+/vendor/bundle/
+
+# Backoffice runtime uploads
+backoffice/public/uploads/*
+!backoffice/public/uploads/.gitkeep
