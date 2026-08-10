@@ -42,11 +42,37 @@ export async function isAtolDriverAppInstalled(): Promise<boolean> {
   }
 }
 
+/**
+ * Приводит payload задания к формату ДТО10 / ФФД 1.2.
+ * Главное: measurementUnit должен быть числом (0 = штука), не строкой «шт».
+ */
+export function normalizeAtolTask(task: unknown): unknown {
+  if (!task || typeof task !== 'object') return task;
+  const root = task as Record<string, unknown>;
+  if (!Array.isArray(root.positions)) return task;
+  return {
+    ...root,
+    positions: root.positions.map((pos) => {
+      if (!pos || typeof pos !== 'object') return pos;
+      const p = pos as Record<string, unknown>;
+      const unit = p.measurementUnit;
+      if (unit === 'шт' || unit === 'piece' || unit === 'unit' || unit == null) {
+        return { ...p, measurementUnit: 0 };
+      }
+      if (typeof unit === 'string' && /^\d+$/.test(unit)) {
+        return { ...p, measurementUnit: Number(unit) };
+      }
+      return p;
+    }),
+  };
+}
+
 export async function runAtolTask(settings: AtolConnectionSettings, task: unknown): Promise<unknown> {
   if (!AtolModule) {
     throw new Error('Драйвер АТОЛ недоступен на этом устройстве (не Android или модуль не собран)');
   }
-  const responseText = await AtolModule.runTask(JSON.stringify(settings), JSON.stringify(task));
+  const payload = normalizeAtolTask(task);
+  const responseText = await AtolModule.runTask(JSON.stringify(settings), JSON.stringify(payload));
   if (responseText == null || String(responseText).trim() === '') {
     throw new Error('Касса вернула пустой ответ (пустая строка JSON_DATA)');
   }

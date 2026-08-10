@@ -107,12 +107,9 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
 
       try {
         const task = typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
-        // Подстраховка на случай старых заданий в очереди / ещё не
-        // задеплоенного backend: «шт» драйвер ФФД 1.2 не принимает.
-        const normalizedTask = normalizeAtolTask(task);
         const response = await runAtolTask(
           { ipAddress: settings.ipAddress, ipPort: settings.ipPort ?? 5555, model: settings.model },
-          normalizedTask
+          task
         );
         console.log(`[ATOL] задание #${job.id} — ответ кассы:`, JSON.stringify(response));
         const { fiscalDocNumber, fiscalSign, fiscalDatetime } = extractResponseFields(response);
