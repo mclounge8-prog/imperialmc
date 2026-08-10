@@ -269,7 +269,7 @@ async function fetchGuestItemsSnapshot(guestId, client) {
   for (const item of rows) {
     // eslint-disable-next-line no-await-in-loop
     const { rows: modRows } = await client.query(
-      'SELECT name, price FROM order_item_modifiers WHERE order_item_id = $1 ORDER BY id',
+      'SELECT modifier_id, name, price FROM order_item_modifiers WHERE order_item_id = $1 ORDER BY id',
       [item.id]
     );
     item.modifiers = modRows;
@@ -338,8 +338,8 @@ async function createReceipt(client, { guest, staff, status, items, payments }) 
     for (const mod of item.modifiers || []) {
       // eslint-disable-next-line no-await-in-loop
       await client.query(
-        'INSERT INTO receipt_item_modifiers (receipt_item_id, name, price) VALUES ($1, $2, $3)',
-        [receiptItemId, mod.name, mod.price]
+        'INSERT INTO receipt_item_modifiers (receipt_item_id, modifier_id, name, price) VALUES ($1, $2, $3, $4)',
+        [receiptItemId, mod.modifier_id, mod.name, mod.price]
       );
     }
   }

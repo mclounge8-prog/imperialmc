@@ -177,10 +177,14 @@ CREATE TABLE IF NOT EXISTS order_item_modifiers (
 );
 
 -- Снапшот модификаторов уже рассчитанного чека — для истории/будущих отчётов
--- по составу продаж (тот же принцип, что и receipt_items).
+-- по составу продаж (тот же принцип, что и receipt_items). modifier_id — не
+-- просто снапшот имени, а ссылка на каталог: нужна, чтобы на терминале можно
+-- было сравнить состав чека с ТЕКУЩИМИ настройками позиции меню и показать,
+-- что из состава по умолчанию убрали, а что докупили сверху.
 CREATE TABLE IF NOT EXISTS receipt_item_modifiers (
   id               SERIAL PRIMARY KEY,
   receipt_item_id  INT NOT NULL REFERENCES receipt_items(id) ON DELETE CASCADE,
+  modifier_id      INT REFERENCES modifiers(id) ON DELETE SET NULL,
   name             VARCHAR(150) NOT NULL,
   price            NUMERIC(10,2) NOT NULL DEFAULT 0
 );
@@ -414,3 +418,18 @@ JOIN modifiers m ON m.warehouse_item_id = wi.id AND m.group_id IS NULL
 WHERE NOT EXISTS (
   SELECT 1 FROM order_item_modifiers oim WHERE oim.order_item_id = oi.id
 );
+
+-- Таблица receipt_item_modifiers создана раньше без modifier_id — CREATE
+-- TABLE IF NOT EXISTS выше её не трогает на уже существующей базе, колонку
+-- нужно добавить явно.
+ALTER TABLE receipt_item_modifiers ADD COLUMN IF NOT EXISTS modifier_id INT REFERENCES modifiers(id) ON DELETE SET NULL;
+
+-- Доливаем ссылку на каталог для уже существующих строк,
+-- сопоставляя по названию (снапшот имени должен совпадать с текущим именем
+-- модификатора почти всегда, кроме случаев, когда модификатор потом
+-- переименовали в каталоге — тогда сравнение состава просто останется
+-- недоступным для этой конкретной старой строки, не критично).
+UPDATE receipt_item_modifiers rim
+SET modifier_id = m.id
+FROM modifiers m
+WHERE rim.modifier_id IS NULL AND m.name = rim.name;

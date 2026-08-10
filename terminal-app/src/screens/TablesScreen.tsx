@@ -15,8 +15,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
-import { fetchTables, fetchOpenOrders } from '../api/client';
-import type { OpenOrderSummary, Zone } from '../api/client';
+import { fetchTables, fetchOpenOrders, fetchPaidReceipts } from '../api/client';
+import type { OpenOrderSummary, PaidReceiptSummary, Zone } from '../api/client';
+import PaidReceiptDetailModal from '../components/PaidReceiptDetailModal';
 import type { RootStackParamList } from '../../App';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -45,6 +46,9 @@ export default function TablesScreen() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [openOrders, setOpenOrders] = useState<OpenOrderSummary[]>([]);
+  const [paidReceipts, setPaidReceipts] = useState<PaidReceiptSummary[]>([]);
+  const [ordersTab, setOrdersTab] = useState<'open' | 'paid'>('open');
+  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [contentHeight, setContentHeight] = useState(0);
@@ -54,13 +58,15 @@ export default function TablesScreen() {
     setLoading(true);
     setError(null);
     try {
-      const [tablesData, ordersData] = await Promise.all([
+      const [tablesData, ordersData, paidData] = await Promise.all([
         fetchTables(venue.id, session.token),
         fetchOpenOrders(venue.id, session.token),
+        fetchPaidReceipts(venue.id, session.token),
       ]);
       setZones(tablesData.zones);
       setSelectedZoneId((prev) => prev ?? tablesData.zones[0]?.id ?? null);
       setOpenOrders(ordersData.orders);
+      setPaidReceipts(paidData);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось загрузить столы');
     } finally {
@@ -243,28 +249,79 @@ export default function TablesScreen() {
       </View>
 
       <View style={[styles.ordersPane, { paddingBottom: 16 + insets.bottom }]}>
-        <Text style={styles.ordersPaneTitle}>Открытые заказы</Text>
-        {openOrders.length === 0 ? (
-          <Text style={styles.emptyText}>Нет открытых заказов</Text>
+        <View style={styles.ordersTabBar}>
+          <Pressable
+            style={[styles.ordersTabButton, ordersTab === 'open' && styles.ordersTabButtonActive]}
+            onPress={() => setOrdersTab('open')}
+          >
+            <Text style={[styles.ordersTabText, ordersTab === 'open' && styles.ordersTabTextActive]}>
+              Открытые
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.ordersTabButton, ordersTab === 'paid' && styles.ordersTabButtonActive]}
+            onPress={() => setOrdersTab('paid')}
+          >
+            <Text style={[styles.ordersTabText, ordersTab === 'paid' && styles.ordersTabTextActive]}>
+              Оплаченные
+            </Text>
+          </Pressable>
+        </View>
+
+        {ordersTab === 'open' ? (
+          openOrders.length === 0 ? (
+            <Text style={styles.emptyText}>Нет открытых заказов</Text>
+          ) : (
+            <ScrollView>
+              {openOrders.map((o) => (
+                <Pressable
+                  key={o.id}
+                  style={styles.openOrderRow}
+                  onPress={() => handleOpenOrderPress(o)}
+                >
+                  <Text style={styles.openOrderName} numberOfLines={1}>
+                    {o.tableName ?? `Быстрый заказ №${o.id}`}
+                  </Text>
+                  <Text style={styles.openOrderTotal}>{o.total.toFixed(0)} ₽</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )
+        ) : paidReceipts.length === 0 ? (
+          <Text style={styles.emptyText}>Сегодня пока нет оплаченных чеков</Text>
         ) : (
           <ScrollView>
-            {openOrders.map((o) => (
+            {paidReceipts.map((r) => (
               <Pressable
-                key={o.id}
-                style={styles.openOrderRow}
-                onPress={() => handleOpenOrderPress(o)}
+                key={r.id}
+                style={styles.paidReceiptRow}
+                onPress={() => setSelectedReceiptId(r.id)}
               >
-                <Text style={styles.openOrderName} numberOfLines={1}>
-                  {o.tableName ?? `Быстрый заказ №${o.id}`}
-                </Text>
-                <Text style={styles.openOrderTotal}>{o.total.toFixed(0)} ₽</Text>
+                <View style={styles.paidReceiptInfo}>
+                  <Text style={styles.openOrderName} numberOfLines={1}>
+                    {r.tableName ?? 'Быстрый заказ'}
+                    {r.guestLabel ? ` · ${r.guestLabel}` : ''}
+                  </Text>
+                  <Text style={styles.paidReceiptTime}>{formatReceiptTime(r.closedAt)}</Text>
+                </View>
+                <Text style={styles.openOrderTotal}>{r.total.toFixed(0)} ₽</Text>
               </Pressable>
             ))}
           </ScrollView>
         )}
       </View>
+
+      <PaidReceiptDetailModal
+        receiptId={selectedReceiptId}
+        token={session?.token ?? ''}
+        onClose={() => setSelectedReceiptId(null)}
+      />
     </View>
   );
+}
+
+function formatReceiptTime(value: string): string {
+  return new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
 const styles = StyleSheet.create({
@@ -321,6 +378,37 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   ordersPaneTitle: { color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 12 },
+  ordersTabBar: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface2,
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: 12,
+  },
+  ordersTabButton: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  ordersTabButtonActive: { backgroundColor: colors.accent },
+  ordersTabText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  ordersTabTextActive: { color: '#f1f1f3' },
+  paidReceiptRow: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  paidReceiptInfo: { flex: 1 },
+  paidReceiptTime: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   openOrderRow: {
     backgroundColor: colors.surface,
     borderWidth: 1,

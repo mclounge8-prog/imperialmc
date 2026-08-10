@@ -82,10 +82,13 @@ apiTerminal.get('/menu', requireStaffToken, async (c) => {
   const { rows: modifierRows } = await pool.query(
     `SELECT mim.menu_item_id, mim.modifier_id, mim.is_default,
             m.name, m.group_id, mg.name AS group_name, mg.min_select, mg.max_select,
-            COALESCE(mim.price_override, m.price) AS price
+            COALESCE(mim.price_override, m.price) AS price,
+            COALESCE(mim.qty_override, m.qty) AS qty,
+            wi.unit AS warehouse_unit
      FROM menu_item_modifiers mim
      JOIN modifiers m ON m.id = mim.modifier_id
      LEFT JOIN modifier_groups mg ON mg.id = m.group_id
+     LEFT JOIN warehouse_items wi ON wi.id = m.warehouse_item_id
      ORDER BY mg.name NULLS FIRST, m.name`
   );
 
@@ -116,6 +119,8 @@ apiTerminal.get('/menu', requireStaffToken, async (c) => {
         name: row.name,
         price: Number(row.price),
         isDefault: row.is_default,
+        qty: Number(row.qty) || 0,
+        unit: row.warehouse_unit || null,
       });
     }
     return [...groups.values()];

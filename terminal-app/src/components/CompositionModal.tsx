@@ -7,6 +7,28 @@ function formatMoney(value: number): string {
   return `${value.toFixed(0)} ₽`;
 }
 
+const UNIT_LABELS: Record<string, string> = {
+  g: 'г',
+  ml: 'мл',
+  pcs: 'шт',
+};
+
+function formatUnit(unit: string): string {
+  return UNIT_LABELS[unit] || unit;
+}
+
+function formatOptionMeta(opt: { price: number; qty: number; unit: string | null; isDefault: boolean }): string {
+  const parts: string[] = [];
+  if (opt.qty > 0 && opt.unit) {
+    parts.push(`${opt.qty} ${formatUnit(opt.unit)}`);
+  }
+  if (opt.price > 0) {
+    parts.push(`+${formatMoney(opt.price)}`);
+  }
+  if (parts.length > 0) return parts.join(' · ');
+  return opt.isDefault ? 'входит' : 'бесплатно';
+}
+
 export type CompositionTarget = {
   name: string;
   modifierGroups: ModifierGroup[];
@@ -38,9 +60,7 @@ export default function CompositionModal({ target, onClose }: Props) {
                         {opt.isDefault ? '✓ ' : '+ '}
                         {opt.name}
                       </Text>
-                      <Text style={styles.compositionPrice}>
-                        {opt.price > 0 ? formatMoney(opt.price) : opt.isDefault ? 'входит' : 'бесплатно'}
-                      </Text>
+                      <Text style={styles.compositionPrice}>{formatOptionMeta(opt)}</Text>
                     </View>
                   ))}
                 </View>

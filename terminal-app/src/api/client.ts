@@ -118,6 +118,8 @@ export type ModifierOption = {
   name: string;
   price: number;
   isDefault: boolean;
+  qty: number;
+  unit: string | null;
 };
 
 // Группа модификаторов позиции меню. id === null — синтетическая группа
@@ -361,6 +363,61 @@ export async function transferOrderTable(
     body: { table_id: tableId },
   });
   return order;
+}
+
+/* ---------- Оплаченные чеки (переключатель на экране столов) ---------- */
+
+export type PaidReceiptSummary = {
+  id: number;
+  tableName: string | null;
+  guestLabel: string | null;
+  staffName: string | null;
+  total: number;
+  closedAt: string;
+};
+
+export type ReceiptDetailItemModifier = {
+  modifierId: number | null;
+  name: string;
+  price: number;
+};
+
+export type ReceiptDetailItem = {
+  id: number;
+  menuItemId: number | null;
+  name: string;
+  price: number;
+  qty: number;
+  lineTotal: number;
+  modifiers: ReceiptDetailItemModifier[];
+  // Сравнение с текущим составом позиции меню по умолчанию — что убрали,
+  // что докупили сверху в этом конкретном чеке
+  removed: string[];
+  added: string[];
+};
+
+export type PaidReceiptDetail = {
+  id: number;
+  tableName: string | null;
+  guestLabel: string | null;
+  staffName: string | null;
+  total: number;
+  closedAt: string;
+  status: string;
+  items: ReceiptDetailItem[];
+};
+
+export async function fetchPaidReceipts(venueId: number, token: string): Promise<PaidReceiptSummary[]> {
+  const { receipts } = await authorizedRequest<{ receipts: PaidReceiptSummary[] }>(
+    `/api/receipts?venueId=${venueId}`,
+    token
+  );
+  return receipts;
+}
+
+export async function fetchPaidReceiptDetail(id: number, token: string): Promise<PaidReceiptDetail> {
+  const { receipt } = await authorizedRequest<{ receipt: PaidReceiptDetail }>(`/api/receipts/${id}`, token);
+  return receipt;
 }
 
 /* ---------- Смены (открытие/закрытие, X-отчёт, чеки смены) ---------- */

@@ -7,6 +7,24 @@ function formatMoney(value: number): string {
   return `${value.toFixed(0)} ₽`;
 }
 
+const UNIT_LABELS: Record<string, string> = {
+  g: 'г',
+  ml: 'мл',
+  pcs: 'шт',
+};
+
+function formatOptionMeta(opt: { price: number; qty: number; unit: string | null; isDefault: boolean }): string {
+  const parts: string[] = [];
+  if (opt.qty > 0 && opt.unit) {
+    parts.push(`${opt.qty} ${UNIT_LABELS[opt.unit] || opt.unit}`);
+  }
+  if (opt.price > 0) {
+    parts.push(`+${formatMoney(opt.price)}`);
+  }
+  if (parts.length > 0) return parts.join(' · ');
+  return opt.isDefault ? '' : 'беспл.';
+}
+
 type Props = {
   item: MenuItem | null;
   onClose: () => void;
@@ -114,9 +132,7 @@ export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) 
                         )}
                       </View>
                       <Text style={styles.optionName}>{opt.name}</Text>
-                      <Text style={styles.optionPrice}>
-                        {opt.price > 0 ? `+${formatMoney(opt.price)}` : opt.isDefault ? '' : 'беспл.'}
-                      </Text>
+                      <Text style={styles.optionPrice}>{formatOptionMeta(opt)}</Text>
                     </Pressable>
                   );
                 })}
