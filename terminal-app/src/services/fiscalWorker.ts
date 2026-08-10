@@ -1,3 +1,4 @@
+import { Alert, NativeModules, Platform } from 'react-native';
 import {
   fetchAtolSettings,
   fetchNextFiscalJob,
@@ -53,7 +54,17 @@ const runningForVenue = new Set<number>();
 // исключение наружу — фискализация никогда не должна ронять основной UI
 // (продажу/смену); при сбое задание просто останется в очереди до следующей
 // попытки (см. useFiscalSync — периодический опрос).
+// ВРЕМЕННО для отладки: показывает alert прямо на экране, чтобы не зависеть
+// от того, доходят логи до logcat/Metro или нет. Убрать после калибровки.
+Alert.alert(
+  'ATOL debug',
+  `runPendingFiscalJobs МОДУЛЬ ЗАГРУЖЕН. Platform=${Platform.OS}, AtolModule=${
+    NativeModules.AtolModule ? 'найден' : 'НЕ найден'
+  }`
+);
+
 export async function runPendingFiscalJobs(venueId: number, token: string): Promise<void> {
+  Alert.alert('ATOL debug', `runPendingFiscalJobs ВЫЗВАНА, venueId=${venueId}`);
   if (!isAtolAvailablePlatform()) {
     console.warn('[ATOL] недоступен на этой платформе/сборке (нативный модуль AtolModule не найден) — пропускаю');
     return;
