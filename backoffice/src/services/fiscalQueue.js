@@ -37,7 +37,9 @@ function buildSellTaskPayload({ items, payments, total, operatorName }) {
   return {
     type: 'sell',
     ...(operatorName ? { operator: { name: operatorName } } : {}),
-    positions: items.map((item) => ({
+    // В JSON-заданиях ДТО10 поле называется items (не positions) —
+    // иначе касса отвечает ошибкой 10 «поле items отсутствует».
+    items: items.map((item) => ({
       type: 'position',
       name: item.name,
       price: Number(item.price),

@@ -42,28 +42,37 @@ export async function isAtolDriverAppInstalled(): Promise<boolean> {
   }
 }
 
+function normalizePosition(pos: unknown): unknown {
+  if (!pos || typeof pos !== 'object') return pos;
+  const p = pos as Record<string, unknown>;
+  const unit = p.measurementUnit;
+  if (unit === 'шт' || unit === 'piece' || unit === 'unit' || unit == null) {
+    return { ...p, measurementUnit: 0 };
+  }
+  if (typeof unit === 'string' && /^\d+$/.test(unit)) {
+    return { ...p, measurementUnit: Number(unit) };
+  }
+  return p;
+}
+
 /**
  * Приводит payload задания к формату ДТО10 / ФФД 1.2.
- * Главное: measurementUnit должен быть числом (0 = штука), не строкой «шт».
+ * - positions → items (драйвер требует поле items)
+ * - measurementUnit: число 0, не строка «шт»
  */
 export function normalizeAtolTask(task: unknown): unknown {
   if (!task || typeof task !== 'object') return task;
   const root = task as Record<string, unknown>;
-  if (!Array.isArray(root.positions)) return task;
+  const rawItems = Array.isArray(root.items)
+    ? root.items
+    : Array.isArray(root.positions)
+      ? root.positions
+      : null;
+  if (!rawItems) return task;
+  const { positions: _dropPositions, ...rest } = root;
   return {
-    ...root,
-    positions: root.positions.map((pos) => {
-      if (!pos || typeof pos !== 'object') return pos;
-      const p = pos as Record<string, unknown>;
-      const unit = p.measurementUnit;
-      if (unit === 'шт' || unit === 'piece' || unit === 'unit' || unit == null) {
-        return { ...p, measurementUnit: 0 };
-      }
-      if (typeof unit === 'string' && /^\d+$/.test(unit)) {
-        return { ...p, measurementUnit: Number(unit) };
-      }
-      return p;
-    }),
+    ...rest,
+    items: rawItems.map(normalizePosition),
   };
 }
 
