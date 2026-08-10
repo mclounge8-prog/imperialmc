@@ -15,7 +15,9 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import XReportScreen from './src/screens/XReportScreen';
 import ShiftReceiptsScreen from './src/screens/ShiftReceiptsScreen';
 import TerminalHeaderRight from './src/components/TerminalHeaderRight';
+import { FiscalAlertsProvider } from './src/context/FiscalAlertsContext';
 import { useFiscalSync } from './src/hooks/useFiscalSync';
+import AtolStatusScreen from './src/screens/AtolStatusScreen';
 import { colors } from './src/theme/colors';
 
 export type RootStackParamList = {
@@ -28,6 +30,7 @@ export type RootStackParamList = {
   Settings: undefined;
   XReport: undefined;
   ShiftReceipts: undefined;
+  AtolStatus: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -105,6 +108,11 @@ function RootNavigator() {
             component={ShiftReceiptsScreen}
             options={{ title: 'Чеки смены' }}
           />
+          <Stack.Screen
+            name="AtolStatus"
+            component={AtolStatusScreen}
+            options={{ title: 'Касса АТОЛ' }}
+          />
         </>
       )}
     </Stack.Navigator>
@@ -116,10 +124,12 @@ export default function App() {
     <SafeAreaProvider>
       <DeviceProvider>
         <SessionProvider>
-          <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-          <NavigationContainer>
-            <RootNavigator />
-          </NavigationContainer>
+          <FiscalAlertsProvider>
+            <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+            <NavigationContainer>
+              <RootNavigator />
+            </NavigationContainer>
+          </FiscalAlertsProvider>
         </SessionProvider>
       </DeviceProvider>
     </SafeAreaProvider>

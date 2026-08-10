@@ -47,16 +47,14 @@ export default function SettingsScreen() {
 
       <Text style={styles.sectionLabel}>Оборудование</Text>
       <View style={styles.card}>
-        <View style={[styles.row, styles.rowDisabled]}>
+        <Pressable style={styles.row} onPress={() => navigation.navigate('AtolStatus')}>
           <Text style={styles.rowIcon}>🖨️</Text>
           <View style={styles.rowTextBlock}>
             <Text style={styles.rowTitle}>Касса АТОЛ</Text>
-            <Text style={styles.rowSubtitle}>Подключение фискального регистратора</Text>
+            <Text style={styles.rowSubtitle}>Статус, ошибки и очередь фискальных заданий</Text>
           </View>
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonText}>скоро</Text>
-          </View>
-        </View>
+          <Text style={styles.rowChevron}>›</Text>
+        </Pressable>
       </View>
     </ScrollView>
   );
@@ -93,18 +91,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  rowDisabled: { opacity: 0.5 },
   rowIcon: { fontSize: 20 },
   rowTextBlock: { flex: 1 },
   rowTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
   rowSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   rowChevron: { color: colors.textMuted, fontSize: 20 },
-  comingSoonBadge: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingVertical: 3,
-    paddingHorizontal: 10,
-  },
-  comingSoonText: { color: colors.textMuted, fontSize: 11 },
 });

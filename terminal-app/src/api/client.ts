@@ -538,3 +538,38 @@ export async function reportFiscalJobResult(
 ): Promise<void> {
   await authorizedRequest(`/api/fiscal/jobs/${jobId}/result`, token, { method: 'POST', body: result });
 }
+
+export type FiscalJobStatus = 'pending' | 'in_progress' | 'done' | 'error';
+
+export type FiscalJobListItem = {
+  id: number;
+  type: FiscalJobType;
+  status: FiscalJobStatus;
+  receiptId: number | null;
+  shiftId: number | null;
+  attempts: number;
+  lastError: string | null;
+  fiscalDocNumber: number | null;
+  fiscalSign: string | null;
+  fiscalDatetime: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function fetchFiscalJobs(
+  venueId: number,
+  token: string,
+  limit = 30
+): Promise<{ jobs: FiscalJobListItem[]; errorCount: number }> {
+  return authorizedRequest<{ jobs: FiscalJobListItem[]; errorCount: number }>(
+    `/api/fiscal/jobs?venueId=${venueId}&limit=${limit}`,
+    token
+  );
+}
+
+export async function retryFiscalJob(jobId: number, venueId: number, token: string): Promise<void> {
+  await authorizedRequest(`/api/fiscal/jobs/${jobId}/retry?venueId=${venueId}`, token, {
+    method: 'POST',
+    body: {},
+  });
+}

@@ -94,6 +94,73 @@ apiFiscal.get('/jobs/next', async (c) => {
   }
 });
 
+// Список последних заданий для экрана «Касса АТОЛ» в терминале —
+// статусы, ошибки, ФД/ФПД. Не забирает задания из очереди (в отличие от /jobs/next).
+apiFiscal.get('/jobs', async (c) => {
+  const venueId = c.req.query('venueId');
+  const limitRaw = Number(c.req.query('limit') || 30);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 30;
+  if (!venueId) {
+    c.status(400);
+    return c.json({ error: 'Не указано заведение' });
+  }
+
+  const { rows } = await pool.query(
+    `SELECT id, type, status, receipt_id, shift_id, attempts, last_error,
+            fiscal_doc_number, fiscal_sign, fiscal_datetime, created_at, updated_at
+     FROM fiscal_jobs
+     WHERE venue_id = $1
+     ORDER BY id DESC
+     LIMIT $2`,
+    [venueId, limit]
+  );
+
+  const { rows: errorCountRows } = await pool.query(
+    `SELECT COUNT(*)::int AS count FROM fiscal_jobs WHERE venue_id = $1 AND status = 'error'`,
+    [venueId]
+  );
+
+  return c.json({
+    errorCount: errorCountRows[0]?.count || 0,
+    jobs: rows.map((job) => ({
+      id: job.id,
+      type: job.type,
+      status: job.status,
+      receiptId: job.receipt_id,
+      shiftId: job.shift_id,
+      attempts: job.attempts,
+      lastError: job.last_error,
+      fiscalDocNumber: job.fiscal_doc_number,
+      fiscalSign: job.fiscal_sign,
+      fiscalDatetime: job.fiscal_datetime,
+      createdAt: job.created_at,
+      updatedAt: job.updated_at,
+    })),
+  });
+});
+
+// Вернуть упавшее задание в очередь — терминал подхватит при следующем опросе.
+apiFiscal.post('/jobs/:id/retry', async (c) => {
+  const jobId = c.req.param('id');
+  const venueId = c.req.query('venueId');
+  if (!venueId) {
+    c.status(400);
+    return c.json({ error: 'Не указано заведение' });
+  }
+
+  const { rowCount } = await pool.query(
+    `UPDATE fiscal_jobs
+     SET status = 'pending', last_error = NULL, updated_at = now()
+     WHERE id = $1 AND venue_id = $2 AND status = 'error'`,
+    [jobId, venueId]
+  );
+  if (!rowCount) {
+    c.status(404);
+    return c.json({ error: 'Задание не найдено или уже не в статусе error' });
+  }
+  return c.json({ ok: true });
+});
+
 // Терминал репортит результат выполнения задания на кассе.
 apiFiscal.post('/jobs/:id/result', async (c) => {
   const jobId = c.req.param('id');
