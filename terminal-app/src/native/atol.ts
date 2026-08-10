@@ -19,7 +19,15 @@ export type AtolConnectionSettings = {
 };
 
 export function isAtolAvailablePlatform(): boolean {
-  return Platform.OS === 'android' && AtolModule != null;
+  if (Platform.OS !== 'android') return false;
+  if (AtolModule == null) {
+    // Модуль не зарегистрирован в текущей сборке — почти всегда значит, что
+    // после добавления Kotlin-кода не делали полный `npx react-native
+    // run-android` (одного Metro/JS-обновления недостаточно, нативный модуль
+    // попадает в приложение только через пересборку и переустановку).
+    return false;
+  }
+  return true;
 }
 
 // Проверка, установлено ли на этом планшете приложение "Драйвер ККТ АТОЛ" —

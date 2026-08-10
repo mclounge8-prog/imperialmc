@@ -54,20 +54,35 @@ const runningForVenue = new Set<number>();
 // (продажу/смену); при сбое задание просто останется в очереди до следующей
 // попытки (см. useFiscalSync — периодический опрос).
 export async function runPendingFiscalJobs(venueId: number, token: string): Promise<void> {
-  if (!isAtolAvailablePlatform()) return;
-  if (runningForVenue.has(venueId)) return;
+  if (!isAtolAvailablePlatform()) {
+    console.warn('[ATOL] недоступен на этой платформе/сборке (нативный модуль AtolModule не найден) — пропускаю');
+    return;
+  }
+  if (runningForVenue.has(venueId)) {
+    console.log('[ATOL] уже выполняется для этого заведения, пропускаю повторный запуск');
+    return;
+  }
   runningForVenue.add(venueId);
+  console.log(`[ATOL] запуск разбора очереди, venueId=${venueId}`);
 
   try {
     const settings = await getSettings(venueId, token);
-    if (!settings.enabled || !settings.ipAddress) return;
+    if (!settings.enabled || !settings.ipAddress) {
+      console.log('[ATOL] касса выключена для этого заведения или не задан IP — пропускаю', settings);
+      return;
+    }
+    console.log('[ATOL] настройки получены:', settings);
 
     // Ограничение итераций за один вызов — если заданий скопилось очень
     // много (например, касса была недоступна много часов), разберём их
     // порциями при следующих вызовах, а не будем крутить цикл бесконечно.
     for (let i = 0; i < 20; i += 1) {
       const job = await fetchNextFiscalJob(venueId, token);
-      if (!job) break;
+      if (!job) {
+        console.log('[ATOL] в очереди больше нет заданий');
+        break;
+      }
+      console.log(`[ATOL] задание #${job.id} (${job.type}) — выполняю`, job.payload);
 
       try {
         const task = typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
@@ -75,16 +90,19 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
           { ipAddress: settings.ipAddress, ipPort: settings.ipPort ?? 5555, model: settings.model },
           task
         );
+        console.log(`[ATOL] задание #${job.id} — ответ кассы:`, response);
         const { fiscalDocNumber, fiscalSign } = extractResponseFields(response);
         await reportFiscalJobResult(job.id, token, { success: true, fiscalDocNumber, fiscalSign });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[ATOL] задание #${job.id} — ошибка:`, message);
         await reportFiscalJobResult(job.id, token, { success: false, error: message }).catch(() => {});
       }
     }
-  } catch {
+  } catch (err) {
     // Не удалось даже получить настройки/связаться с backend — просто выходим,
     // задания останутся pending и разберутся при следующей попытке.
+    console.warn('[ATOL] не удалось получить настройки/связаться с backend:', err);
   } finally {
     runningForVenue.delete(venueId);
   }
