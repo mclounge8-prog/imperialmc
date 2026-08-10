@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
+import { enqueueReceiptFiscalJob } from '../services/fiscalQueue.js';
 
 const apiOrders = new Hono();
 
@@ -351,6 +352,20 @@ async function createReceipt(client, { guest, staff, status, items, payments }) 
       p.method,
       p.amount,
     ]);
+  }
+
+  // Фискализация — только для реально оплаченных чеков (cancelled — гость
+  // ушёл не заплатив, денег не было, фискальный документ не нужен). Тихо
+  // ничего не делает, если у заведения нет включённой кассы АТОЛ.
+  if (status === 'paid') {
+    await enqueueReceiptFiscalJob(client, {
+      venueId: guest.venue_id,
+      receiptId,
+      items,
+      payments,
+      total: subtotal,
+      operatorName: staff.name,
+    });
   }
 
   return receiptId;

@@ -17,6 +17,7 @@ import apiOrdersRoutes from './routes/apiOrders.js';
 import apiDevicesRoutes from './routes/apiDevices.js';
 import apiShiftsRoutes from './routes/apiShifts.js';
 import apiReceiptsRoutes from './routes/apiReceipts.js';
+import apiFiscalRoutes from './routes/apiFiscal.js';
 import reportsRoutes from './routes/reports.js';
 import statsRoutes from './routes/stats.js';
 import modifiersRoutes from './routes/modifiers.js';
@@ -44,6 +45,7 @@ app.route('/api', apiOrdersRoutes); // JSON API заказов: открытие
 app.route('/api/devices', apiDevicesRoutes); // JSON API устройств: регистрация по коду, статус
 app.route('/api/shifts', apiShiftsRoutes); // JSON API смен: открытие/закрытие, X-отчёт, чеки смены
 app.route('/api/receipts', apiReceiptsRoutes); // JSON API чеков: список оплаченных за сегодня + состав конкретного
+app.route('/api/fiscal', apiFiscalRoutes); // JSON API для локального фискального агента АТОЛ (не для терминала)
 app.route('/reports', reportsRoutes); // Отчёты: чеки с фильтрами по заведению/датам
 app.route('/stats', statsRoutes); // Главный экран: сводная статистика продаж (графики)
 app.route('/preferences', preferencesRoutes); // Общий выбор заведения в шапке (cookie)

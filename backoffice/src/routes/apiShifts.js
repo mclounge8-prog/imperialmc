@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
+import { enqueueShiftFiscalJob } from '../services/fiscalQueue.js';
 
 const apiShifts = new Hono();
 apiShifts.use('*', requireStaffToken);
@@ -105,6 +106,13 @@ apiShifts.post('/open', async (c) => {
     [venueId, staff.sub, staff.name]
   );
 
+  await enqueueShiftFiscalJob(pool, {
+    venueId,
+    shiftId: rows[0].id,
+    type: 'open_shift',
+    operatorName: staff.name,
+  });
+
   const stats = await fetchShiftStats(rows[0].id);
   return c.json({ shift: serializeShift(rows[0], stats) });
 });
@@ -135,6 +143,13 @@ apiShifts.post('/close', async (c) => {
      RETURNING *`,
     [staff.sub, staff.name, stats.receiptsCount, stats.revenueTotal, shift.id]
   );
+
+  await enqueueShiftFiscalJob(pool, {
+    venueId,
+    shiftId: shift.id,
+    type: 'close_shift',
+    operatorName: staff.name,
+  });
 
   return c.json({ shift: serializeShift(rows[0], stats) });
 });

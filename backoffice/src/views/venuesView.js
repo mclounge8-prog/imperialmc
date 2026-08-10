@@ -17,11 +17,13 @@ export function renderVenueCard(venue, assignedNames) {
         <div class="venue-staff-summary" id="venue-staff-summary-${venue.id}">${summaryText}</div>
         <div class="venue-actions">
           <button hx-get="/venues/${venue.id}/staff" hx-target="#venue-staff-panel-${venue.id}" hx-swap="innerHTML">Сотрудники</button>
+          <button hx-get="/venues/${venue.id}/atol" hx-target="#venue-atol-panel-${venue.id}" hx-swap="innerHTML">Касса АТОЛ</button>
           <button hx-get="/venues/${venue.id}/edit" hx-target="#venue-card-${venue.id}" hx-swap="outerHTML">Изменить</button>
           <button class="danger" hx-delete="/venues/${venue.id}" hx-target="#venue-card-${venue.id}" hx-swap="outerHTML" hx-confirm="Удалить заведение «${safeName}»? Это затронет всё, что к нему привязано.">Удалить</button>
         </div>
       </div>
       <div id="venue-staff-panel-${venue.id}" class="venue-staff-panel"></div>
+      <div id="venue-atol-panel-${venue.id}" class="venue-atol-panel"></div>
     </div>
   `;
 }
@@ -90,6 +92,158 @@ export function renderVenueListRows(venueCards) {
  */
 export function renderVenueListOob(venueCards) {
   return `<div class="venues-list" id="venues-list" hx-swap-oob="true">${renderVenueListRows(venueCards)}</div>`;
+}
+
+const FISCAL_JOB_TYPE_LABELS = {
+  open_shift: 'Открытие смены',
+  close_shift: 'Закрытие смены (Z-отчёт)',
+  x_report: 'X-отчёт',
+  receipt: 'Чек',
+};
+
+const FISCAL_JOB_STATUS_LABELS = {
+  pending: 'В очереди',
+  in_progress: 'Выполняется',
+  done: 'Готово',
+  error: 'Ошибка',
+};
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  return new Date(value).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function renderFiscalJobRow(job, venueId) {
+  const typeLabel = FISCAL_JOB_TYPE_LABELS[job.type] || job.type;
+  const statusLabel = FISCAL_JOB_STATUS_LABELS[job.status] || job.status;
+  const errorHtml = job.last_error
+    ? `<div class="fiscal-job-error">${escapeHtml(job.last_error)}</div>`
+    : '';
+  const retryHtml =
+    job.status === 'error'
+      ? `<button
+           type="button"
+           class="secondary fiscal-job-retry"
+           hx-post="/venues/${venueId}/atol/jobs/${job.id}/retry"
+           hx-target="#atol-jobs-tbody-${venueId}"
+           hx-swap="innerHTML"
+         >Повторить</button>`
+      : '';
+  return `
+    <tr class="fiscal-job-row fiscal-job-${job.status}">
+      <td>${formatDateTime(job.created_at)}</td>
+      <td>${escapeHtml(typeLabel)}</td>
+      <td><span class="fiscal-job-badge fiscal-job-badge-${job.status}">${escapeHtml(statusLabel)}</span>${errorHtml}</td>
+      <td>${job.fiscal_doc_number || '—'}</td>
+      <td>${retryHtml}</td>
+    </tr>
+  `;
+}
+
+export function renderVenueAtolPanel(venue, settings, jobs) {
+  const safe = settings || { enabled: false, kkt_port: 5555 };
+  const hasToken = !!safe.agent_token;
+  const agentOnline =
+    safe.last_seen_at && Date.now() - new Date(safe.last_seen_at).getTime() < 2 * 60 * 1000;
+
+  const jobsHtml = jobs.length
+    ? jobs.map((job) => renderFiscalJobRow(job, venue.id)).join('')
+    : '<tr><td colspan="5" class="empty-hint">Заданий пока не было</td></tr>';
+
+  return `
+    <div class="atol-settings" id="atol-settings-${venue.id}">
+      <h3>Касса АТОЛ</h3>
+      <p class="atol-hint">
+        Система налогообложения и ставка НДС настраиваются один раз на самой кассе (как раньше в QuickResto) —
+        здесь мы их не задаём. Фискальный агент устанавливается на любой ПК в той же локальной сети, что и касса.
+      </p>
+
+      <form
+        class="atol-settings-form"
+        hx-post="/venues/${venue.id}/atol"
+        hx-target="#venue-atol-panel-${venue.id}"
+        hx-swap="innerHTML"
+      >
+        <label class="atol-toggle-row">
+          <input type="checkbox" name="enabled" ${safe.enabled ? 'checked' : ''}>
+          <span>Касса АТОЛ включена для этого заведения</span>
+        </label>
+
+        <div class="atol-fields-grid">
+          <label>
+            <span>IP-адрес кассы</span>
+            <input type="text" name="kkt_ip" value="${safe.kkt_ip ? escapeHtml(safe.kkt_ip) : ''}" placeholder="192.168.1.50">
+          </label>
+          <label>
+            <span>Порт (канал обмена)</span>
+            <input type="number" name="kkt_port" value="${safe.kkt_port || 5555}" placeholder="5555">
+          </label>
+          <label>
+            <span>Код модели (драйвер)</span>
+            <input type="number" name="kkt_model" value="${safe.kkt_model || ''}" placeholder="см. Тест драйвера ККТ">
+          </label>
+          <label>
+            <span>Оператор по умолчанию</span>
+            <input type="text" name="operator_name" value="${safe.operator_name ? escapeHtml(safe.operator_name) : ''}" placeholder="ФИО кассира">
+          </label>
+        </div>
+
+        <div class="venue-actions">
+          <button type="submit">Сохранить</button>
+        </div>
+      </form>
+
+      <div class="atol-agent-block">
+        <div class="atol-agent-status">
+          Агент: ${agentOnline ? '<span class="atol-agent-online">● на связи</span>' : '<span class="atol-agent-offline">○ не подключён</span>'}
+          ${safe.last_seen_at ? `<span class="atol-agent-seen">последний опрос: ${formatDateTime(safe.last_seen_at)}</span>` : ''}
+        </div>
+        <div class="atol-token-row">
+          <span>Токен агента:</span>
+          <code class="atol-token-value">${hasToken ? escapeHtml(safe.agent_token) : 'не создан'}</code>
+          <button
+            type="button"
+            class="secondary"
+            hx-post="/venues/${venue.id}/atol/token"
+            hx-target="#venue-atol-panel-${venue.id}"
+            hx-swap="innerHTML"
+            hx-confirm="${hasToken ? 'Старый токен перестанет работать, агент на месте нужно перенастроить. Продолжить?' : ''}"
+          >${hasToken ? 'Сгенерировать новый' : 'Создать токен'}</button>
+        </div>
+        <p class="atol-hint">Впишите этот токен и IP backend в настройки фискального агента на ПК точки (см. <code>atol-agent/README.md</code>).</p>
+      </div>
+
+      <div class="atol-jobs-block">
+        <div class="atol-jobs-header">
+          <h4>Журнал заданий</h4>
+          <button
+            type="button"
+            class="secondary"
+            hx-get="/venues/${venue.id}/atol/jobs"
+            hx-target="#atol-jobs-tbody-${venue.id}"
+            hx-swap="innerHTML"
+          >Обновить</button>
+        </div>
+        <table class="data-table atol-jobs-table">
+          <thead>
+            <tr><th>Когда</th><th>Тип</th><th>Статус</th><th>№ ФД</th><th></th></tr>
+          </thead>
+          <tbody id="atol-jobs-tbody-${venue.id}">${jobsHtml}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+export function renderVenueAtolJobsRows(jobs, venueId) {
+  return jobs.length
+    ? jobs.map((job) => renderFiscalJobRow(job, venueId)).join('')
+    : '<tr><td colspan="5" class="empty-hint">Заданий пока не было</td></tr>';
 }
 
 export function renderVenuesSection(venueCards) {

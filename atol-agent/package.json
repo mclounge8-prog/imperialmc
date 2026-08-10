@@ -1,0 +1,15 @@
+{
+  "name": "atol-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Локальный фискальный агент: опрашивает backend за заданиями и выполняет их на кассе АТОЛ через ДТО10",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "node-atol-wrapper": "^0.0.28"
+  }
+}

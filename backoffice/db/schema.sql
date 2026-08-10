@@ -433,3 +433,60 @@ UPDATE receipt_item_modifiers rim
 SET modifier_id = m.id
 FROM modifiers m
 WHERE rim.modifier_id IS NULL AND m.name = rim.name;
+
+-- ============================================================
+-- Интеграция с фискальными регистраторами АТОЛ (54-ФЗ). Архитектура:
+-- на точке физическая касса АТОЛ доступна по TCP/IP в локальной сети;
+-- рядом (на любом ПК в той же сети) работает наш "фискальный агент" —
+-- отдельный Node.js-процесс, который опрашивает backend через API
+-- ниже, получает задание (открыть/закрыть смену, пробить чек) и
+-- выполняет его через официальный драйвер ДТО10. Сам backend никогда
+-- не обращается к кассе напрямую — она не в его локальной сети.
+-- Система налогообложения/НДС по умолчанию настраиваются один раз на
+-- самой кассе (как и раньше, в QuickResto) — мы их не пересылаем.
+-- ============================================================
+
+-- Настройки кассы на заведение. Одно заведение — одна касса; если
+-- когда-нибудь понадобится несколько касс на точку, таблицу расширим
+-- на составной ключ, сейчас это не требуется.
+CREATE TABLE IF NOT EXISTS venue_atol_settings (
+  venue_id      INT PRIMARY KEY REFERENCES venues(id) ON DELETE CASCADE,
+  enabled       BOOLEAN NOT NULL DEFAULT false,
+  kkt_ip        VARCHAR(64),               -- IP кассы в локальной сети точки
+  kkt_port      INT NOT NULL DEFAULT 5555, -- порт канала обмена (TCP/IP) драйвера ДТО10
+  kkt_model     INT,                       -- числовой код модели в драйвере (см. "Тест драйвера ККТ" на месте)
+  operator_name VARCHAR(100),              -- ФИО оператора по умолчанию для чека/смены (тег 1021), если не переопределяется сотрудником
+  agent_token   VARCHAR(64) UNIQUE,        -- токен фискального агента для авторизации на backend
+  last_seen_at  TIMESTAMPTZ,               -- когда агент последний раз опрашивал backend — для индикации "агент онлайн"
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now()
+);
+
+-- Очередь фискальных заданий. Пополняется backend'ом при пробитии чека
+-- и открытии/закрытии смены (если у заведения включена касса АТОЛ),
+-- разбирается агентом через GET /api/fiscal/jobs/next и репортится
+-- обратно через POST /api/fiscal/jobs/:id/result.
+CREATE TABLE IF NOT EXISTS fiscal_jobs (
+  id                SERIAL PRIMARY KEY,
+  venue_id          INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  type              VARCHAR(20) NOT NULL, -- open_shift, close_shift, receipt, x_report
+  receipt_id        INT REFERENCES receipts(id) ON DELETE SET NULL,
+  shift_id          INT REFERENCES shifts(id) ON DELETE SET NULL,
+  payload           JSONB NOT NULL,       -- готовое JSON-задание для драйвера (processJson)
+  status            VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, in_progress, done, error
+  attempts          INT NOT NULL DEFAULT 0,
+  last_error        TEXT,
+  fiscal_doc_number INT,       -- номер фискального документа из ответа кассы
+  fiscal_sign       VARCHAR(30), -- ФПД чека
+  fiscal_datetime   TIMESTAMPTZ, -- дата/время из ответа кассы
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  updated_at        TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_fiscal_jobs_venue_status ON fiscal_jobs(venue_id, status, id);
+CREATE INDEX IF NOT EXISTS idx_fiscal_jobs_receipt ON fiscal_jobs(receipt_id);
+
+-- Быстрый статус фискализации прямо на чеке — чтобы не делать join с
+-- fiscal_jobs для отображения бейджа в списке чеков терминала/бэкофиса.
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS fiscal_status VARCHAR(20); -- NULL (не требуется), pending, done, error
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS fiscal_doc_number INT;
