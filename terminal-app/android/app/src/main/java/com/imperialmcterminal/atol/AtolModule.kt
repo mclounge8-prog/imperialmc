@@ -19,6 +19,12 @@ import ru.atol.drivers10.fptr.IFptr
  * JSON-задания (openShift/closeShift/sell и т.д.) собираются на backend
  * (см. backoffice/src/services/fiscalQueue.js) — этот модуль их не строит,
  * только передаёт кассе через processJson() и возвращает её ответ как есть.
+ *
+ * Важно про IPC-обёртку libfptr10.aar: методы вроде processJson()/open()
+ * почти всегда возвращают 0 даже при ошибке кассы. Реальный статус — в
+ * errorCode()/errorDescription(). JSON-ответ задания — в
+ * getParamString(LIBFPTR_PARAM_JSON_DATA); если его нет при errorCode==0,
+ * пробуем достать ФД/ФПД через fnQueryData(LAST_DOCUMENT).
  */
 class AtolModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
@@ -29,10 +35,7 @@ class AtolModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMo
    * taskJson: JSON-задание для кассы, например {"type": "sell", ...}
    *
    * Резолвит promise с JSON-строкой ответа кассы при успехе, либо реджектит
-   * с кодом/описанием ошибки драйвера (см. errorCode()/errorDescription()) —
-   * коды ошибок совпадают с десктопным драйвером, расшифровку см. в
-   * atol-agent (в этом проекте больше не используется, но справочник ошибок
-   * там актуален) или в документации АТОЛ.
+   * с кодом/описанием ошибки драйвера.
    */
   @ReactMethod
   fun runTask(settingsJson: String, taskJson: String, promise: Promise) {
@@ -57,21 +60,51 @@ class AtolModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMo
         fptr.setSingleSetting(IFptr.LIBFPTR_SETTING_MODEL, model.toString())
       }
       fptr.applySingleSettings()
+      if (fptr.errorCode() != 0) {
+        promise.reject(
+          "ATOL_${fptr.errorCode()}",
+          fptr.errorDescription() ?: "Не удалось применить настройки кассы"
+        )
+        return
+      }
 
-      val openResult = fptr.open()
-      if (openResult < 0) {
-        promise.reject("ATOL_${fptr.errorCode()}", fptr.errorDescription() ?: "Не удалось подключиться к кассе")
+      // В IPC-варианте open()/close() — no-op (соединением управляет
+      // приложение «Драйвер ККТ АТОЛ»), но оставляем вызов по API десктопа.
+      fptr.open()
+      if (fptr.errorCode() != 0) {
+        promise.reject(
+          "ATOL_${fptr.errorCode()}",
+          fptr.errorDescription() ?: "Не удалось подключиться к кассе"
+        )
         return
       }
 
       fptr.setParam(IFptr.LIBFPTR_PARAM_JSON_DATA, taskJson)
-      val taskResult = fptr.processJson()
-      if (taskResult < 0) {
-        promise.reject("ATOL_${fptr.errorCode()}", fptr.errorDescription() ?: "Касса вернула ошибку")
+      fptr.processJson()
+      if (fptr.errorCode() != 0) {
+        promise.reject(
+          "ATOL_${fptr.errorCode()}",
+          fptr.errorDescription() ?: "Касса вернула ошибку"
+        )
         return
       }
 
-      val responseJson = fptr.getParamString(IFptr.LIBFPTR_PARAM_JSON_DATA)
+      var responseJson = fptr.getParamString(IFptr.LIBFPTR_PARAM_JSON_DATA)
+      if (responseJson.isNullOrBlank()) {
+        // Касса могла пробить чек, но не положить JSON в JSON_DATA
+        // (встречается на IPC-обёртке). Достаём ФД/ФПД из последнего документа ФН.
+        responseJson = queryLastDocumentAsJson(fptr)
+        if (responseJson == null) {
+          promise.reject(
+            "ATOL_EMPTY_RESPONSE",
+            "Касса вернула пустой ответ processJson (errorCode=0), " +
+              "и не удалось прочитать последний документ ФН: " +
+              (fptr.errorDescription() ?: "нет описания")
+          )
+          return
+        }
+      }
+
       promise.resolve(responseJson)
     } catch (e: Exception) {
       promise.reject("ATOL_EXCEPTION", e.message ?: "Неизвестная ошибка драйвера АТОЛ", e)
@@ -79,10 +112,34 @@ class AtolModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMo
       try {
         fptr?.close()
         fptr?.destroy()
-      } catch (e: Exception) {
+      } catch (_: Exception) {
         // Касса могла быть уже физически отключена — не мешаем завершению
       }
     }
+  }
+
+  /**
+   * Собирает JSON вида {"fiscalParams":{...},"_source":"fnQueryData_lastDocument"}
+   * из классического запроса последнего документа ФН. null — если не удалось.
+   */
+  private fun queryLastDocumentAsJson(fptr: Fptr): String? {
+    fptr.setParam(IFptr.LIBFPTR_PARAM_FN_DATA_TYPE, IFptr.LIBFPTR_FNDT_LAST_DOCUMENT)
+    fptr.fnQueryData()
+    if (fptr.errorCode() != 0) {
+      return null
+    }
+    val docNumber = fptr.getParamInt(IFptr.LIBFPTR_PARAM_DOCUMENT_NUMBER)
+    val fiscalSign = fptr.getParamString(IFptr.LIBFPTR_PARAM_FISCAL_SIGN) ?: ""
+    if (docNumber <= 0L && fiscalSign.isEmpty()) {
+      return null
+    }
+    val fiscalParams = JSONObject()
+    fiscalParams.put("fiscalDocumentNumber", docNumber)
+    fiscalParams.put("fiscalDocumentSign", fiscalSign)
+    val wrapper = JSONObject()
+    wrapper.put("fiscalParams", fiscalParams)
+    wrapper.put("_source", "fnQueryData_lastDocument")
+    return wrapper.toString()
   }
 
   /**
@@ -95,7 +152,7 @@ class AtolModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMo
     try {
       reactApplicationContext.packageManager.getPackageInfo("ru.atol.drivers10.service", 0)
       promise.resolve(true)
-    } catch (e: Exception) {
+    } catch (_: Exception) {
       promise.resolve(false)
     }
   }

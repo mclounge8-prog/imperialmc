@@ -43,7 +43,8 @@ function buildSellTaskPayload({ items, payments, total, operatorName }) {
       price: Number(item.price),
       quantity: item.qty,
       amount: Math.round(Number(item.price) * item.qty * 100) / 100,
-      measurementUnit: 'шт',
+      // ФФД 1.2: 0 = штучный товар. Строку «шт» драйвер может отвергнуть.
+      measurementUnit: 0,
       paymentMethod: 'fullPayment',
       paymentObject: 'commodity',
     })),

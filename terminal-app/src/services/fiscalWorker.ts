@@ -26,20 +26,38 @@ export function invalidateAtolSettingsCache(venueId: number): void {
   settingsCache.delete(venueId);
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object') return null;
+  return value as Record<string, unknown>;
+}
+
+function coerceNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 function extractResponseFields(response: unknown): {
   fiscalDocNumber: number | null;
   fiscalSign: string | null;
+  fiscalDatetime: string | null;
 } {
-  if (!response || typeof response !== 'object') {
-    return { fiscalDocNumber: null, fiscalSign: null };
+  const root = asRecord(response);
+  if (!root) {
+    return { fiscalDocNumber: null, fiscalSign: null, fiscalDatetime: null };
   }
-  const r = response as Record<string, unknown>;
-  const doc = r.fiscalDocumentNumber ?? r.documentNumber ?? r.shiftNumber ?? null;
-  const sign = r.fiscalSign ?? null;
-  return {
-    fiscalDocNumber: typeof doc === 'number' ? doc : null,
-    fiscalSign: typeof sign === 'string' ? sign : null,
-  };
+  // Ответ processJson для sell/openShift/closeShift: поля лежат в fiscalParams.
+  // Fallback из AtolModule (fnQueryData) тоже кладёт их туда.
+  const fp = asRecord(root.fiscalParams) ?? root;
+  const doc = coerceNumber(fp.fiscalDocumentNumber ?? fp.documentNumber ?? null);
+  const signRaw = fp.fiscalDocumentSign ?? fp.fiscalSign ?? null;
+  const sign = signRaw == null || signRaw === '' ? null : String(signRaw);
+  const dtRaw = fp.fiscalDocumentDateTime ?? null;
+  const fiscalDatetime = typeof dtRaw === 'string' && dtRaw ? dtRaw : null;
+  return { fiscalDocNumber: doc, fiscalSign: sign, fiscalDatetime };
 }
 
 // Не даём двум параллельным вызовам (например, ручной вызов после оплаты +
@@ -54,19 +72,11 @@ const runningForVenue = new Set<number>();
 // исключение наружу — фискализация никогда не должна ронять основной UI
 // (продажу/смену); при сбое задание просто останется в очереди до следующей
 // попытки (см. useFiscalSync — периодический опрос).
-// ВРЕМЕННО для отладки: показывает alert прямо на экране, чтобы не зависеть
-// от того, доходят логи до logcat/Metro или нет. Убрать после калибровки.
-Alert.alert(
-  'ATOL debug',
-  `runPendingFiscalJobs МОДУЛЬ ЗАГРУЖЕН. Platform=${Platform.OS}, AtolModule=${
-    NativeModules.AtolModule ? 'найден' : 'НЕ найден'
-  }`
-);
-
 export async function runPendingFiscalJobs(venueId: number, token: string): Promise<void> {
-  Alert.alert('ATOL debug', `runPendingFiscalJobs ВЫЗВАНА, venueId=${venueId}`);
   if (!isAtolAvailablePlatform()) {
-    console.warn('[ATOL] недоступен на этой платформе/сборке (нативный модуль AtolModule не найден) — пропускаю');
+    console.warn(
+      '[ATOL] недоступен на этой платформе/сборке (нативный модуль AtolModule не найден) — пропускаю'
+    );
     return;
   }
   if (runningForVenue.has(venueId)) {
@@ -97,16 +107,41 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
 
       try {
         const task = typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
+        // Подстраховка на случай старых заданий в очереди / ещё не
+        // задеплоенного backend: «шт» драйвер ФФД 1.2 не принимает.
+        const normalizedTask = normalizeAtolTask(task);
         const response = await runAtolTask(
           { ipAddress: settings.ipAddress, ipPort: settings.ipPort ?? 5555, model: settings.model },
-          task
+          normalizedTask
         );
-        console.log(`[ATOL] задание #${job.id} — ответ кассы:`, response);
-        const { fiscalDocNumber, fiscalSign } = extractResponseFields(response);
-        await reportFiscalJobResult(job.id, token, { success: true, fiscalDocNumber, fiscalSign });
+        console.log(`[ATOL] задание #${job.id} — ответ кассы:`, JSON.stringify(response));
+        const { fiscalDocNumber, fiscalSign, fiscalDatetime } = extractResponseFields(response);
+
+        // Для чека без ФД/ФПД не считаем успех — иначе в бэкофисе «done» без
+        // номера, а повторно пробить уже нельзя (чек мог уйти на ленту).
+        if (job.type === 'receipt' && (fiscalDocNumber == null || !fiscalSign)) {
+          const message =
+            `Касса ответила без fiscalDocumentNumber/fiscalDocumentSign: ${JSON.stringify(response)}`;
+          console.warn(`[ATOL] задание #${job.id} — ${message}`);
+          Alert.alert('ATOL', `#${job.id}: нет ФД/ФПД в ответе`);
+          await reportFiscalJobResult(job.id, token, { success: false, error: message }).catch(() => {});
+          continue;
+        }
+
+        Alert.alert(
+          'ATOL OK',
+          `#${job.id}: ФД=${fiscalDocNumber ?? '—'} ФПД=${fiscalSign ?? '—'}`
+        );
+        await reportFiscalJobResult(job.id, token, {
+          success: true,
+          fiscalDocNumber,
+          fiscalSign,
+          fiscalDatetime,
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.warn(`[ATOL] задание #${job.id} — ошибка:`, message);
+        Alert.alert('ATOL ошибка', `#${job.id}: ${message}`);
         await reportFiscalJobResult(job.id, token, { success: false, error: message }).catch(() => {});
       }
     }
@@ -118,3 +153,11 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
     runningForVenue.delete(venueId);
   }
 }
+
+// ВРЕМЕННО: одна отладочная метка при загрузке модуля (без спама на каждый poll).
+Alert.alert(
+  'ATOL debug',
+  `модуль загружен. Platform=${Platform.OS}, AtolModule=${
+    NativeModules.AtolModule ? 'найден' : 'НЕ найден'
+  }`
+);

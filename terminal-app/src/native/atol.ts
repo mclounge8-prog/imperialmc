@@ -47,6 +47,9 @@ export async function runAtolTask(settings: AtolConnectionSettings, task: unknow
     throw new Error('Драйвер АТОЛ недоступен на этом устройстве (не Android или модуль не собран)');
   }
   const responseText = await AtolModule.runTask(JSON.stringify(settings), JSON.stringify(task));
+  if (responseText == null || String(responseText).trim() === '') {
+    throw new Error('Касса вернула пустой ответ (пустая строка JSON_DATA)');
+  }
   try {
     return JSON.parse(responseText);
   } catch {
