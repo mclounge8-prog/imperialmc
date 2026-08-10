@@ -127,5 +127,9 @@ dependencies {
     // Драйвер ККТ АТОЛ (ipc-вариант, см. libs/libfptr10.aar) — общается с
     // отдельно устанавливаемым на планшет приложением "Драйвер ККТ АТОЛ"
     // (ru.atol.drivers10.service) через AIDL, без встраивания родных .so.
+    // AAR не тянет transitive-зависимости: внутри Fptr использует
+    // com.google.gson.JsonObject / JsonParser — без Gson на classpath
+    // processJson() падает с Failed resolution of: Lcom/google/gson/JsonObject.
     implementation(name: 'libfptr10', ext: 'aar')
+    implementation('com.google.code.gson:gson:2.11.0')
 }
