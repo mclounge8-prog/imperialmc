@@ -2,6 +2,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Без этого на Android 11+ (API 30+) наше приложение не увидит пакет
+         "Драйвер ККТ АТОЛ" (ru.atol.drivers10.service), даже если он установлен,
+         и не сможет к нему привязаться через AIDL для фискализации чеков. -->
+    <queries>
+        <package android:name="ru.atol.drivers10.service" />
+    </queries>
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"

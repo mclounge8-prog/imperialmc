@@ -15,6 +15,10 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import XReportScreen from './src/screens/XReportScreen';
 import ShiftReceiptsScreen from './src/screens/ShiftReceiptsScreen';
 import TerminalHeaderRight from './src/components/TerminalHeaderRight';
+import { FiscalAlertsProvider } from './src/context/FiscalAlertsContext';
+import { useFiscalSync } from './src/hooks/useFiscalSync';
+import AtolStatusScreen from './src/screens/AtolStatusScreen';
+import CashScreen from './src/screens/CashScreen';
 import { colors } from './src/theme/colors';
 
 export type RootStackParamList = {
@@ -27,6 +31,8 @@ export type RootStackParamList = {
   Settings: undefined;
   XReport: undefined;
   ShiftReceipts: undefined;
+  AtolStatus: undefined;
+  Cash: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -42,6 +48,10 @@ const screenOptions = {
 function RootNavigator() {
   const { session } = useSession();
   const { deviceToken, status, loading: deviceLoading } = useDevice();
+
+  // Разбор очереди фискальных заданий (касса АТОЛ) — работает на фоне, пока
+  // есть сессия и заведение, независимо от текущего экрана.
+  useFiscalSync(status?.venue?.id ?? null, session?.token ?? null);
 
   if (deviceLoading) {
     return (
@@ -100,6 +110,12 @@ function RootNavigator() {
             component={ShiftReceiptsScreen}
             options={{ title: 'Чеки смены' }}
           />
+          <Stack.Screen
+            name="AtolStatus"
+            component={AtolStatusScreen}
+            options={{ title: 'Касса АТОЛ' }}
+          />
+          <Stack.Screen name="Cash" component={CashScreen} options={{ title: 'Наличность' }} />
         </>
       )}
     </Stack.Navigator>
@@ -111,10 +127,12 @@ export default function App() {
     <SafeAreaProvider>
       <DeviceProvider>
         <SessionProvider>
-          <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-          <NavigationContainer>
-            <RootNavigator />
-          </NavigationContainer>
+          <FiscalAlertsProvider>
+            <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+            <NavigationContainer>
+              <RootNavigator />
+            </NavigationContainer>
+          </FiscalAlertsProvider>
         </SessionProvider>
       </DeviceProvider>
     </SafeAreaProvider>

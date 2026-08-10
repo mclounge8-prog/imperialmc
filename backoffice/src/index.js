@@ -17,6 +17,7 @@ import apiOrdersRoutes from './routes/apiOrders.js';
 import apiDevicesRoutes from './routes/apiDevices.js';
 import apiShiftsRoutes from './routes/apiShifts.js';
 import apiReceiptsRoutes from './routes/apiReceipts.js';
+import apiFiscalRoutes from './routes/apiFiscal.js';
 import reportsRoutes from './routes/reports.js';
 import statsRoutes from './routes/stats.js';
 import modifiersRoutes from './routes/modifiers.js';
@@ -26,6 +27,7 @@ import { renderDashboardShell } from './views/dashboardShell.js';
 import { sections } from './views/sections.js';
 import { fetchAllVenues } from './utils/venues.js';
 import { readLastSection, readSelectedVenueId, resolveSelectedVenue } from './utils/preferences.js';
+import { startFiscalJobsCleanup } from './services/fiscalCleanup.js';
 
 const app = new Hono();
 
@@ -44,6 +46,7 @@ app.route('/api', apiOrdersRoutes); // JSON API заказов: открытие
 app.route('/api/devices', apiDevicesRoutes); // JSON API устройств: регистрация по коду, статус
 app.route('/api/shifts', apiShiftsRoutes); // JSON API смен: открытие/закрытие, X-отчёт, чеки смены
 app.route('/api/receipts', apiReceiptsRoutes); // JSON API чеков: список оплаченных за сегодня + состав конкретного
+app.route('/api/fiscal', apiFiscalRoutes); // JSON API фискализации АТОЛ — очередь заданий, разбирает сам terminal-app
 app.route('/reports', reportsRoutes); // Отчёты: чеки с фильтрами по заведению/датам
 app.route('/stats', statsRoutes); // Главный экран: сводная статистика продаж (графики)
 app.route('/preferences', preferencesRoutes); // Общий выбор заведения в шапке (cookie)
@@ -90,4 +93,6 @@ const port = Number(process.env.PORT || 3000);
 
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`Бэкофис запущен: http://localhost:${info.port}`);
+  // Раз в час чистим старые done/error задания — журнал не раздувается.
+  startFiscalJobsCleanup();
 });

@@ -6,6 +6,8 @@ import {
   renderVenueEditCard,
   renderVenueStaffPanel,
   renderVenueListOob,
+  renderVenueAtolPanel,
+  renderVenueAtolJobsRows,
 } from '../views/venuesView.js';
 
 const venues = new Hono();
@@ -155,6 +157,88 @@ venues.post('/:venueId/staff/:staffId/toggle', async (c) => {
   return c.html(
     renderVenueStaffPanel(venue, staffList, assignedStaffIds, { withSummaryOob: true })
   );
+});
+
+async function fetchAtolSettings(venueId) {
+  const { rows } = await pool.query('SELECT * FROM venue_atol_settings WHERE venue_id = $1', [venueId]);
+  return rows[0] || null;
+}
+
+async function fetchRecentFiscalJobs(venueId, limit = 30) {
+  // Только за последние сутки — полный архив не нужен, TTL чистит старое.
+  const { rows } = await pool.query(
+    `SELECT * FROM fiscal_jobs
+     WHERE venue_id = $1 AND created_at >= now() - interval '1 day'
+     ORDER BY id DESC
+     LIMIT $2`,
+    [venueId, limit]
+  );
+  return rows;
+}
+
+venues.get('/:id/atol', async (c) => {
+  const venueId = c.req.param('id');
+  const venue = await fetchVenue(venueId);
+  if (!venue) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+
+  const settings = await fetchAtolSettings(venueId);
+  const jobs = await fetchRecentFiscalJobs(venueId);
+  return c.html(renderVenueAtolPanel(venue, settings, jobs));
+});
+
+venues.post('/:id/atol', async (c) => {
+  const venueId = c.req.param('id');
+  const venue = await fetchVenue(venueId);
+  if (!venue) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+
+  const body = await c.req.parseBody();
+  const enabled = body.enabled === 'on' || body.enabled === 'true';
+  const kktIp = String(body.kkt_ip || '').trim() || null;
+  const kktPort = body.kkt_port ? Number(body.kkt_port) : 5555;
+  const kktModel = body.kkt_model ? Number(body.kkt_model) : null;
+  const operatorName = String(body.operator_name || '').trim() || null;
+
+  await pool.query(
+    `INSERT INTO venue_atol_settings (venue_id, enabled, kkt_ip, kkt_port, kkt_model, operator_name, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, now())
+     ON CONFLICT (venue_id) DO UPDATE SET
+       enabled = EXCLUDED.enabled,
+       kkt_ip = EXCLUDED.kkt_ip,
+       kkt_port = EXCLUDED.kkt_port,
+       kkt_model = EXCLUDED.kkt_model,
+       operator_name = EXCLUDED.operator_name,
+       updated_at = now()`,
+    [venueId, enabled, kktIp, kktPort, kktModel, operatorName]
+  );
+
+  const settings = await fetchAtolSettings(venueId);
+  const jobs = await fetchRecentFiscalJobs(venueId);
+  return c.html(renderVenueAtolPanel(venue, settings, jobs));
+});
+
+venues.get('/:id/atol/jobs', async (c) => {
+  const venueId = c.req.param('id');
+  const jobs = await fetchRecentFiscalJobs(venueId);
+  return c.html(renderVenueAtolJobsRows(jobs, venueId));
+});
+
+// Вернуть упавшее задание в очередь (например, кассу временно отключали от сети) —
+// terminal-app подхватит его при следующем опросе.
+venues.post('/:id/atol/jobs/:jobId/retry', async (c) => {
+  const { id: venueId, jobId } = c.req.param();
+  await pool.query(
+    "UPDATE fiscal_jobs SET status = 'pending', last_error = NULL WHERE id = $1 AND venue_id = $2 AND status = 'error'",
+    [jobId, venueId]
+  );
+
+  const jobs = await fetchRecentFiscalJobs(venueId);
+  return c.html(renderVenueAtolJobsRows(jobs, venueId));
 });
 
 export default venues;

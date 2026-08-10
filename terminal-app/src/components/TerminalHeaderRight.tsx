@@ -6,6 +6,7 @@ import { colors } from '../theme/colors';
 import { ICON_BUTTON_SIZE } from '../theme/sizes';
 import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
+import { useFiscalAlerts } from '../context/FiscalAlertsContext';
 import type { RootStackParamList } from '../../App';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -13,19 +14,33 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 export default function TerminalHeaderRight() {
   const { session, logout } = useSession();
   const { status } = useDevice();
+  const { errorCount, lastError } = useFiscalAlerts();
   const venue = status?.venue ?? null;
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute();
 
   if (!session) return null;
 
-  // Справочник состава и настройки доступны с любого экрана, кроме самих себя —
-  // иначе можно было бы навигировать на текущий же экран, что бессмысленно
   const showReferenceButton = route.name !== 'MenuReference';
-  const showSettingsButton = !['Settings', 'XReport', 'ShiftReceipts'].includes(route.name);
+  const showSettingsButton = !['Settings', 'XReport', 'ShiftReceipts', 'AtolStatus', 'Cash'].includes(
+    route.name
+  );
+  const showAtolChip = errorCount > 0 && route.name !== 'AtolStatus';
 
   return (
     <View style={styles.container}>
+      {showAtolChip ? (
+        <Pressable
+          style={styles.atolChip}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => navigation.navigate('AtolStatus')}
+        >
+          <Text style={styles.atolChipText} numberOfLines={1}>
+            АТОЛ · {errorCount}
+            {lastError ? `: ${lastError.message}` : ''}
+          </Text>
+        </Pressable>
+      ) : null}
       {showReferenceButton && (
         <Pressable
           style={styles.referenceButton}
@@ -71,7 +86,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginRight: 8,
-    maxWidth: 420,
+    maxWidth: 520,
+  },
+  atolChip: {
+    maxWidth: 180,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    backgroundColor: 'rgba(225, 76, 76, 0.15)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    minHeight: ICON_BUTTON_SIZE,
+    justifyContent: 'center',
+  },
+  atolChipText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: '700',
   },
   referenceButton: {
     borderWidth: 1,

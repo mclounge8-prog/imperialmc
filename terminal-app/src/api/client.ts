@@ -428,6 +428,16 @@ export type PaymentBreakdown = {
   other: number;
 };
 
+export type ShiftCash = {
+  openingCash: number;
+  cashSales: number;
+  deposits: number;
+  withdrawals: number;
+  expectedCash: number;
+  countedCash: number | null;
+  difference: number | null;
+};
+
 export type Shift = {
   id: number;
   venueId: number;
@@ -436,11 +446,14 @@ export type Shift = {
   openedByName: string | null;
   closedAt: string | null;
   closedByName: string | null;
+  openingCash: number;
+  closingCash: number | null;
   receiptsCount: number;
   guestsCount: number;
   revenueTotal: number;
   avgCheck: number;
   paymentBreakdown: PaymentBreakdown;
+  cash: ShiftCash;
 };
 
 export type ShiftReceipt = {
@@ -462,20 +475,67 @@ export async function fetchCurrentShift(venueId: number, token: string): Promise
   return shift;
 }
 
-export async function openShift(venueId: number, token: string): Promise<Shift> {
+export async function openShift(
+  venueId: number,
+  token: string,
+  openingCash = 0
+): Promise<Shift> {
   const { shift } = await authorizedRequest<{ shift: Shift }>('/api/shifts/open', token, {
     method: 'POST',
-    body: { venue_id: venueId },
+    body: { venue_id: venueId, opening_cash: openingCash },
   });
   return shift;
 }
 
-export async function closeShift(venueId: number, token: string): Promise<Shift> {
+export async function closeShift(
+  venueId: number,
+  token: string,
+  closingCash: number
+): Promise<Shift> {
   const { shift } = await authorizedRequest<{ shift: Shift }>('/api/shifts/close', token, {
     method: 'POST',
-    body: { venue_id: venueId },
+    body: { venue_id: venueId, closing_cash: closingCash },
   });
   return shift;
+}
+
+export type CashMovementType = 'deposit' | 'withdrawal';
+
+export type CashMovement = {
+  id: number;
+  type: CashMovementType;
+  amount: number;
+  comment: string | null;
+  staffName: string | null;
+  createdAt: string;
+};
+
+export async function createCashMovement(
+  venueId: number,
+  token: string,
+  type: CashMovementType,
+  amount: number,
+  comment?: string
+): Promise<{ movement: CashMovement; shift: Shift }> {
+  return authorizedRequest<{ movement: CashMovement; shift: Shift }>(
+    '/api/shifts/cash-movements',
+    token,
+    {
+      method: 'POST',
+      body: { venue_id: venueId, type, amount, comment: comment || null },
+    }
+  );
+}
+
+export async function fetchCashMovements(
+  venueId: number,
+  token: string
+): Promise<{ shiftId: number | null; movements: CashMovement[] }> {
+  const { shift, movements } = await authorizedRequest<{
+    shift: { id: number } | null;
+    movements: CashMovement[];
+  }>(`/api/shifts/cash-movements?venueId=${venueId}`, token);
+  return { shiftId: shift ? shift.id : null, movements };
 }
 
 export async function fetchShiftReceipts(
@@ -487,4 +547,95 @@ export async function fetchShiftReceipts(
     token
   );
   return { shiftId: shift ? shift.id : null, receipts };
+}
+
+// --- Фискализация через кассу АТОЛ (выполняется этим же планшетом,
+// см. src/native/atol.ts и src/services/fiscalWorker.ts) ---
+
+export type AtolSettings = {
+  enabled: boolean;
+  ipAddress?: string;
+  ipPort?: number;
+  model?: number | null;
+  operatorName?: string | null;
+};
+
+export async function fetchAtolSettings(venueId: number, token: string): Promise<AtolSettings> {
+  return authorizedRequest<AtolSettings>(`/api/fiscal/settings?venueId=${venueId}`, token);
+}
+
+export type FiscalJobType =
+  | 'open_shift'
+  | 'close_shift'
+  | 'receipt'
+  | 'x_report'
+  | 'cash_in'
+  | 'cash_out';
+
+export type FiscalJob = {
+  id: number;
+  type: FiscalJobType;
+  receiptId: number | null;
+  shiftId: number | null;
+  payload: unknown;
+  attempts: number;
+};
+
+export async function fetchNextFiscalJob(venueId: number, token: string): Promise<FiscalJob | null> {
+  const { job } = await authorizedRequest<{ job: FiscalJob | null }>(
+    `/api/fiscal/jobs/next?venueId=${venueId}`,
+    token
+  );
+  return job;
+}
+
+export type FiscalJobResult = {
+  success: boolean;
+  fiscalDocNumber?: number | null;
+  fiscalSign?: string | null;
+  fiscalDatetime?: string | null;
+  error?: string;
+};
+
+export async function reportFiscalJobResult(
+  jobId: number,
+  token: string,
+  result: FiscalJobResult
+): Promise<void> {
+  await authorizedRequest(`/api/fiscal/jobs/${jobId}/result`, token, { method: 'POST', body: result });
+}
+
+export type FiscalJobStatus = 'pending' | 'in_progress' | 'done' | 'error';
+
+export type FiscalJobListItem = {
+  id: number;
+  type: FiscalJobType;
+  status: FiscalJobStatus;
+  receiptId: number | null;
+  shiftId: number | null;
+  attempts: number;
+  lastError: string | null;
+  fiscalDocNumber: number | null;
+  fiscalSign: string | null;
+  fiscalDatetime: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function fetchFiscalJobs(
+  venueId: number,
+  token: string,
+  limit = 30
+): Promise<{ jobs: FiscalJobListItem[]; errorCount: number }> {
+  return authorizedRequest<{ jobs: FiscalJobListItem[]; errorCount: number }>(
+    `/api/fiscal/jobs?venueId=${venueId}&limit=${limit}`,
+    token
+  );
+}
+
+export async function retryFiscalJob(jobId: number, venueId: number, token: string): Promise<void> {
+  await authorizedRequest(`/api/fiscal/jobs/${jobId}/retry?venueId=${venueId}`, token, {
+    method: 'POST',
+    body: {},
+  });
 }

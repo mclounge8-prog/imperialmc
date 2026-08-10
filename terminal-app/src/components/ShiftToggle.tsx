@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   LayoutChangeEvent,
   PanResponder,
@@ -11,6 +12,8 @@ import {
 import { colors } from '../theme/colors';
 import { useCurrentShift } from '../hooks/useCurrentShift';
 import { openShift, closeShift } from '../api/client';
+import { runPendingFiscalJobs } from '../services/fiscalWorker';
+import AmountPromptModal from './AmountPromptModal';
 
 const KNOB_SIZE = 52;
 const TRACK_HEIGHT = 60;
@@ -29,6 +32,7 @@ export default function ShiftToggle() {
   const [toggling, setToggling] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [trackWidth, setTrackWidth] = useState(0);
+  const [prompt, setPrompt] = useState<null | 'open' | 'close'>(null);
 
   const isOpen = Boolean(shift);
   const maxTravel = Math.max(0, trackWidth - KNOB_SIZE);
@@ -65,14 +69,25 @@ export default function ShiftToggle() {
     }).start();
   };
 
-  const handleOpen = async () => {
+  const handleOpen = () => {
+    setActionError(null);
+    setPrompt('open');
+  };
+
+  const handleClose = () => {
+    setActionError(null);
+    setPrompt('close');
+  };
+
+  const confirmOpen = async (openingCash: number) => {
     const { session: liveSession, venue: liveVenue } = liveRef.current;
     if (!liveSession || !liveVenue) return;
-    setActionError(null);
+    setPrompt(null);
     setToggling(true);
     try {
-      const opened = await openShift(liveVenue.id, liveSession.token);
+      const opened = await openShift(liveVenue.id, liveSession.token, openingCash);
       setShift(opened);
+      runPendingFiscalJobs(liveVenue.id, liveSession.token);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Не удалось открыть смену');
       snapTo(0);
@@ -81,20 +96,38 @@ export default function ShiftToggle() {
     }
   };
 
-  const handleClose = async () => {
+  const confirmClose = async (closingCash: number) => {
     const { session: liveSession, venue: liveVenue, maxTravel: liveMaxTravel } = liveRef.current;
     if (!liveSession || !liveVenue) return;
-    setActionError(null);
+    setPrompt(null);
     setToggling(true);
     try {
-      await closeShift(liveVenue.id, liveSession.token);
+      const closed = await closeShift(liveVenue.id, liveSession.token, closingCash);
       setShift(null);
+      runPendingFiscalJobs(liveVenue.id, liveSession.token);
+      const expected = closed.cash?.expectedCash;
+      const counted = closed.cash?.countedCash;
+      const diff = closed.cash?.difference;
+      if (expected != null && counted != null && diff != null) {
+        const sign = diff > 0 ? '+' : '';
+        Alert.alert(
+          'Смена закрыта',
+          `По учёту: ${Math.round(expected).toLocaleString('ru-RU')} ₽\n` +
+            `Факт: ${Math.round(counted).toLocaleString('ru-RU')} ₽\n` +
+            `Разница: ${sign}${Math.round(diff).toLocaleString('ru-RU')} ₽`
+        );
+      }
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Не удалось закрыть смену');
       snapTo(liveMaxTravel);
     } finally {
       setToggling(false);
     }
+  };
+
+  const cancelPrompt = () => {
+    setPrompt(null);
+    snapTo(liveRef.current.isOpen ? liveRef.current.maxTravel : 0);
   };
 
   const panResponder = useMemo(
@@ -209,11 +242,42 @@ export default function ShiftToggle() {
         )}
       </View>
 
+      {isOpen && shift?.cash ? (
+        <Text style={styles.cashHint}>
+          Наличных в кассе (расчёт): {Math.round(shift.cash.expectedCash).toLocaleString('ru-RU')} ₽
+        </Text>
+      ) : null}
+
       {actionError && (
         <Text style={styles.actionErrorText} onPress={() => setActionError(null)}>
           {actionError} · скрыть
         </Text>
       )}
+
+      <AmountPromptModal
+        visible={prompt === 'open'}
+        title="Остаток наличных"
+        subtitle="Сколько наличных лежит в кассе при открытии смены? На АТОЛ уйдёт учётный чек внесения."
+        confirmLabel="Открыть смену"
+        initialValue="0"
+        allowZero
+        onCancel={cancelPrompt}
+        onConfirm={confirmOpen}
+      />
+      <AmountPromptModal
+        visible={prompt === 'close'}
+        title="Пересчёт наличных"
+        subtitle={
+          shift?.cash
+            ? `По учёту должно быть ${Math.round(shift.cash.expectedCash).toLocaleString('ru-RU')} ₽. Введите фактическую сумму в ящике.`
+            : 'Введите фактическую сумму наличных в кассе.'
+        }
+        confirmLabel="Закрыть смену"
+        initialValue={shift?.cash ? String(Math.round(shift.cash.expectedCash)) : '0'}
+        allowZero
+        onCancel={cancelPrompt}
+        onConfirm={confirmClose}
+      />
     </View>
   );
 }
@@ -298,6 +362,12 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 12,
     marginTop: 10,
+    textAlign: 'center',
+  },
+  cashHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 12,
     textAlign: 'center',
   },
 });
