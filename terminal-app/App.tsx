@@ -15,6 +15,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import XReportScreen from './src/screens/XReportScreen';
 import ShiftReceiptsScreen from './src/screens/ShiftReceiptsScreen';
 import TerminalHeaderRight from './src/components/TerminalHeaderRight';
+import { useFiscalSync } from './src/hooks/useFiscalSync';
 import { colors } from './src/theme/colors';
 
 export type RootStackParamList = {
@@ -42,6 +43,10 @@ const screenOptions = {
 function RootNavigator() {
   const { session } = useSession();
   const { deviceToken, status, loading: deviceLoading } = useDevice();
+
+  // Разбор очереди фискальных заданий (касса АТОЛ) — работает на фоне, пока
+  // есть сессия и заведение, независимо от текущего экрана.
+  useFiscalSync(status?.venue?.id ?? null, session?.token ?? null);
 
   if (deviceLoading) {
     return (

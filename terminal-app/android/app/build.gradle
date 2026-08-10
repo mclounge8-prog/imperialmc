@@ -72,6 +72,13 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+repositories {
+    // Драйвер ККТ АТОЛ поставляется как локальный .aar (ipc-обёртка для
+    // общения с отдельно установленным приложением "Драйвер ККТ АТОЛ" через
+    // AIDL) — у АТОЛ нет публичного Maven-репозитория для этой библиотеки.
+    flatDir { dirs 'libs' }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -116,4 +123,9 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Драйвер ККТ АТОЛ (ipc-вариант, см. libs/libfptr10.aar) — общается с
+    // отдельно устанавливаемым на планшет приложением "Драйвер ККТ АТОЛ"
+    // (ru.atol.drivers10.service) через AIDL, без встраивания родных .so.
+    implementation(name: 'libfptr10', ext: 'aar')
 }

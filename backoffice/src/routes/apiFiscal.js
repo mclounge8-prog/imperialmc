@@ -1,49 +1,56 @@
-// API для фискального агента (см. /atol-agent) — отдельный процесс, который
-// крутится на ПК в локальной сети конкретной точки, рядом с кассой АТОЛ.
-// Backend сюда никогда не пишет напрямую в кассу — только кладёт задания в
-// очередь (см. services/fiscalQueue.js), а агент их разбирает через этот API.
+// JSON API для терминала — фискализация чеков/смен через кассу АТОЛ,
+// подключённую к той же локальной сети, что и планшет. Backend только
+// собирает JSON-задания и кладёт их в очередь (см. services/fiscalQueue.js),
+// а выполняет их сам terminal-app через нативный модуль (см.
+// terminal-app/android/app/src/main/java/.../atol/AtolModule.kt), который
+// общается с отдельно установленным на планшет приложением "Драйвер ККТ
+// АТОЛ" по TCP/IP — backend саму кассу никогда не видит, она не в его сети.
 import { Hono } from 'hono';
 import { pool } from '../db.js';
+import { requireStaffToken } from '../middleware/apiAuth.js';
 
 const apiFiscal = new Hono();
+apiFiscal.use('*', requireStaffToken);
 
-// Авторизация агента — по токену, привязанному к конкретному заведению.
-// Токен генерируется/показывается один раз в бэкофисе (карточка заведения →
-// «Касса АТОЛ») и вписывается в .env агента при установке на месте.
-async function requireAgentToken(c, next) {
-  const token = c.req.header('X-Agent-Token');
-  if (!token) {
-    c.status(401);
-    return c.json({ error: 'Не указан токен агента' });
+// Настройки кассы для конкретного заведения — терминал запрашивает их один
+// раз при открытии смены/экрана настроек, чтобы знать, включена ли касса
+// АТОЛ и куда подключаться. enabled: false (или отсутствие строки) — касса
+// не используется, terminal-app должен просто не фискализировать.
+apiFiscal.get('/settings', async (c) => {
+  const venueId = c.req.query('venueId');
+  if (!venueId) {
+    c.status(400);
+    return c.json({ error: 'Не указано заведение' });
   }
 
   const { rows } = await pool.query(
-    'SELECT venue_id, enabled FROM venue_atol_settings WHERE agent_token = $1',
-    [token]
+    'SELECT enabled, kkt_ip, kkt_port, kkt_model, operator_name FROM venue_atol_settings WHERE venue_id = $1',
+    [venueId]
   );
   const settings = rows[0];
-  if (!settings) {
-    c.status(401);
-    return c.json({ error: 'Неверный токен агента' });
+  if (!settings || !settings.enabled) {
+    return c.json({ enabled: false });
   }
 
-  await pool.query('UPDATE venue_atol_settings SET last_seen_at = now() WHERE venue_id = $1', [
-    settings.venue_id,
-  ]);
-
-  c.set('venueId', settings.venue_id);
-  c.set('atolEnabled', settings.enabled);
-  await next();
-}
-
-apiFiscal.use('*', requireAgentToken);
+  return c.json({
+    enabled: true,
+    ipAddress: settings.kkt_ip,
+    ipPort: settings.kkt_port,
+    model: settings.kkt_model,
+    operatorName: settings.operator_name,
+  });
+});
 
 // Следующее необработанное задание для этого заведения (если есть). Забирает
 // самое старое pending-задание и сразу переводит его в in_progress — так
-// два параллельных опроса (например, при перезапуске агента) не возьмут
-// одно и то же задание дважды.
+// повторный опрос (например, если терминал перезапустили) не возьмёт то же
+// задание дважды, пока предыдущая попытка ещё не отчиталась результатом.
 apiFiscal.get('/jobs/next', async (c) => {
-  const venueId = c.get('venueId');
+  const venueId = c.req.query('venueId');
+  if (!venueId) {
+    c.status(400);
+    return c.json({ error: 'Не указано заведение' });
+  }
 
   const client = await pool.connect();
   try {
@@ -87,9 +94,8 @@ apiFiscal.get('/jobs/next', async (c) => {
   }
 });
 
-// Агент репортит результат выполнения задания на кассе.
+// Терминал репортит результат выполнения задания на кассе.
 apiFiscal.post('/jobs/:id/result', async (c) => {
-  const venueId = c.get('venueId');
   const jobId = c.req.param('id');
   const body = await c.req.json().catch(() => null);
   if (!body || typeof body.success !== 'boolean') {
@@ -97,10 +103,7 @@ apiFiscal.post('/jobs/:id/result', async (c) => {
     return c.json({ error: 'Некорректное тело запроса' });
   }
 
-  const { rows: jobRows } = await pool.query('SELECT * FROM fiscal_jobs WHERE id = $1 AND venue_id = $2', [
-    jobId,
-    venueId,
-  ]);
+  const { rows: jobRows } = await pool.query('SELECT * FROM fiscal_jobs WHERE id = $1', [jobId]);
   const job = jobRows[0];
   if (!job) {
     c.status(404);
@@ -124,7 +127,7 @@ apiFiscal.post('/jobs/:id/result', async (c) => {
   } else {
     await pool.query(
       "UPDATE fiscal_jobs SET status = 'error', last_error = $1, updated_at = now() WHERE id = $2",
-      [body.error || 'Неизвестная ошибка агента', jobId]
+      [body.error || 'Неизвестная ошибка терминала', jobId]
     );
     if (job.type === 'receipt' && job.receipt_id) {
       await pool.query("UPDATE receipts SET fiscal_status = 'error' WHERE id = $1", [job.receipt_id]);

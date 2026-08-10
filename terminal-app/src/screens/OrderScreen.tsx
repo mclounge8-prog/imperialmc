@@ -34,6 +34,7 @@ import {
   payGuest,
   cancelGuest,
 } from '../api/client';
+import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import type { MenuItem, MenuResponse, Order, OrderGuest, OrderItem, PaymentMethod, Zone } from '../api/client';
 import type { RootStackParamList } from '../../App';
 
@@ -337,6 +338,9 @@ export default function OrderScreen({ route, navigation }: Props) {
     try {
       const updated = await payGuest(order.id, guest.id, method, guest.total, session.token);
       closePaymentModal();
+      // Не ждём фискализацию — она не должна задерживать закрытие модалки
+      // оплаты, при сбое чек останется в очереди и разберётся фоном.
+      if (venue) runPendingFiscalJobs(venue.id, session.token);
       if (updated.guests.length === 0) {
         navigation.goBack();
       } else {

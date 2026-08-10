@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import crypto from 'node:crypto';
 import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
 import {
@@ -219,27 +218,6 @@ venues.post('/:id/atol', async (c) => {
   return c.html(renderVenueAtolPanel(venue, settings, jobs));
 });
 
-venues.post('/:id/atol/token', async (c) => {
-  const venueId = c.req.param('id');
-  const venue = await fetchVenue(venueId);
-  if (!venue) {
-    c.status(404);
-    return c.text('Заведение не найдено');
-  }
-
-  const token = crypto.randomBytes(24).toString('hex');
-  await pool.query(
-    `INSERT INTO venue_atol_settings (venue_id, agent_token, updated_at)
-     VALUES ($1, $2, now())
-     ON CONFLICT (venue_id) DO UPDATE SET agent_token = EXCLUDED.agent_token, updated_at = now()`,
-    [venueId, token]
-  );
-
-  const settings = await fetchAtolSettings(venueId);
-  const jobs = await fetchRecentFiscalJobs(venueId);
-  return c.html(renderVenueAtolPanel(venue, settings, jobs));
-});
-
 venues.get('/:id/atol/jobs', async (c) => {
   const venueId = c.req.param('id');
   const jobs = await fetchRecentFiscalJobs(venueId);
@@ -247,7 +225,7 @@ venues.get('/:id/atol/jobs', async (c) => {
 });
 
 // Вернуть упавшее задание в очередь (например, кассу временно отключали от сети) —
-// агент подхватит его при следующем опросе.
+// terminal-app подхватит его при следующем опросе.
 venues.post('/:id/atol/jobs/:jobId/retry', async (c) => {
   const { id: venueId, jobId } = c.req.param();
   await pool.query(

@@ -11,6 +11,7 @@ import {
 import { colors } from '../theme/colors';
 import { useCurrentShift } from '../hooks/useCurrentShift';
 import { openShift, closeShift } from '../api/client';
+import { runPendingFiscalJobs } from '../services/fiscalWorker';
 
 const KNOB_SIZE = 52;
 const TRACK_HEIGHT = 60;
@@ -73,6 +74,9 @@ export default function ShiftToggle() {
     try {
       const opened = await openShift(liveVenue.id, liveSession.token);
       setShift(opened);
+      // Не ждём фискализацию — она не должна задерживать открытие смены на
+      // экране, при сбое задание останется в очереди и разберётся фоном.
+      runPendingFiscalJobs(liveVenue.id, liveSession.token);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Не удалось открыть смену');
       snapTo(0);
@@ -89,6 +93,7 @@ export default function ShiftToggle() {
     try {
       await closeShift(liveVenue.id, liveSession.token);
       setShift(null);
+      runPendingFiscalJobs(liveVenue.id, liveSession.token);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Не удалось закрыть смену');
       snapTo(liveMaxTravel);

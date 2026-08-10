@@ -488,3 +488,53 @@ export async function fetchShiftReceipts(
   );
   return { shiftId: shift ? shift.id : null, receipts };
 }
+
+// --- Фискализация через кассу АТОЛ (выполняется этим же планшетом,
+// см. src/native/atol.ts и src/services/fiscalWorker.ts) ---
+
+export type AtolSettings = {
+  enabled: boolean;
+  ipAddress?: string;
+  ipPort?: number;
+  model?: number | null;
+  operatorName?: string | null;
+};
+
+export async function fetchAtolSettings(venueId: number, token: string): Promise<AtolSettings> {
+  return authorizedRequest<AtolSettings>(`/api/fiscal/settings?venueId=${venueId}`, token);
+}
+
+export type FiscalJobType = 'open_shift' | 'close_shift' | 'receipt' | 'x_report';
+
+export type FiscalJob = {
+  id: number;
+  type: FiscalJobType;
+  receiptId: number | null;
+  shiftId: number | null;
+  payload: unknown;
+  attempts: number;
+};
+
+export async function fetchNextFiscalJob(venueId: number, token: string): Promise<FiscalJob | null> {
+  const { job } = await authorizedRequest<{ job: FiscalJob | null }>(
+    `/api/fiscal/jobs/next?venueId=${venueId}`,
+    token
+  );
+  return job;
+}
+
+export type FiscalJobResult = {
+  success: boolean;
+  fiscalDocNumber?: number | null;
+  fiscalSign?: string | null;
+  fiscalDatetime?: string | null;
+  error?: string;
+};
+
+export async function reportFiscalJobResult(
+  jobId: number,
+  token: string,
+  result: FiscalJobResult
+): Promise<void> {
+  await authorizedRequest(`/api/fiscal/jobs/${jobId}/result`, token, { method: 'POST', body: result });
+}

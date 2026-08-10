@@ -147,9 +147,6 @@ function renderFiscalJobRow(job, venueId) {
 
 export function renderVenueAtolPanel(venue, settings, jobs) {
   const safe = settings || { enabled: false, kkt_port: 5555 };
-  const hasToken = !!safe.agent_token;
-  const agentOnline =
-    safe.last_seen_at && Date.now() - new Date(safe.last_seen_at).getTime() < 2 * 60 * 1000;
 
   const jobsHtml = jobs.length
     ? jobs.map((job) => renderFiscalJobRow(job, venue.id)).join('')
@@ -160,7 +157,8 @@ export function renderVenueAtolPanel(venue, settings, jobs) {
       <h3>Касса АТОЛ</h3>
       <p class="atol-hint">
         Система налогообложения и ставка НДС настраиваются один раз на самой кассе (как раньше в QuickResto) —
-        здесь мы их не задаём. Фискальный агент устанавливается на любой ПК в той же локальной сети, что и касса.
+        здесь мы их не задаём. Фискализацию выполняет сам планшет-терминал (нужно приложение «Драйвер ККТ АТОЛ»,
+        установленное на том же планшете) — никакого отдельного ПК/агента не требуется.
       </p>
 
       <form
@@ -197,26 +195,6 @@ export function renderVenueAtolPanel(venue, settings, jobs) {
           <button type="submit">Сохранить</button>
         </div>
       </form>
-
-      <div class="atol-agent-block">
-        <div class="atol-agent-status">
-          Агент: ${agentOnline ? '<span class="atol-agent-online">● на связи</span>' : '<span class="atol-agent-offline">○ не подключён</span>'}
-          ${safe.last_seen_at ? `<span class="atol-agent-seen">последний опрос: ${formatDateTime(safe.last_seen_at)}</span>` : ''}
-        </div>
-        <div class="atol-token-row">
-          <span>Токен агента:</span>
-          <code class="atol-token-value">${hasToken ? escapeHtml(safe.agent_token) : 'не создан'}</code>
-          <button
-            type="button"
-            class="secondary"
-            hx-post="/venues/${venue.id}/atol/token"
-            hx-target="#venue-atol-panel-${venue.id}"
-            hx-swap="innerHTML"
-            hx-confirm="${hasToken ? 'Старый токен перестанет работать, агент на месте нужно перенастроить. Продолжить?' : ''}"
-          >${hasToken ? 'Сгенерировать новый' : 'Создать токен'}</button>
-        </div>
-        <p class="atol-hint">Впишите этот токен и IP backend в настройки фискального агента на ПК точки (см. <code>atol-agent/README.md</code>).</p>
-      </div>
 
       <div class="atol-jobs-block">
         <div class="atol-jobs-header">
