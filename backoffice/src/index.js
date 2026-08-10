@@ -27,6 +27,7 @@ import { renderDashboardShell } from './views/dashboardShell.js';
 import { sections } from './views/sections.js';
 import { fetchAllVenues } from './utils/venues.js';
 import { readLastSection, readSelectedVenueId, resolveSelectedVenue } from './utils/preferences.js';
+import { startFiscalJobsCleanup } from './services/fiscalCleanup.js';
 
 const app = new Hono();
 
@@ -92,4 +93,6 @@ const port = Number(process.env.PORT || 3000);
 
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`Бэкофис запущен: http://localhost:${info.port}`);
+  // Раз в час чистим старые done/error задания — журнал не раздувается.
+  startFiscalJobsCleanup();
 });

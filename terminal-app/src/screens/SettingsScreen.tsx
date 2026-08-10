@@ -8,8 +8,10 @@ import type { RootStackParamList } from '../../App';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
+type SettingsTarget = 'XReport' | 'Cash' | 'ShiftReceipts';
+
 type SettingsRow = {
-  key: keyof RootStackParamList;
+  key: SettingsTarget;
   icon: string;
   title: string;
   subtitle: string;
@@ -17,6 +19,7 @@ type SettingsRow = {
 
 const ROWS: SettingsRow[] = [
   { key: 'XReport', icon: '📊', title: 'X-отчёт', subtitle: 'Сводка по текущей смене без закрытия' },
+  { key: 'Cash', icon: '💵', title: 'Наличность', subtitle: 'Внесение, инкассация, остаток в кассе' },
   { key: 'ShiftReceipts', icon: '🧾', title: 'Чеки', subtitle: 'Чеки текущей смены' },
 ];
 
@@ -33,7 +36,7 @@ export default function SettingsScreen() {
           <Pressable
             key={row.key}
             style={[styles.row, idx < ROWS.length - 1 && styles.rowBorder]}
-            onPress={() => navigation.navigate(row.key as never)}
+            onPress={() => navigation.navigate(row.key)}
           >
             <Text style={styles.rowIcon}>{row.icon}</Text>
             <View style={styles.rowTextBlock}>

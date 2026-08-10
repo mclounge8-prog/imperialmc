@@ -164,9 +164,13 @@ async function fetchAtolSettings(venueId) {
   return rows[0] || null;
 }
 
-async function fetchRecentFiscalJobs(venueId, limit = 15) {
+async function fetchRecentFiscalJobs(venueId, limit = 30) {
+  // Только за последние сутки — полный архив не нужен, TTL чистит старое.
   const { rows } = await pool.query(
-    'SELECT * FROM fiscal_jobs WHERE venue_id = $1 ORDER BY id DESC LIMIT $2',
+    `SELECT * FROM fiscal_jobs
+     WHERE venue_id = $1 AND created_at >= now() - interval '1 day'
+     ORDER BY id DESC
+     LIMIT $2`,
     [venueId, limit]
   );
   return rows;

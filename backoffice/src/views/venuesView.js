@@ -99,6 +99,8 @@ const FISCAL_JOB_TYPE_LABELS = {
   close_shift: 'Закрытие смены (Z-отчёт)',
   x_report: 'X-отчёт',
   receipt: 'Чек',
+  cash_in: 'Внесение',
+  cash_out: 'Инкассация',
 };
 
 const FISCAL_JOB_STATUS_LABELS = {
@@ -198,7 +200,7 @@ export function renderVenueAtolPanel(venue, settings, jobs) {
 
       <div class="atol-jobs-block">
         <div class="atol-jobs-header">
-          <h4>Журнал заданий</h4>
+          <h4>Задания за сутки</h4>
           <button
             type="button"
             class="secondary"
@@ -207,6 +209,7 @@ export function renderVenueAtolPanel(venue, settings, jobs) {
             hx-swap="innerHTML"
           >Обновить</button>
         </div>
+        <p class="atol-hint">Старые записи автоматически удаляются через 7 дней.</p>
         <table class="data-table atol-jobs-table">
           <thead>
             <tr><th>Когда</th><th>Тип</th><th>Статус</th><th>№ ФД</th><th></th></tr>

@@ -24,6 +24,9 @@ const PAYMENT_LABELS: Record<'cash' | 'card' | 'other', string> = {
 };
 
 export default function ShiftStatsCard({ shift }: { shift: Shift }) {
+  const cash = shift.cash;
+  const showCash = Boolean(cash) && shift.status === 'open';
+
   return (
     <View>
       <View style={styles.metaRow}>
@@ -58,13 +61,38 @@ export default function ShiftStatsCard({ shift }: { shift: Shift }) {
         </View>
       </View>
 
+      {showCash ? (
+        <>
+          <Text style={styles.sectionLabel}>Наличность в кассе</Text>
+          <View style={[styles.card, styles.cashCard]}>
+            <View style={styles.cashHero}>
+              <Text style={styles.cashHeroLabel}>Сейчас в кассе (расчёт)</Text>
+              <Text style={styles.cashHeroValue}>{formatMoney(cash.expectedCash)}</Text>
+            </View>
+            <View style={styles.paymentRow}>
+              <Text style={styles.paymentLabel}>Остаток на открытии</Text>
+              <Text style={styles.paymentValue}>{formatMoney(cash.openingCash)}</Text>
+            </View>
+            <View style={[styles.paymentRow, styles.paymentRowBorder]}>
+              <Text style={styles.paymentLabel}>Наличные продажи</Text>
+              <Text style={styles.paymentValue}>{formatMoney(cash.cashSales)}</Text>
+            </View>
+            <View style={[styles.paymentRow, styles.paymentRowBorder]}>
+              <Text style={styles.paymentLabel}>Внесения</Text>
+              <Text style={styles.paymentValue}>+{formatMoney(cash.deposits)}</Text>
+            </View>
+            <View style={[styles.paymentRow, styles.paymentRowBorder]}>
+              <Text style={styles.paymentLabel}>Инкассации</Text>
+              <Text style={styles.paymentValue}>−{formatMoney(cash.withdrawals)}</Text>
+            </View>
+          </View>
+        </>
+      ) : null}
+
       <Text style={styles.sectionLabel}>По способу оплаты</Text>
       <View style={styles.card}>
         {(Object.keys(PAYMENT_LABELS) as Array<'cash' | 'card' | 'other'>).map((method, idx) => (
-          <View
-            key={method}
-            style={[styles.paymentRow, idx < 2 && styles.paymentRowBorder]}
-          >
+          <View key={method} style={[styles.paymentRow, idx < 2 && styles.paymentRowBorder]}>
             <Text style={styles.paymentLabel}>{PAYMENT_LABELS[method]}</Text>
             <Text style={styles.paymentValue}>{formatMoney(shift.paymentBreakdown[method])}</Text>
           </View>
@@ -109,7 +137,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 12,
     overflow: 'hidden',
+    marginBottom: 16,
   },
+  cashCard: { marginBottom: 20 },
+  cashHero: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface2,
+  },
+  cashHeroLabel: { color: colors.textMuted, fontSize: 12, marginBottom: 4 },
+  cashHeroValue: { color: colors.accent2, fontSize: 28, fontWeight: '800' },
   paymentRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

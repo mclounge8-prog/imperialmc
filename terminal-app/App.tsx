@@ -18,6 +18,7 @@ import TerminalHeaderRight from './src/components/TerminalHeaderRight';
 import { FiscalAlertsProvider } from './src/context/FiscalAlertsContext';
 import { useFiscalSync } from './src/hooks/useFiscalSync';
 import AtolStatusScreen from './src/screens/AtolStatusScreen';
+import CashScreen from './src/screens/CashScreen';
 import { colors } from './src/theme/colors';
 
 export type RootStackParamList = {
@@ -31,6 +32,7 @@ export type RootStackParamList = {
   XReport: undefined;
   ShiftReceipts: undefined;
   AtolStatus: undefined;
+  Cash: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -113,6 +115,7 @@ function RootNavigator() {
             component={AtolStatusScreen}
             options={{ title: 'Касса АТОЛ' }}
           />
+          <Stack.Screen name="Cash" component={CashScreen} options={{ title: 'Наличность' }} />
         </>
       )}
     </Stack.Navigator>

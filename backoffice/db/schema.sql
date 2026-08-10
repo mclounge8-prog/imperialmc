@@ -490,3 +490,28 @@ CREATE INDEX IF NOT EXISTS idx_fiscal_jobs_receipt ON fiscal_jobs(receipt_id);
 -- fiscal_jobs для отображения бейджа в списке чеков терминала/бэкофиса.
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS fiscal_status VARCHAR(20); -- NULL (не требуется), pending, done, error
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS fiscal_doc_number INT;
+
+-- Учёт наличности в смене: остаток на открытии, фактический пересчёт на закрытии,
+-- ожидаемая сумма на закрытии (снапшот формулы). Операции внесения/инкассации —
+-- в cash_movements; наличные продажи считаются из receipt_payments.
+ALTER TABLE shifts ADD COLUMN IF NOT EXISTS opening_cash NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE shifts ADD COLUMN IF NOT EXISTS closing_cash NUMERIC(12,2);
+ALTER TABLE shifts ADD COLUMN IF NOT EXISTS closing_cash_expected NUMERIC(12,2);
+
+CREATE TABLE IF NOT EXISTS cash_movements (
+  id          SERIAL PRIMARY KEY,
+  venue_id    INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  shift_id    INT NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+  type        VARCHAR(20) NOT NULL, -- deposit (внесение), withdrawal (инкассация)
+  amount      NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  comment     TEXT,
+  staff_id    INT REFERENCES staff(id) ON DELETE SET NULL,
+  staff_name  VARCHAR(100),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cash_movements_shift ON cash_movements(shift_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_cash_movements_venue ON cash_movements(venue_id, created_at);
+
+-- Для TTL-очистки завершённых фискальных заданий (не раздувать таблицу).
+CREATE INDEX IF NOT EXISTS idx_fiscal_jobs_created_at ON fiscal_jobs(created_at);

@@ -28,6 +28,8 @@ const TYPE_LABELS: Record<string, string> = {
   close_shift: 'Закрытие смены',
   x_report: 'X-отчёт',
   receipt: 'Чек',
+  cash_in: 'Внесение',
+  cash_out: 'Инкассация',
 };
 
 const STATUS_LABELS: Record<string, string> = {

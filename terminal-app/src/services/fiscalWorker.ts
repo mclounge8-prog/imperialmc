@@ -60,6 +60,8 @@ function jobTypeLabel(type: string): string {
   if (type === 'open_shift') return 'Открытие смены';
   if (type === 'close_shift') return 'Закрытие смены';
   if (type === 'x_report') return 'X-отчёт';
+  if (type === 'cash_in') return 'Внесение';
+  if (type === 'cash_out') return 'Инкассация';
   return type;
 }
 

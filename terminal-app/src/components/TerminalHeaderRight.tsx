@@ -22,7 +22,7 @@ export default function TerminalHeaderRight() {
   if (!session) return null;
 
   const showReferenceButton = route.name !== 'MenuReference';
-  const showSettingsButton = !['Settings', 'XReport', 'ShiftReceipts', 'AtolStatus'].includes(
+  const showSettingsButton = !['Settings', 'XReport', 'ShiftReceipts', 'AtolStatus', 'Cash'].includes(
     route.name
   );
   const showAtolChip = errorCount > 0 && route.name !== 'AtolStatus';
