@@ -547,3 +547,21 @@ CREATE INDEX IF NOT EXISTS idx_cash_movements_venue ON cash_movements(venue_id, 
 
 -- Для TTL-очистки завершённых фискальных заданий (не раздувать таблицу).
 CREATE INDEX IF NOT EXISTS idx_fiscal_jobs_created_at ON fiscal_jobs(created_at);
+
+-- ============================================================
+-- Режим пречека (нефискальный счёт гостю) — включается per-venue.
+-- После печати пречека состав чека фиксируется: только оплата (фискальный
+-- чек) или отмена с обязательным комментарием (пишется в receipts).
+-- ============================================================
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS precheck_enabled BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS precheck_printed_at TIMESTAMPTZ;
+ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS precheck_printed_by INT REFERENCES staff(id) ON DELETE SET NULL;
+ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS precheck_printed_by_name VARCHAR(100);
+
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS cancel_comment TEXT;
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS precheck_was_printed BOOLEAN NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS idx_receipts_cancelled_precheck
+  ON receipts(venue_id, closed_at DESC)
+  WHERE status = 'cancelled' AND precheck_was_printed = true;

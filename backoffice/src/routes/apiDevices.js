@@ -59,10 +59,16 @@ apiDevices.get('/me', requireDeviceToken, async (c) => {
 
   let venue = null;
   if (device.venue_id) {
-    const { rows } = await pool.query('SELECT id, name FROM venues WHERE id = $1', [
+    const { rows } = await pool.query('SELECT id, name, COALESCE(precheck_enabled, false) AS precheck_enabled FROM venues WHERE id = $1', [
       device.venue_id,
     ]);
-    venue = rows[0] || null;
+    venue = rows[0]
+      ? {
+          id: rows[0].id,
+          name: rows[0].name,
+          precheckEnabled: !!rows[0].precheck_enabled,
+        }
+      : null;
   }
 
   return c.json({ active: device.is_active, venue });

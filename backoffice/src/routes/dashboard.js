@@ -36,7 +36,7 @@ export async function renderFragmentHtml(key, c) {
 
   if (key === 'venues') {
     const { rows: venueRows } = await pool.query(
-      'SELECT id, name, address FROM venues ORDER BY name'
+      'SELECT id, name, address, COALESCE(precheck_enabled, false) AS precheck_enabled FROM venues ORDER BY name'
     );
     const venueCards = [];
     for (const venue of venueRows) {
