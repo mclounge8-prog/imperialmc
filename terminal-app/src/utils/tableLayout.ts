@@ -20,21 +20,27 @@ export function layoutSizeForTable(table: Pick<TableInfo, 'size' | 'width' | 'he
 }
 
 export type FittedFloorPlan = {
+  scaleX: number;
+  scaleY: number;
+  /** Средний масштаб — для размера шрифта на плитке. */
   scale: number;
   planWidth: number;
   planHeight: number;
   tables: Array<TableInfo & { left: number; top: number; tileWidth: number; tileHeight: number }>;
 };
 
-/** Подгоняет схему под доступную область: целиком на экране, без скролла. */
+/**
+ * Растягивает схему на всю доступную ширину и высоту (scaleX/scaleY независимо),
+ * без пустых полей сверху/снизу/по бокам.
+ */
 export function fitFloorPlan(
   tables: TableInfo[],
   availWidth: number,
   availHeight: number,
-  padding = 12
+  padding = 0
 ): FittedFloorPlan {
-  const safeW = Math.max(1, availWidth - padding * 2);
-  const safeH = Math.max(1, availHeight - padding * 2);
+  const planWidth = Math.max(1, Math.floor(availWidth - padding * 2));
+  const planHeight = Math.max(1, Math.floor(availHeight - padding * 2));
 
   const layoutTables = tables.map((table) => {
     const dims = layoutSizeForTable(table);
@@ -48,18 +54,22 @@ export function fitFloorPlan(
 
   const contentW = Math.max(...layoutTables.map((t) => t.posX + t.layoutWidth), 1);
   const contentH = Math.max(...layoutTables.map((t) => t.posY + t.layoutHeight), 1);
-  const scale = Math.min(safeW / contentW, safeH / contentH);
+  const scaleX = planWidth / contentW;
+  const scaleY = planHeight / contentH;
+  const scale = Math.sqrt(scaleX * scaleY);
 
   return {
+    scaleX,
+    scaleY,
     scale,
-    planWidth: Math.max(1, Math.round(contentW * scale)),
-    planHeight: Math.max(1, Math.round(contentH * scale)),
+    planWidth,
+    planHeight,
     tables: layoutTables.map((table) => ({
       ...table,
-      left: Math.round(table.posX * scale),
-      top: Math.round(table.posY * scale),
-      tileWidth: Math.max(36, Math.round(table.layoutWidth * scale)),
-      tileHeight: Math.max(28, Math.round(table.layoutHeight * scale)),
+      left: Math.round(table.posX * scaleX),
+      top: Math.round(table.posY * scaleY),
+      tileWidth: Math.max(36, Math.round(table.layoutWidth * scaleX)),
+      tileHeight: Math.max(28, Math.round(table.layoutHeight * scaleY)),
     })),
   };
 }

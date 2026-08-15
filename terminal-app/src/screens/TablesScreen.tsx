@@ -229,56 +229,54 @@ export default function TablesScreen() {
                 <Text style={styles.emptyText}>В этой зоне пока нет столов</Text>
               </View>
             ) : fitted ? (
-              <View style={styles.floorPlanHost}>
-                <View
-                  style={[
-                    styles.floorPlan,
-                    { width: fitted.planWidth, height: fitted.planHeight },
-                  ]}
-                >
-                  {fitted.tables.map((table) => {
-                    const fontScale = Math.max(0.75, Math.min(1.15, fitted.scale));
-                    return (
-                      <Pressable
-                        key={table.id}
+              <View
+                style={[
+                  styles.floorPlan,
+                  { width: fitted.planWidth, height: fitted.planHeight },
+                ]}
+              >
+                {fitted.tables.map((table) => {
+                  const fontScale = Math.max(0.7, Math.min(1.25, fitted.scale));
+                  return (
+                    <Pressable
+                      key={table.id}
+                      style={[
+                        styles.tableTile,
+                        {
+                          left: table.left,
+                          top: table.top,
+                          width: table.tileWidth,
+                          height: table.tileHeight,
+                          borderColor: STATUS_COLORS[table.status],
+                        },
+                      ]}
+                      onPress={() => handleTablePress(table.id, table.name)}
+                    >
+                      <Text
+                        style={[styles.tileName, { fontSize: Math.round(13 * fontScale) }]}
+                        numberOfLines={2}
+                      >
+                        {table.name}
+                      </Text>
+                      <Text
+                        style={[styles.tileCapacity, { fontSize: Math.round(11 * fontScale) }]}
+                      >
+                        {table.capacity} мест
+                      </Text>
+                      <Text
                         style={[
-                          styles.tableTile,
+                          styles.tileStatus,
                           {
-                            left: table.left,
-                            top: table.top,
-                            width: table.tileWidth,
-                            height: table.tileHeight,
-                            borderColor: STATUS_COLORS[table.status],
+                            color: STATUS_COLORS[table.status],
+                            fontSize: Math.round(11 * fontScale),
                           },
                         ]}
-                        onPress={() => handleTablePress(table.id, table.name)}
                       >
-                        <Text
-                          style={[styles.tileName, { fontSize: Math.round(13 * fontScale) }]}
-                          numberOfLines={2}
-                        >
-                          {table.name}
-                        </Text>
-                        <Text
-                          style={[styles.tileCapacity, { fontSize: Math.round(11 * fontScale) }]}
-                        >
-                          {table.capacity} мест
-                        </Text>
-                        <Text
-                          style={[
-                            styles.tileStatus,
-                            {
-                              color: STATUS_COLORS[table.status],
-                              fontSize: Math.round(11 * fontScale),
-                            },
-                          ]}
-                        >
-                          {STATUS_LABELS[table.status] || table.status}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                        {STATUS_LABELS[table.status] || table.status}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             ) : null}
           </View>
@@ -388,15 +386,11 @@ const styles = StyleSheet.create({
 
   floorArea: {
     flex: 1,
-    marginHorizontal: 16,
+    marginLeft: 16,
+    marginRight: 8,
     marginTop: 12,
     marginBottom: 8,
     minHeight: 120,
-  },
-  floorPlanHost: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   floorPlan: {
     position: 'relative',
