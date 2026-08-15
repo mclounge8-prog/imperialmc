@@ -45,3 +45,7 @@ terminal-app/coverage/
 # Backoffice runtime uploads
 backoffice/public/uploads/*
 !backoffice/public/uploads/.gitkeep
+
+# Terminal deploy secrets / build artifacts
+terminal-app/.env.deploy
+terminal-app/dist/
