@@ -356,17 +356,29 @@ export async function removeOrderItem(
 
 export type PaymentMethod = 'cash' | 'card';
 
+export type DiscountPercent = 0 | 10 | 15 | 20 | 25 | 100;
+
 export async function payGuest(
   orderId: number,
   guestId: number,
   method: PaymentMethod,
   amount: number,
-  token: string
+  token: string,
+  discountPercent: DiscountPercent = 0
 ): Promise<Order> {
+  const body: {
+    payments: { method: PaymentMethod; amount: number }[];
+    discount_percent?: DiscountPercent;
+  } = {
+    payments: amount > 0.009 ? [{ method, amount }] : [],
+  };
+  if (discountPercent > 0) {
+    body.discount_percent = discountPercent;
+  }
   const { order } = await authorizedRequest<OrderEnvelope>(
     `/api/orders/${orderId}/guests/${guestId}/pay`,
     token,
-    { method: 'POST', body: { payments: [{ method, amount }] } }
+    { method: 'POST', body }
   );
   return order;
 }

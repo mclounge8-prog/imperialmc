@@ -20,10 +20,11 @@ async function isAtolEnabledForVenue(client, venueId) {
 }
 
 function buildSellTaskPayload({ items, payments, total, operatorName }) {
+  const fiscalItems = applyDiscountToFiscalItems(items, total);
   return {
     type: 'sell',
     ...(operatorName ? { operator: { name: operatorName } } : {}),
-    items: items.map((item) => ({
+    items: fiscalItems.map((item) => ({
       type: 'position',
       name: item.name,
       price: Number(item.price),
@@ -39,6 +40,37 @@ function buildSellTaskPayload({ items, payments, total, operatorName }) {
     })),
     total: Number(total),
   };
+}
+
+/** Пропорционально снижает цены позиций, чтобы sum(price*qty) == targetTotal (АТОЛ сверяет). */
+export function applyDiscountToFiscalItems(items, targetTotal) {
+  const list = Array.isArray(items) ? items : [];
+  const target = Math.round(Number(targetTotal) * 100) / 100;
+  const subtotal =
+    Math.round(list.reduce((sum, i) => sum + Number(i.price) * Number(i.qty), 0) * 100) / 100;
+
+  if (list.length === 0) return list;
+  if (Math.abs(subtotal - target) < 0.005) {
+    return list.map((i) => ({ ...i, price: Number(i.price) }));
+  }
+  if (target <= 0.009 || subtotal <= 0.009) {
+    return list.map((i) => ({ ...i, price: 0 }));
+  }
+
+  const factor = target / subtotal;
+  const scaled = list.map((i) => ({
+    ...i,
+    price: Math.round(Number(i.price) * factor * 100) / 100,
+  }));
+
+  let sum = Math.round(scaled.reduce((s, i) => s + Number(i.price) * Number(i.qty), 0) * 100) / 100;
+  const diff = Math.round((target - sum) * 100) / 100;
+  if (Math.abs(diff) >= 0.01) {
+    const last = scaled[scaled.length - 1];
+    const qty = Number(last.qty) || 1;
+    last.price = Math.round((Number(last.price) + diff / qty) * 100) / 100;
+  }
+  return scaled;
 }
 
 function buildOpenShiftPayload({ operatorName }) {
@@ -161,6 +193,11 @@ export async function enqueueReceiptFiscalJob(
   { venueId, receiptId, items, payments, total, operatorName }
 ) {
   if (!venueId) return;
+  // Нулевая сумма (100% скидка) — фискальный sell не печатаем.
+  if (Number(total) <= 0.009) {
+    await client.query("UPDATE receipts SET fiscal_status = NULL WHERE id = $1", [receiptId]);
+    return;
+  }
   const enabled = await isAtolEnabledForVenue(client, venueId);
   if (!enabled) return;
 

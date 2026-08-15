@@ -173,6 +173,40 @@ export function buildCashPaymentMessage({ venueName, amount, cashier, tableName,
     .join('\n');
 }
 
+export function buildDiscountPaymentMessage({
+  venueName,
+  subtotal,
+  discountPercent,
+  discountAmount,
+  total,
+  payments,
+  cashier,
+  tableName,
+  guestLabel,
+  when,
+}) {
+  const where = [tableName ? `стол ${tableName}` : 'быстрый заказ', guestLabel].filter(Boolean).join(' · ');
+  const methodLabels = { cash: 'наличные', card: 'безнал', other: 'прочее' };
+  const payLines = (payments || [])
+    .filter((p) => Number(p.amount) > 0.009)
+    .map(
+      (p) =>
+        `${methodLabels[p.method] || p.method}: ${escapeHtml(formatMoney(p.amount))}`
+    );
+  return [
+    header(`🏷 Скидка ${escapeHtml(String(discountPercent))}%`, venueName, when),
+    '',
+    `Сумма без скидки: ${escapeHtml(formatMoney(subtotal))}`,
+    `Скидка: <b>−${escapeHtml(formatMoney(discountAmount))}</b> (${escapeHtml(String(discountPercent))}%)`,
+    `К оплате: <b>${escapeHtml(formatMoney(total))}</b>`,
+    payLines.length ? `Оплата: ${payLines.join(', ')}` : 'Оплата: не требуется (100%)',
+    where ? `Чек: ${escapeHtml(where)}` : null,
+    `Кассир: ${escapeHtml(cashier || '—')}`,
+  ]
+    .filter((x) => x != null)
+    .join('\n');
+}
+
 export function buildShiftOpenMessage({
   venueName,
   openingCash,
