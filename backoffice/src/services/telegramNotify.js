@@ -81,17 +81,35 @@ export async function sendTelegramMessage(text, { parseMode = 'HTML', force = fa
     return { skipped: true, reason: 'disabled_or_incomplete' };
   }
 
+  // На сервере api.telegram.org часто доступен только по IPv6.
+  try {
+    const dns = await import('node:dns');
+    if (typeof dns.setDefaultResultOrder === 'function') {
+      dns.setDefaultResultOrder('ipv6first');
+    }
+  } catch {
+    /* ignore */
+  }
+
   const url = `https://api.telegram.org/bot${settings.botToken}/sendMessage`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: settings.chatId,
-      text,
-      parse_mode: parseMode,
-      disable_web_page_preview: true,
-    }),
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: settings.chatId,
+        text,
+        parse_mode: parseMode,
+        disable_web_page_preview: true,
+      }),
+    });
+  } catch (err) {
+    const cause = err?.cause?.code || err?.cause?.message || err?.message || 'network_error';
+    const wrapped = new Error(`Не удалось связаться с api.telegram.org (${cause})`);
+    wrapped.code = 'TELEGRAM_NETWORK_ERROR';
+    throw wrapped;
+  }
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.ok) {
