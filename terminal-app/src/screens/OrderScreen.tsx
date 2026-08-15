@@ -33,6 +33,7 @@ import {
   transferOrderTable,
   payGuest,
   cancelGuest,
+  fetchCurrentShift,
 } from '../api/client';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import type { MenuItem, MenuResponse, Order, OrderGuest, OrderItem, PaymentMethod, Zone } from '../api/client';
@@ -320,10 +321,31 @@ export default function OrderScreen({ route, navigation }: Props) {
     });
   };
 
-  const handlePay = () => {
+  const ensureShiftOpen = async (guestTotal = 0): Promise<boolean> => {
+    // Нулевой чек можно закрыть без смены
+    if (Number(guestTotal) <= 0.009) return true;
+    if (!session || !venue) {
+      showAlert('Смена не открыта', 'Смена не открыта — закрыть стол или провести оплату нельзя.');
+      return false;
+    }
+    try {
+      const shift = await fetchCurrentShift(venue.id, session.token);
+      if (!shift) {
+        showAlert('Смена не открыта', 'Смена не открыта — закрыть стол или провести оплату нельзя.');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось проверить смену');
+      return false;
+    }
+  };
+
+  const handlePay = async () => {
     if (!order) return;
     const guest = order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
     if (!guest) return;
+    if (!(await ensureShiftOpen(guest.total))) return;
     setPaymentTarget(guest);
   };
 
@@ -333,6 +355,10 @@ export default function OrderScreen({ route, navigation }: Props) {
 
   const confirmPayment = async (method: PaymentMethod) => {
     if (!session || !order || !paymentTarget) return;
+    if (!(await ensureShiftOpen(paymentTarget.total))) {
+      closePaymentModal();
+      return;
+    }
     const guest = paymentTarget;
     setPaymentBusy(true);
     try {
@@ -355,10 +381,11 @@ export default function OrderScreen({ route, navigation }: Props) {
     }
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (!order) return;
     const guest = order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
     if (!guest) return;
+    if (!(await ensureShiftOpen(guest.total))) return;
     showAlert('Закрыть чек', `Чек «${guest.label}» будет закрыт без оплаты. Продолжить?`, [
       { text: 'Отмена', style: 'cancel' },
       {
@@ -366,6 +393,7 @@ export default function OrderScreen({ route, navigation }: Props) {
         style: 'destructive',
         onPress: async () => {
           if (!session) return;
+          if (!(await ensureShiftOpen(guest.total))) return;
           setBusy(true);
           try {
             const updated = await cancelGuest(order.id, guest.id, session.token);

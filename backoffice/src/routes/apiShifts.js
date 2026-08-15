@@ -107,6 +107,31 @@ async function fetchOpenShift(venueId) {
   return rows[0] || null;
 }
 
+/** Открытые заказы с суммой > 0 — мешают закрытию смены. */
+async function fetchOpenPositiveOrders(venueId) {
+  const { rows } = await pool.query(
+    `SELECT o.id, o.table_id, t.name AS table_name,
+            COALESCE((
+              SELECT SUM(oi.price * oi.qty) FROM order_items oi
+              JOIN order_guests og ON og.id = oi.guest_id
+              WHERE oi.order_id = o.id AND og.status = 'open'
+            ), 0) AS total
+     FROM orders o
+     LEFT JOIN tables t ON t.id = o.table_id
+     WHERE o.venue_id = $1 AND o.status = 'open'
+     ORDER BY o.opened_at`,
+    [venueId]
+  );
+  return rows
+    .filter((r) => Number(r.total) > 0.009)
+    .map((r) => ({
+      id: r.id,
+      tableId: r.table_id,
+      tableName: r.table_name || 'Быстрый заказ',
+      total: Number(r.total),
+    }));
+}
+
 function parseMoney(value, { allowZero = true } = {}) {
   if (value == null || value === '') return null;
   const n = Number(value);
@@ -198,6 +223,7 @@ apiShifts.post('/close', async (c) => {
   const body = await c.req.json().catch(() => null);
   const venueId = body && body.venue_id ? Number(body.venue_id) : null;
   const countedCash = parseMoney(body?.closing_cash ?? body?.closingCash ?? body?.counted_cash);
+  const forcePin = body?.force_pin != null ? String(body.force_pin) : body?.forcePin != null ? String(body.forcePin) : null;
 
   if (!venueId) {
     c.status(400);
@@ -214,8 +240,45 @@ apiShifts.post('/close', async (c) => {
     return c.json({ error: 'Открытой смены нет' });
   }
 
+  const openPositive = await fetchOpenPositiveOrders(venueId);
+  if (openPositive.length > 0) {
+    const preview = openPositive
+      .slice(0, 5)
+      .map((o) => `${o.tableName} (${Math.round(o.total)} ₽)`)
+      .join(', ');
+    const more = openPositive.length > 5 ? ` и ещё ${openPositive.length - 5}` : '';
+    c.status(409);
+    return c.json({
+      error: `Нельзя закрыть смену: есть открытые чеки на сумму > 0 — ${preview}${more}. Сначала закройте или оплатите их.`,
+      code: 'OPEN_ORDERS_EXIST',
+      orders: openPositive,
+    });
+  }
+
   const stats = await fetchShiftStats(shift);
   const expectedCash = stats.cash.expectedCash;
+  const mismatch = Math.abs(countedCash - expectedCash) > 0.009;
+  const FORCE_CLOSE_PIN = '3467';
+
+  // Пока наличность не сходится — закрытие запрещено, кроме спец. PIN 3467.
+  // Открытие при расхождении счётчика ФР не блокируем.
+  if (mismatch) {
+    if (forcePin == null || forcePin === '') {
+      c.status(409);
+      return c.json({
+        error:
+          `Наличность не сходится: по учёту ${expectedCash.toFixed(0)} ₽, факт ${countedCash.toFixed(0)} ₽. ` +
+          `Пересчитайте кассу или введите PIN для принудительного закрытия.`,
+        code: 'CASH_MISMATCH',
+        expectedCash,
+        countedCash,
+      });
+    }
+    if (forcePin !== FORCE_CLOSE_PIN) {
+      c.status(403);
+      return c.json({ error: 'Неверный PIN для принудительного закрытия', code: 'FORCE_PIN_INVALID' });
+    }
+  }
 
   const client = await pool.connect();
   try {
@@ -247,7 +310,10 @@ apiShifts.post('/close', async (c) => {
 
     await client.query('COMMIT');
     const closedStats = await fetchShiftStats(rows[0]);
-    return c.json({ shift: serializeShift(rows[0], closedStats) });
+    return c.json({
+      shift: serializeShift(rows[0], closedStats),
+      forcedClose: Boolean(mismatch && forcePin === FORCE_CLOSE_PIN),
+    });
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

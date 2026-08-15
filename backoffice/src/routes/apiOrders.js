@@ -278,10 +278,7 @@ async function fetchGuestItemsSnapshot(guestId, client) {
   return rows;
 }
 
-// Текущая открытая смена заведения — если её нет, чек всё равно создаётся
-// (продажи пока не блокируются отсутствием смены, это будущая доработка под
-// фискализацию АТОЛ), просто shift_id останется NULL и чек не попадёт в
-// «Чеки смены»/X-отчёт на терминале, только в общие «Отчёты» в бэкофисе.
+// Текущая открытая смена заведения. Оплата и закрытие чека без смены запрещены.
 async function fetchOpenShiftId(client, venueId) {
   if (!venueId) return null;
   const { rows } = await client.query("SELECT id FROM shifts WHERE venue_id = $1 AND status = 'open'", [
@@ -290,9 +287,24 @@ async function fetchOpenShiftId(client, venueId) {
   return rows[0] ? rows[0].id : null;
 }
 
+async function requireOpenShiftId(client, venueId) {
+  const shiftId = await fetchOpenShiftId(client, venueId);
+  if (!shiftId) {
+    const err = new Error('Смена не открыта — закрыть стол или провести оплату нельзя');
+    err.status = 409;
+    err.code = 'SHIFT_REQUIRED';
+    throw err;
+  }
+  return shiftId;
+}
+
 async function createReceipt(client, { guest, staff, status, items, payments }) {
   const subtotal = items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
-  const shiftId = await fetchOpenShiftId(client, guest.venue_id);
+  // Чек на 0 ₽ можно закрыть без открытой смены (пустой стол / ошибочно открытый).
+  const shiftId =
+    subtotal > 0.009
+      ? await requireOpenShiftId(client, guest.venue_id)
+      : await fetchOpenShiftId(client, guest.venue_id);
 
   const { rows: receiptRows } = await client.query(
     `INSERT INTO receipts
@@ -421,6 +433,10 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
+    if (err && err.code === 'SHIFT_REQUIRED') {
+      c.status(err.status || 409);
+      return c.json({ error: err.message, code: err.code });
+    }
     throw err;
   } finally {
     client.release();
@@ -457,6 +473,10 @@ apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, asy
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
+    if (err && err.code === 'SHIFT_REQUIRED') {
+      c.status(err.status || 409);
+      return c.json({ error: err.message, code: err.code });
+    }
     throw err;
   } finally {
     client.release();
