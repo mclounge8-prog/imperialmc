@@ -1,4 +1,5 @@
 import { escapeHtml } from './escapeHtml.js';
+import { TABLE_SIZE_PRESETS, withTableDimensions } from '../tableSizes.js';
 
 const STATUS_LABELS = {
   free: 'Свободен',
@@ -6,12 +7,13 @@ const STATUS_LABELS = {
   dirty: 'Грязный',
 };
 
-function tableWidth(table) {
-  return Number(table.width) > 0 ? Number(table.width) : 92;
-}
-
-function tableHeight(table) {
-  return Number(table.height) > 0 ? Number(table.height) : 72;
+function sizeSelectHtml(selectedSize) {
+  return Object.entries(TABLE_SIZE_PRESETS)
+    .map(([value, preset]) => {
+      const isSelected = value === selectedSize ? ' selected' : '';
+      return `<option value="${value}"${isSelected}>${preset.label}</option>`;
+    })
+    .join('');
 }
 
 export function renderZoneRow(zone, { oob = false } = {}) {
@@ -43,64 +45,58 @@ export function renderZoneRow(zone, { oob = false } = {}) {
  * потому что координаты динамические и их нельзя зашить в статичный hx-vals.
  */
 export function renderTableTile(table, { oob = false, zoneId = null } = {}) {
+  const t = withTableDimensions(table);
   const oobAttr = oob && zoneId ? ` hx-swap-oob="beforeend:#floor-plan-${zoneId}"` : '';
-  const safeName = escapeHtml(table.name);
-  const w = tableWidth(table);
-  const h = tableHeight(table);
+  const safeName = escapeHtml(t.name);
 
   return `
     <div
-      class="table-tile status-${table.status}"
-      id="table-tile-${table.id}"
-      style="left:${table.pos_x}px; top:${table.pos_y}px; width:${w}px; height:${h}px;"
-      x-data="{ dragging:false, sx:0, sy:0, ox:${table.pos_x}, oy:${table.pos_y} }"
+      class="table-tile status-${t.status} size-${t.size}"
+      id="table-tile-${t.id}"
+      style="left:${t.pos_x}px; top:${t.pos_y}px; width:${t.width}px; height:${t.height}px;"
+      x-data="{ dragging:false, sx:0, sy:0, ox:${t.pos_x}, oy:${t.pos_y} }"
       @mousedown="dragging=true; sx=$event.clientX; sy=$event.clientY; ox=parseInt($el.style.left); oy=parseInt($el.style.top);"
       @mousemove.window="if(dragging){ $el.style.left = Math.max(0, ox + ($event.clientX - sx)) + 'px'; $el.style.top = Math.max(0, oy + ($event.clientY - sy)) + 'px'; }"
-      @mouseup.window="if(dragging){ dragging=false; htmx.ajax('PUT', '/tables/${table.id}/position', { values: { pos_x: parseInt($el.style.left), pos_y: parseInt($el.style.top) }, swap: 'none' }); }"
+      @mouseup.window="if(dragging){ dragging=false; htmx.ajax('PUT', '/tables/${t.id}/position', { values: { pos_x: parseInt($el.style.left), pos_y: parseInt($el.style.top) }, swap: 'none' }); }"
       ${oobAttr}
     >
       <button
         class="table-edit-btn"
         @mousedown.stop
-        hx-get="/tables/${table.id}/edit"
-        hx-target="#table-tile-${table.id}"
+        hx-get="/tables/${t.id}/edit"
+        hx-target="#table-tile-${t.id}"
         hx-swap="outerHTML"
         aria-label="Изменить стол"
       >✎</button>
       <div class="table-name">${safeName}</div>
-      <div class="table-capacity">${table.capacity} мест</div>
+      <div class="table-capacity">${t.capacity} мест</div>
     </div>
   `;
 }
 
 export function renderTableEditTile(table, errorMsg = null) {
+  const t = withTableDimensions(table);
   const errorHtml = errorMsg ? `<div class="field-error">${escapeHtml(errorMsg)}</div>` : '';
-  const w = tableWidth(table);
-  const h = tableHeight(table);
 
   const statusOptions = Object.entries(STATUS_LABELS)
     .map(([value, label]) => {
-      const isSelected = value === table.status ? ' selected' : '';
+      const isSelected = value === t.status ? ' selected' : '';
       return `<option value="${value}"${isSelected}>${label}</option>`;
     })
     .join('');
 
   return `
-    <form class="table-edit-panel" id="table-tile-${table.id}" style="left:${table.pos_x}px; top:${table.pos_y}px;">
-      <input type="text" name="name" value="${escapeHtml(table.name)}" placeholder="Название" required>
-      <input type="number" min="1" name="capacity" value="${table.capacity}" placeholder="Вместимость">
-      <div class="table-size-row" title="Размер плитки на схеме, px (не вместимость)">
-        <input type="number" min="48" max="320" name="width" value="${w}" placeholder="Ширина px" aria-label="Ширина плитки">
-        <span>×</span>
-        <input type="number" min="48" max="320" name="height" value="${h}" placeholder="Высота px" aria-label="Высота плитки">
-      </div>
+    <form class="table-edit-panel" id="table-tile-${t.id}" style="left:${t.pos_x}px; top:${t.pos_y}px;">
+      <input type="text" name="name" value="${escapeHtml(t.name)}" placeholder="Название" required>
+      <input type="number" min="1" name="capacity" value="${t.capacity}" placeholder="Вместимость">
+      <select name="size" title="Размер плитки на схеме (не вместимость)">${sizeSelectHtml(t.size)}</select>
       <select name="status">${statusOptions}</select>
       ${errorHtml}
       <div class="edit-actions">
-        <button type="button" class="primary" hx-put="/tables/${table.id}" hx-target="#table-tile-${table.id}" hx-swap="outerHTML">Сохранить</button>
-        <button type="button" hx-get="/tables/${table.id}/view" hx-target="#table-tile-${table.id}" hx-swap="outerHTML">Отмена</button>
+        <button type="button" class="primary" hx-put="/tables/${t.id}" hx-target="#table-tile-${t.id}" hx-swap="outerHTML">Сохранить</button>
+        <button type="button" hx-get="/tables/${t.id}/view" hx-target="#table-tile-${t.id}" hx-swap="outerHTML">Отмена</button>
       </div>
-      <button type="button" class="danger" hx-delete="/tables/${table.id}" hx-target="#table-tile-${table.id}" hx-swap="outerHTML" hx-confirm="Удалить стол «${escapeHtml(table.name)}»?">Удалить</button>
+      <button type="button" class="danger" hx-delete="/tables/${t.id}" hx-target="#table-tile-${t.id}" hx-swap="outerHTML" hx-confirm="Удалить стол «${escapeHtml(t.name)}»?">Удалить</button>
     </form>
   `;
 }
@@ -122,12 +118,11 @@ export function renderFloorPlan(zone, tableList) {
     >
       <input type="text" name="name" placeholder="Название стола" required>
       <input type="number" min="1" name="capacity" placeholder="Вместимость" value="4">
-      <input type="number" min="48" max="320" name="width" placeholder="Ширина px" value="92" title="Ширина плитки на схеме">
-      <input type="number" min="48" max="320" name="height" placeholder="Высота px" value="72" title="Высота плитки на схеме">
+      <select name="size" title="Размер плитки на схеме">${sizeSelectHtml('medium')}</select>
       <button type="submit">Добавить стол</button>
       <div id="table-form-error" class="error"></div>
     </form>
-    <p class="hint">Перетаскивай столы мышью. Размер плитки (ширина × высота) задаётся в карточке стола, не путать со вместимостью.</p>
+    <p class="hint">Перетаскивай столы мышью. Размер — маленький / средний / большой (на планшете схема подгоняется под экран сама).</p>
     <div class="floor-plan" id="floor-plan-${zone.id}">${tiles}</div>
   `;
 }

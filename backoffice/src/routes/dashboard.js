@@ -5,6 +5,7 @@ import { renderStaffSection } from '../views/staffView.js';
 import { renderWarehouseSection } from '../views/warehouseView.js';
 import { renderMenuSection } from '../views/menuView.js';
 import { renderTablesSection } from '../views/tablesView.js';
+import { withTableDimensions } from '../tableSizes.js';
 import { renderVenuesSection } from '../views/venuesView.js';
 import { renderDevicesSection } from '../views/devicesView.js';
 import { renderReceiptsSection } from '../views/reportsView.js';
@@ -127,10 +128,10 @@ export async function renderFragmentHtml(key, c) {
       selectedZone = zones[0] || null;
       if (selectedZone) {
         const { rows: tRows } = await pool.query(
-          'SELECT id, zone_id, name, capacity, pos_x, pos_y, width, height, status FROM tables WHERE zone_id = $1 ORDER BY id',
+          'SELECT id, zone_id, name, capacity, pos_x, pos_y, width, height, size, status FROM tables WHERE zone_id = $1 ORDER BY id',
           [selectedZone.id]
         );
-        tableRows = tRows;
+        tableRows = tRows.map(withTableDimensions);
       }
     }
     return renderTablesSection(

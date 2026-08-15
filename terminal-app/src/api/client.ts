@@ -94,6 +94,8 @@ export type VenuesResponse = {
 
 export type TableStatus = 'free' | 'occupied' | 'dirty';
 
+export type TableSize = 'small' | 'medium' | 'large';
+
 export type TableInfo = {
   id: number;
   name: string;
@@ -101,7 +103,8 @@ export type TableInfo = {
   status: TableStatus;
   posX: number;
   posY: number;
-  /** Visual tile size in px (backoffice), not guest capacity. */
+  /** Preset tile size; terminal scales the whole floor plan to fit the screen. */
+  size: TableSize;
   width: number;
   height: number;
 };
