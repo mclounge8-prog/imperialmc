@@ -101,6 +101,9 @@ export type TableInfo = {
   status: TableStatus;
   posX: number;
   posY: number;
+  /** Visual tile size in px (backoffice), not guest capacity. */
+  width: number;
+  height: number;
 };
 
 export type Zone = {

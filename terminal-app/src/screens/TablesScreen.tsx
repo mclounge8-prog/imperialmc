@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,9 +33,17 @@ const STATUS_COLORS: Record<string, string> = {
   dirty: colors.textMuted,
 };
 
+const TABLES_POLL_MS = 5000;
+
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const GRADIENT_BLUE: [string, string] = [colors.accent, colors.accent2];
+
+function normalizeTableSize(value: number | undefined, fallback: number, min: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.max(min, Math.round(n));
+}
 
 export default function TablesScreen() {
   const { session } = useSession();
@@ -53,38 +61,61 @@ export default function TablesScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [contentHeight, setContentHeight] = useState(0);
+  const hasLoadedRef = useRef(false);
 
-  const load = useCallback(async () => {
-    if (!session || !venue) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const [tablesData, ordersData, paidData] = await Promise.all([
-        fetchTables(venue.id, session.token),
-        fetchOpenOrders(venue.id, session.token),
-        fetchPaidReceipts(venue.id, session.token),
-      ]);
-      setZones(tablesData.zones);
-      setSelectedZoneId((prev) => prev ?? tablesData.zones[0]?.id ?? null);
-      setOpenOrders(ordersData.orders);
-      setPaidReceipts(paidData);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось загрузить столы');
-    } finally {
-      setLoading(false);
-    }
-  }, [session, venue]);
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!session || !venue) return;
+      const silent = opts?.silent === true;
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
+      try {
+        const [tablesData, ordersData, paidData] = await Promise.all([
+          fetchTables(venue.id, session.token),
+          fetchOpenOrders(venue.id, session.token),
+          fetchPaidReceipts(venue.id, session.token),
+        ]);
+        const nextZones = tablesData.zones.map((zone) => ({
+          ...zone,
+          tables: zone.tables.map((table) => ({
+            ...table,
+            width: normalizeTableSize(table.width, 92, 48),
+            height: normalizeTableSize(table.height, 72, 40),
+          })),
+        }));
+        setZones(nextZones);
+        setSelectedZoneId((prev) => {
+          if (prev != null && nextZones.some((z) => z.id === prev)) return prev;
+          return nextZones[0]?.id ?? null;
+        });
+        setOpenOrders(ordersData.orders);
+        setPaidReceipts(paidData);
+        hasLoadedRef.current = true;
+        if (silent) setError(null);
+      } catch (e) {
+        // Тихий poll не должен сбрасывать уже показанную схему при сетевом сбое
+        if (!silent) {
+          setError(e instanceof Error ? e.message : 'Не удалось загрузить столы');
+        }
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [session, venue]
+  );
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // Обновляем схему при возврате на экран (например, после закрытия заказа) —
-  // статусы столов и список открытых заказов могли поменяться
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', load);
-    return unsubscribe;
-  }, [navigation, load]);
+  // При фокусе экрана и каждые 5 с — подтягиваем схему из бэкофиса без спиннера
+  useFocusEffect(
+    useCallback(() => {
+      void load({ silent: hasLoadedRef.current });
+      const interval = setInterval(() => {
+        void load({ silent: true });
+      }, TABLES_POLL_MS);
+      return () => clearInterval(interval);
+    }, [load])
+  );
 
   const goToPrevZone = useCallback(() => {
     setSelectedZoneId((prev) => {
@@ -189,7 +220,7 @@ export default function TablesScreen() {
         {error ? (
           <View style={styles.center}>
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retryButton} onPress={load}>
+            <Pressable style={styles.retryButton} onPress={() => void load()}>
               <Text style={styles.retryText}>Повторить</Text>
             </Pressable>
           </View>
@@ -205,11 +236,11 @@ export default function TablesScreen() {
               </View>
             ) : (
               (() => {
-                // Ширина — минимум по ширине левой рабочей области, высота — минимум по
-                // реально измеренному остатку пространства, чтобы зал не выглядел
-                // маленьким островком; если стол расставлен за пределами — работает скролл
-                const maxX = Math.max(...selectedZone.tables.map((t) => t.posX), 0) + 140;
-                const maxY = Math.max(...selectedZone.tables.map((t) => t.posY), 0) + 120;
+                // Ширина/высота зала — по реальным размерам плиток и позициям
+                const maxX =
+                  Math.max(...selectedZone.tables.map((t) => t.posX + (t.width || 92)), 0) + 48;
+                const maxY =
+                  Math.max(...selectedZone.tables.map((t) => t.posY + (t.height || 72)), 0) + 48;
                 const floorPlanWidth = Math.max(maxX, windowWidth * 0.6 - 32);
                 const floorPlanHeight = Math.max(maxY, contentHeight - 16);
 
@@ -230,12 +261,16 @@ export default function TablesScreen() {
                               {
                                 left: table.posX,
                                 top: table.posY,
+                                width: table.width || 92,
+                                height: table.height || 72,
                                 borderColor: STATUS_COLORS[table.status],
                               },
                             ]}
                             onPress={() => handleTablePress(table.id, table.name)}
                           >
-                            <Text style={styles.tileName}>{table.name}</Text>
+                            <Text style={styles.tileName} numberOfLines={2}>
+                              {table.name}
+                            </Text>
                             <Text style={styles.tileCapacity}>{table.capacity} мест</Text>
                             <Text style={[styles.tileStatus, { color: STATUS_COLORS[table.status] }]}>
                               {STATUS_LABELS[table.status] || table.status}
@@ -363,16 +398,16 @@ const styles = StyleSheet.create({
   },
   tableTile: {
     position: 'absolute',
-    width: 92,
-    height: 72,
     borderRadius: 10,
     borderWidth: 2,
     backgroundColor: colors.surface2,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
+    paddingHorizontal: 4,
+    overflow: 'hidden',
   },
-  tileName: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  tileName: { color: colors.text, fontSize: 13, fontWeight: '600', textAlign: 'center' },
   tileCapacity: { color: colors.textMuted, fontSize: 11 },
   tileStatus: { fontSize: 11, fontWeight: '500' },
 

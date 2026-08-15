@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS tables (
   capacity  INT DEFAULT 4,
   pos_x     INT DEFAULT 0,                  -- координаты под визуальную схему зала
   pos_y     INT DEFAULT 0,
+  width     INT NOT NULL DEFAULT 92,         -- визуальный размер плитки на схеме (px)
+  height    INT NOT NULL DEFAULT 72,
   status    VARCHAR(20) NOT NULL DEFAULT 'free' -- free, occupied, dirty
 );
 
@@ -373,6 +375,8 @@ ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS icon VARCHAR(10);
 ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS parent_id INT REFERENCES menu_categories(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_menu_categories_parent ON menu_categories(parent_id);
 ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS width INT NOT NULL DEFAULT 92;
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS height INT NOT NULL DEFAULT 72;
 ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'open';
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS shift_id INT REFERENCES shifts(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_receipts_shift ON receipts(shift_id);

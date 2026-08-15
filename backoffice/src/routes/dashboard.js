@@ -127,7 +127,7 @@ export async function renderFragmentHtml(key, c) {
       selectedZone = zones[0] || null;
       if (selectedZone) {
         const { rows: tRows } = await pool.query(
-          'SELECT id, zone_id, name, capacity, pos_x, pos_y, status FROM tables WHERE zone_id = $1 ORDER BY id',
+          'SELECT id, zone_id, name, capacity, pos_x, pos_y, width, height, status FROM tables WHERE zone_id = $1 ORDER BY id',
           [selectedZone.id]
         );
         tableRows = tRows;

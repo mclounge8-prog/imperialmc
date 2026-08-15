@@ -29,7 +29,7 @@ apiTerminal.get('/tables', requireStaffToken, async (c) => {
     [venueId]
   );
   const { rows: tableRows } = await pool.query(
-    `SELECT t.id, t.zone_id, t.name, t.capacity, t.status, t.pos_x, t.pos_y
+    `SELECT t.id, t.zone_id, t.name, t.capacity, t.status, t.pos_x, t.pos_y, t.width, t.height
      FROM tables t
      JOIN zones z ON z.id = t.zone_id
      WHERE z.venue_id = $1
@@ -49,6 +49,8 @@ apiTerminal.get('/tables', requireStaffToken, async (c) => {
         status: t.status,
         posX: t.pos_x,
         posY: t.pos_y,
+        width: Number(t.width) > 0 ? Number(t.width) : 92,
+        height: Number(t.height) > 0 ? Number(t.height) : 72,
       })),
   }));
 

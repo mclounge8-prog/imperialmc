@@ -6,6 +6,14 @@ const STATUS_LABELS = {
   dirty: 'Грязный',
 };
 
+function tableWidth(table) {
+  return Number(table.width) > 0 ? Number(table.width) : 92;
+}
+
+function tableHeight(table) {
+  return Number(table.height) > 0 ? Number(table.height) : 72;
+}
+
 export function renderZoneRow(zone, { oob = false } = {}) {
   const oobAttr = oob ? ' hx-swap-oob="beforeend:#zones-list"' : '';
   const safeName = escapeHtml(zone.name);
@@ -37,12 +45,14 @@ export function renderZoneRow(zone, { oob = false } = {}) {
 export function renderTableTile(table, { oob = false, zoneId = null } = {}) {
   const oobAttr = oob && zoneId ? ` hx-swap-oob="beforeend:#floor-plan-${zoneId}"` : '';
   const safeName = escapeHtml(table.name);
+  const w = tableWidth(table);
+  const h = tableHeight(table);
 
   return `
     <div
       class="table-tile status-${table.status}"
       id="table-tile-${table.id}"
-      style="left:${table.pos_x}px; top:${table.pos_y}px;"
+      style="left:${table.pos_x}px; top:${table.pos_y}px; width:${w}px; height:${h}px;"
       x-data="{ dragging:false, sx:0, sy:0, ox:${table.pos_x}, oy:${table.pos_y} }"
       @mousedown="dragging=true; sx=$event.clientX; sy=$event.clientY; ox=parseInt($el.style.left); oy=parseInt($el.style.top);"
       @mousemove.window="if(dragging){ $el.style.left = Math.max(0, ox + ($event.clientX - sx)) + 'px'; $el.style.top = Math.max(0, oy + ($event.clientY - sy)) + 'px'; }"
@@ -65,6 +75,8 @@ export function renderTableTile(table, { oob = false, zoneId = null } = {}) {
 
 export function renderTableEditTile(table, errorMsg = null) {
   const errorHtml = errorMsg ? `<div class="field-error">${escapeHtml(errorMsg)}</div>` : '';
+  const w = tableWidth(table);
+  const h = tableHeight(table);
 
   const statusOptions = Object.entries(STATUS_LABELS)
     .map(([value, label]) => {
@@ -77,6 +89,11 @@ export function renderTableEditTile(table, errorMsg = null) {
     <form class="table-edit-panel" id="table-tile-${table.id}" style="left:${table.pos_x}px; top:${table.pos_y}px;">
       <input type="text" name="name" value="${escapeHtml(table.name)}" placeholder="Название" required>
       <input type="number" min="1" name="capacity" value="${table.capacity}" placeholder="Вместимость">
+      <div class="table-size-row" title="Размер плитки на схеме, px (не вместимость)">
+        <input type="number" min="48" max="320" name="width" value="${w}" placeholder="Ширина px" aria-label="Ширина плитки">
+        <span>×</span>
+        <input type="number" min="48" max="320" name="height" value="${h}" placeholder="Высота px" aria-label="Высота плитки">
+      </div>
       <select name="status">${statusOptions}</select>
       ${errorHtml}
       <div class="edit-actions">
@@ -105,10 +122,12 @@ export function renderFloorPlan(zone, tableList) {
     >
       <input type="text" name="name" placeholder="Название стола" required>
       <input type="number" min="1" name="capacity" placeholder="Вместимость" value="4">
+      <input type="number" min="48" max="320" name="width" placeholder="Ширина px" value="92" title="Ширина плитки на схеме">
+      <input type="number" min="48" max="320" name="height" placeholder="Высота px" value="72" title="Высота плитки на схеме">
       <button type="submit">Добавить стол</button>
       <div id="table-form-error" class="error"></div>
     </form>
-    <p class="hint">Перетаскивай столы мышью, чтобы расставить их по залу «${escapeHtml(zone.name)}».</p>
+    <p class="hint">Перетаскивай столы мышью. Размер плитки (ширина × высота) задаётся в карточке стола, не путать со вместимостью.</p>
     <div class="floor-plan" id="floor-plan-${zone.id}">${tiles}</div>
   `;
 }

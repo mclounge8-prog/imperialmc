@@ -13,12 +13,17 @@ const tables = new Hono();
 tables.use('*', requireAuthApi);
 
 const STATUS_VALUES = ['free', 'occupied', 'dirty'];
+const TABLE_SELECT =
+  'SELECT id, zone_id, name, capacity, pos_x, pos_y, width, height, status FROM tables';
+
+function clampSize(value, fallback) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return fallback;
+  return Math.max(48, Math.min(320, Math.round(n)));
+}
 
 async function fetchTable(id) {
-  const { rows } = await pool.query(
-    'SELECT id, zone_id, name, capacity, pos_x, pos_y, status FROM tables WHERE id = $1',
-    [id]
-  );
+  const { rows } = await pool.query(`${TABLE_SELECT} WHERE id = $1`, [id]);
   return rows[0] || null;
 }
 
@@ -30,10 +35,9 @@ async function fetchZonesAndFirstFloorPlan(venueId) {
   const selectedZone = zones[0] || null;
   let tableRows = [];
   if (selectedZone) {
-    const { rows } = await pool.query(
-      'SELECT id, zone_id, name, capacity, pos_x, pos_y, status FROM tables WHERE zone_id = $1 ORDER BY id',
-      [selectedZone.id]
-    );
+    const { rows } = await pool.query(`${TABLE_SELECT} WHERE zone_id = $1 ORDER BY id`, [
+      selectedZone.id,
+    ]);
     tableRows = rows;
   }
   return { zones, selectedZone, tableRows };
@@ -79,10 +83,9 @@ tables.get('/zones/:id/floor-plan', async (c) => {
     return c.html('<p class="empty-hint">Зона не найдена</p>');
   }
 
-  const { rows: tableRows } = await pool.query(
-    'SELECT id, zone_id, name, capacity, pos_x, pos_y, status FROM tables WHERE zone_id = $1 ORDER BY id',
-    [zoneId]
-  );
+  const { rows: tableRows } = await pool.query(`${TABLE_SELECT} WHERE zone_id = $1 ORDER BY id`, [
+    zoneId,
+  ]);
 
   return c.html(renderFloorPlan(zone, tableRows));
 });
@@ -94,6 +97,8 @@ tables.post('/zones/:zoneId/tables', async (c) => {
   const body = await c.req.parseBody();
   const name = String(body.name || '').trim();
   const capacity = body.capacity ? Number(body.capacity) : 4;
+  const width = clampSize(body.width, 92);
+  const height = clampSize(body.height, 72);
 
   if (!name) return c.html('<p>Укажи название стола</p>');
   if (Number.isNaN(capacity) || capacity < 1) {
@@ -104,9 +109,9 @@ tables.post('/zones/:zoneId/tables', async (c) => {
   const posY = 20 + Math.floor(Math.random() * 200);
 
   const { rows } = await pool.query(
-    `INSERT INTO tables (zone_id, name, capacity, pos_x, pos_y, status)
-     VALUES ($1, $2, $3, $4, $5, 'free') RETURNING id`,
-    [zoneId, name, capacity, posX, posY]
+    `INSERT INTO tables (zone_id, name, capacity, pos_x, pos_y, width, height, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'free') RETURNING id`,
+    [zoneId, name, capacity, posX, posY, width, height]
   );
 
   const created = await fetchTable(rows[0].id);
@@ -137,6 +142,8 @@ tables.put('/:id', async (c) => {
   const name = String(body.name || '').trim();
   const capacity = Number(body.capacity);
   const status = String(body.status || '');
+  const width = clampSize(body.width, 92);
+  const height = clampSize(body.height, 72);
 
   const current = await fetchTable(id);
   if (!current) {
@@ -154,12 +161,10 @@ tables.put('/:id', async (c) => {
     return c.html(renderTableEditTile({ ...current, name, capacity }, 'Некорректный статус'));
   }
 
-  await pool.query('UPDATE tables SET name = $1, capacity = $2, status = $3 WHERE id = $4', [
-    name,
-    capacity,
-    status,
-    id,
-  ]);
+  await pool.query(
+    'UPDATE tables SET name = $1, capacity = $2, status = $3, width = $4, height = $5 WHERE id = $6',
+    [name, capacity, status, width, height, id]
+  );
 
   const updated = await fetchTable(id);
   return c.html(renderTableTile(updated));
