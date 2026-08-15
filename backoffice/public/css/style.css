@@ -1024,9 +1024,25 @@ input[type="radio"] {
   cursor: pointer;
 }
 
+a.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 .btn-secondary:hover {
   border-color: var(--accent-2);
   color: var(--accent-2);
+}
+
+.flash-success {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-2) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 45%, transparent);
+  color: var(--text);
+  font-size: 14px;
 }
 
 .btn-primary {

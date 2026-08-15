@@ -3,6 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
+import { parseMenuExcel, buildMenuExportWorkbook } from '../utils/menuExcel.js';
+import { escapeHtml } from '../views/escapeHtml.js';
 import {
   renderMenuCategoryAccordionSection,
   renderMenuUncategorizedAccordionSection,
@@ -18,6 +20,156 @@ import {
 
 const menu = new Hono();
 menu.use('*', requireAuthApi);
+
+/**
+ * Upsert категорий и позиций из разобранного Excel.
+ * Категории сопоставляются без учёта регистра; позиции — по нижнему имени.
+ * Существующие позиции обновляют цену/категорию/активность; картинки и модификаторы не трогаем.
+ */
+async function applyMenuImport({ categories, items }) {
+  const client = await pool.connect();
+  const stats = {
+    categoriesCreated: 0,
+    itemsCreated: 0,
+    itemsUpdated: 0,
+    itemsSkipped: 0,
+  };
+
+  try {
+    await client.query('BEGIN');
+
+    const { rows: existingCats } = await client.query(
+      'SELECT id, name, sort_order FROM menu_categories'
+    );
+    const catByLower = new Map(existingCats.map((c) => [c.name.toLowerCase(), c]));
+    let nextSort =
+      existingCats.reduce((max, c) => Math.max(max, Number(c.sort_order) || 0), 0) + 1;
+
+    for (const catName of categories) {
+      const key = catName.toLowerCase();
+      if (catByLower.has(key)) continue;
+      const { rows } = await client.query(
+        'INSERT INTO menu_categories (name, sort_order) VALUES ($1, $2) RETURNING id, name, sort_order',
+        [catName, nextSort]
+      );
+      nextSort += 1;
+      catByLower.set(key, rows[0]);
+      stats.categoriesCreated += 1;
+    }
+
+    const { rows: existingItems } = await client.query(
+      'SELECT id, name, category_id, price, is_active FROM menu_items'
+    );
+    const itemByLower = new Map(existingItems.map((i) => [i.name.toLowerCase(), i]));
+
+    for (const item of items) {
+      if (!item.name || item.price == null || Number.isNaN(Number(item.price)) || item.price < 0) {
+        stats.itemsSkipped += 1;
+        continue;
+      }
+
+      let categoryId = null;
+      if (item.category) {
+        const cat = catByLower.get(item.category.toLowerCase());
+        categoryId = cat ? cat.id : null;
+      }
+
+      const key = item.name.toLowerCase();
+      const existing = itemByLower.get(key);
+      if (existing) {
+        await client.query(
+          'UPDATE menu_items SET name = $1, category_id = $2, price = $3, is_active = $4 WHERE id = $5',
+          [item.name, categoryId, item.price, item.isActive !== false, existing.id]
+        );
+        itemByLower.set(key, {
+          ...existing,
+          name: item.name,
+          category_id: categoryId,
+          price: item.price,
+          is_active: item.isActive !== false,
+        });
+        stats.itemsUpdated += 1;
+      } else {
+        const { rows } = await client.query(
+          `INSERT INTO menu_items (category_id, name, price, is_active)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id, name, category_id, price, is_active`,
+          [categoryId, item.name, item.price, item.isActive !== false]
+        );
+        itemByLower.set(key, rows[0]);
+        stats.itemsCreated += 1;
+      }
+    }
+
+    await client.query('COMMIT');
+    return stats;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ---------- Импорт / экспорт номенклатуры ----------
+
+menu.get('/export', async (c) => {
+  const categories = await fetchMenuCategories();
+  const { rows: items } = await pool.query(
+    `SELECT id, name, category_id, price, is_active
+     FROM menu_items
+     ORDER BY category_id NULLS LAST, name`
+  );
+  const buffer = await buildMenuExportWorkbook(categories, items);
+  const filename = `menu-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  return new Response(buffer, {
+    headers: {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+  });
+});
+
+menu.post('/import', async (c) => {
+  const body = await c.req.parseBody();
+  const venueId = body.venue_id;
+  const file = body.file;
+
+  if (!file || typeof file === 'string') {
+    return c.html('<p class="field-error">Выбери Excel-файл (.xlsx)</p>');
+  }
+
+  const name = String(file.name || '').toLowerCase();
+  if (!name.endsWith('.xlsx') && !name.endsWith('.xlsm')) {
+    return c.html('<p class="field-error">Нужен файл Excel (.xlsx)</p>');
+  }
+
+  let parsed;
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    parsed = await parseMenuExcel(buffer);
+  } catch (err) {
+    return c.html(`<p class="field-error">${String(err.message || err)}</p>`);
+  }
+
+  if (parsed.items.length === 0 && parsed.categories.length === 0) {
+    return c.html('<p class="field-error">В файле не найдено ни категорий, ни позиций</p>');
+  }
+
+  const stats = await applyMenuImport(parsed);
+  const categories = await fetchMenuCategories();
+  const hiddenCategoryIds = venueId ? await fetchHiddenCategoryIds(venueId) : [];
+  const items = await fetchAllMenuItems();
+  const flash = `Импорт готов: категорий +${stats.categoriesCreated}, позиций +${stats.itemsCreated} / обновлено ${stats.itemsUpdated}${
+    stats.itemsSkipped ? `, пропущено ${stats.itemsSkipped}` : ''
+  }.`;
+
+  // Форма по умолчанию целится в #menu-import-form-error; при успехе
+  // перенаправляем ответ в контейнер меню.
+  c.header('HX-Retarget', '#menu-venue-container');
+  c.header('HX-Reswap', 'innerHTML');
+  return c.html(renderMenuVenueContainer(venueId, categories, hiddenCategoryIds, items, flash));
+});
 
 async function fetchMenuCategories() {
   const { rows } = await pool.query(

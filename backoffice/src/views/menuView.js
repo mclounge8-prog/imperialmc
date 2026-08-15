@@ -248,16 +248,54 @@ function renderAddMenuItemModal(categories, venueId) {
   `;
 }
 
-export function renderMenuVenueContainer(venueId, categories, hiddenCategoryIds, items) {
+function renderImportMenuModal(venueId) {
+  return `
+    <div class="modal-trigger" x-data="{ open: false }" @htmx:after-request="if ($event.detail.successful) open = false">
+      <button type="button" class="btn-secondary" @click="open = true">Импорт Excel</button>
+      <div class="modal-backdrop" x-show="open" @click.self="open = false" style="display:none;">
+        <div class="modal-box">
+          <h3>Импорт номенклатуры</h3>
+          <p class="hint">
+            Подходит экспорт QuickResto (колонки «Наименование», «Базовая цена», «Расположение»)
+            и наш файл экспорта. Категории и позиции создаются или обновляются по названию;
+            фото и модификаторы не затрагиваются.
+          </p>
+          <form
+            hx-post="/menu/import"
+            hx-encoding="multipart/form-data"
+            hx-target="#menu-import-form-error"
+            hx-swap="innerHTML"
+          >
+            <input type="file" name="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+            <input type="hidden" name="venue_id" value="${venueId}">
+            <div id="menu-import-form-error" class="error"></div>
+            <div class="modal-actions">
+              <button type="submit" class="btn-primary">Импортировать</button>
+              <button type="button" class="btn-secondary" @click="open = false">Отмена</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+export function renderMenuVenueContainer(venueId, categories, hiddenCategoryIds, items, flashMessage = null) {
+  const flashHtml = flashMessage
+    ? `<p class="flash-success">${escapeHtml(flashMessage)}</p>`
+    : '';
   return `
     <div class="subsection">
       <div class="subsection-header">
         <h2>Категории и позиции</h2>
         <div class="subsection-actions">
+          <a class="btn-secondary" href="/menu/export">Экспорт Excel</a>
+          ${renderImportMenuModal(venueId)}
           ${renderAddMenuCategoryModal(venueId)}
           ${renderAddMenuItemModal(categories, venueId)}
         </div>
       </div>
+      ${flashHtml}
       <p class="hint">
         Сами позиции и категории общие для всех заведений. Галочка «Показывать здесь»
         у каждой категории — это видимость именно для выбранного в шапке заведения:
