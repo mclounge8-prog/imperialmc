@@ -82,12 +82,13 @@ CREATE TABLE IF NOT EXISTS venue_warehouse_stock (
   PRIMARY KEY (venue_id, warehouse_item_id)
 );
 
--- Категории меню (Кальяны, Бар...)
+-- Категории меню (Кальяны, Бар...) — parent_id задаёт подкатегории
 CREATE TABLE IF NOT EXISTS menu_categories (
   id          SERIAL PRIMARY KEY,
   name        VARCHAR(100) NOT NULL,
   icon        VARCHAR(10),
-  sort_order  INT DEFAULT 0
+  sort_order  INT DEFAULT 0,
+  parent_id   INT REFERENCES menu_categories(id) ON DELETE CASCADE
 );
 
 -- Позиции меню (то, что продаётся гостю) — общие для всех заведений
@@ -369,6 +370,8 @@ ALTER TABLE warehouse_items DROP COLUMN IF EXISTS stock_qty;
 ALTER TABLE warehouse_items DROP COLUMN IF EXISTS min_stock_qty;
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS guest_id INT REFERENCES order_guests(id) ON DELETE SET NULL;
 ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS icon VARCHAR(10);
+ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS parent_id INT REFERENCES menu_categories(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_menu_categories_parent ON menu_categories(parent_id);
 ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);
 ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'open';
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS shift_id INT REFERENCES shifts(id) ON DELETE SET NULL;

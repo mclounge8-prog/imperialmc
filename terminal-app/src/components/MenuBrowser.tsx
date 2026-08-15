@@ -4,7 +4,7 @@ import FastImage from '@d11/react-native-fast-image';
 import LinearGradient from 'react-native-linear-gradient';
 import { colors } from '../theme/colors';
 import { API_BASE_URL } from '../api/client';
-import type { MenuItem, MenuResponse } from '../api/client';
+import type { MenuCategory, MenuItem, MenuResponse } from '../api/client';
 
 // Единый синий градиент вместо разноцветной палитры — категории выдержаны
 // в одной айдентике, не в случайных системных цветах
@@ -16,6 +16,31 @@ type Props = {
   onItemPress: (item: MenuItem) => void;
 };
 
+function flattenItems(categories: MenuCategory[]): MenuItem[] {
+  const out: MenuItem[] = [];
+  for (const cat of categories) {
+    out.push(...cat.items);
+    if (cat.children?.length) out.push(...flattenItems(cat.children));
+  }
+  return out;
+}
+
+function findCategoryPath(
+  categories: MenuCategory[],
+  targetId: number,
+  path: MenuCategory[] = []
+): MenuCategory[] | null {
+  for (const cat of categories) {
+    const next = [...path, cat];
+    if (cat.id === targetId) return next;
+    if (cat.children?.length) {
+      const found = findCategoryPath(cat.children, targetId, next);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 export default function MenuBrowser({ menu, busy = false, onItemPress }: Props) {
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,11 +48,17 @@ export default function MenuBrowser({ menu, busy = false, onItemPress }: Props) 
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query || !menu) return null;
-    const all: MenuItem[] = [...menu.categories.flatMap((c) => c.items), ...menu.uncategorized];
+    const all: MenuItem[] = [...flattenItems(menu.categories), ...menu.uncategorized];
     return all.filter((item) => item.name.toLowerCase().includes(query));
   }, [searchQuery, menu]);
 
-  const activeCategory = menu?.categories.find((c) => c.id === activeCategoryId) ?? null;
+  const activePath = useMemo(() => {
+    if (!menu || activeCategoryId == null) return [];
+    return findCategoryPath(menu.categories, activeCategoryId) || [];
+  }, [menu, activeCategoryId]);
+
+  const activeCategory = activePath.length ? activePath[activePath.length - 1] : null;
+  const parentCategory = activePath.length > 1 ? activePath[activePath.length - 2] : null;
 
   const renderItemTile = (item: MenuItem) => (
     <Pressable key={item.id} style={styles.itemTile} disabled={busy} onPress={() => onItemPress(item)}>
@@ -58,6 +89,26 @@ export default function MenuBrowser({ menu, busy = false, onItemPress }: Props) 
     </Pressable>
   );
 
+  const renderCategoryTile = (cat: MenuCategory) => (
+    <Pressable
+      key={`cat-${cat.id}`}
+      style={styles.categoryTileWrapper}
+      onPress={() => setActiveCategoryId(cat.id)}
+    >
+      <LinearGradient
+        colors={GRADIENT_BLUE}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.categoryTile}
+      >
+        {cat.icon ? <Text style={styles.categoryTileIcon}>{cat.icon}</Text> : null}
+        <Text style={styles.categoryTileName} numberOfLines={2}>
+          {cat.name}
+        </Text>
+      </LinearGradient>
+    </Pressable>
+  );
+
   return (
     <View style={styles.menuPane}>
       <View style={styles.searchBar}>
@@ -81,36 +132,25 @@ export default function MenuBrowser({ menu, busy = false, onItemPress }: Props) 
           </View>
         ) : activeCategory ? (
           <>
-            <Pressable style={styles.backTile} onPress={() => setActiveCategoryId(null)}>
-              <Text style={styles.backTileText}>← Назад</Text>
+            <Pressable
+              style={styles.backTile}
+              onPress={() => setActiveCategoryId(parentCategory ? parentCategory.id : null)}
+            >
+              <Text style={styles.backTileText}>
+                ← {parentCategory ? parentCategory.name : 'Назад'}
+              </Text>
             </Pressable>
-            {activeCategory.items.length === 0 ? (
-              <Text style={styles.emptyText}>В этой категории пока нет позиций</Text>
-            ) : (
-              <View style={styles.tileGrid}>{activeCategory.items.map((item) => renderItemTile(item))}</View>
-            )}
+            <View style={styles.tileGrid}>
+              {(activeCategory.children || []).map((child) => renderCategoryTile(child))}
+              {activeCategory.items.map((item) => renderItemTile(item))}
+              {(activeCategory.children || []).length === 0 && activeCategory.items.length === 0 ? (
+                <Text style={styles.emptyText}>В этой категории пока нет позиций</Text>
+              ) : null}
+            </View>
           </>
         ) : (
           <View style={styles.tileGrid}>
-            {menu?.categories.map((cat) => (
-              <Pressable
-                key={`cat-${cat.id}`}
-                style={styles.categoryTileWrapper}
-                onPress={() => setActiveCategoryId(cat.id)}
-              >
-                <LinearGradient
-                  colors={GRADIENT_BLUE}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.categoryTile}
-                >
-                  {cat.icon ? <Text style={styles.categoryTileIcon}>{cat.icon}</Text> : null}
-                  <Text style={styles.categoryTileName} numberOfLines={2}>
-                    {cat.name}
-                  </Text>
-                </LinearGradient>
-              </Pressable>
-            ))}
+            {menu?.categories.map((cat) => renderCategoryTile(cat))}
             {menu?.uncategorized.map((item) => renderItemTile(item))}
           </View>
         )}

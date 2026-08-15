@@ -88,7 +88,7 @@ export async function renderFragmentHtml(key, c) {
     const venueRows = await fetchAllVenues();
     const selectedVenue = resolveSelectedVenue(venueRows, readSelectedVenueId(c));
     const { rows: categories } = await pool.query(
-      'SELECT id, name, icon FROM menu_categories ORDER BY sort_order, name'
+      'SELECT id, name, icon, parent_id, sort_order FROM menu_categories ORDER BY sort_order, name'
     );
     const { rows: items } = await pool.query(
       `SELECT mi.id, mi.name, mi.category_id, mi.price, mi.image_url, mi.is_active,

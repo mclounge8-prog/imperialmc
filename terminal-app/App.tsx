@@ -128,7 +128,7 @@ export default function App() {
       <DeviceProvider>
         <SessionProvider>
           <FiscalAlertsProvider>
-            <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
             <NavigationContainer>
               <RootNavigator />
             </NavigationContainer>

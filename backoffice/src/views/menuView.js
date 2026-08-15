@@ -2,13 +2,28 @@ import { escapeHtml } from './escapeHtml.js';
 import { UNITS } from './warehouseView.js';
 
 function categoryOptions(categories, selectedId) {
-  const options = categories
-    .map((cat) => {
+  const roots = categories.filter((c) => !c.parent_id);
+  const childrenOf = (parentId) => categories.filter((c) => c.parent_id === parentId);
+
+  const options = [];
+  for (const cat of roots) {
+    const isSelected = String(cat.id) === String(selectedId) ? ' selected' : '';
+    options.push(`<option value="${cat.id}"${isSelected}>${escapeHtml(cat.name)}</option>`);
+    for (const child of childrenOf(cat.id)) {
+      const childSelected = String(child.id) === String(selectedId) ? ' selected' : '';
+      options.push(
+        `<option value="${child.id}"${childSelected}>— ${escapeHtml(child.name)}</option>`
+      );
+    }
+  }
+  // orphan subcategories (parent missing)
+  for (const cat of categories) {
+    if (cat.parent_id && !categories.some((p) => p.id === cat.parent_id)) {
       const isSelected = String(cat.id) === String(selectedId) ? ' selected' : '';
-      return `<option value="${cat.id}"${isSelected}>${escapeHtml(cat.name)}</option>`;
-    })
-    .join('');
-  return `<option value="">Без категории</option>${options}`;
+      options.push(`<option value="${cat.id}"${isSelected}>${escapeHtml(cat.name)}</option>`);
+    }
+  }
+  return `<option value="">Без категории</option>${options.join('')}`;
 }
 
 /**
@@ -101,7 +116,7 @@ export function renderMenuCategoryAccordionSection(
   items,
   venueId,
   isHidden,
-  { oob = false, oobMode = 'append', forceOpen = false } = {}
+  { oob = false, oobMode = 'append', forceOpen = false, childrenHtml = '' } = {}
 ) {
   // 'append' — новая категория, в конец аккордеона (редкое действие).
   // 'replace' — категория уже на экране, целиком заменяем ЕЁ секцию по id
@@ -116,6 +131,8 @@ export function renderMenuCategoryAccordionSection(
   const iconPrefix = category.icon ? `${escapeHtml(category.icon)} ` : '';
   const bodyId = `menu-category-items-${category.id}`;
   const rows = items.map((i) => renderMenuItemRow(i)).join('');
+  const nestedClass = category.parent_id ? ' accordion-section-nested' : '';
+  const itemCount = items.length;
 
   const visibilityToggle = `
     <label class="visibility-toggle" @click.stop title="Видимость этой категории именно в выбранном заведении">
@@ -131,11 +148,11 @@ export function renderMenuCategoryAccordionSection(
   `;
 
   return `
-    <div class="accordion-section" id="menu-category-section-${category.id}"${oobAttr} x-data="{ open: ${initialOpen} }">
+    <div class="accordion-section${nestedClass}" id="menu-category-section-${category.id}"${oobAttr} x-data="{ open: ${initialOpen} }">
       <div class="accordion-header" role="button" tabindex="0" @click="open = !open">
         <span class="accordion-arrow" :class="{ 'accordion-arrow-open': open }">▸</span>
         <span class="accordion-title">${iconPrefix}${safeName}</span>
-        <span class="accordion-count">${items.length}</span>
+        <span class="accordion-count">${itemCount}</span>
         ${visibilityToggle}
         <button
           type="button"
@@ -148,6 +165,7 @@ export function renderMenuCategoryAccordionSection(
         >Удалить</button>
       </div>
       <div class="accordion-body" x-show="open" style="display:none;">
+        ${childrenHtml}
         ${renderMenuAccordionTable(bodyId, rows)}
       </div>
     </div>
@@ -173,7 +191,34 @@ export function renderMenuUncategorizedAccordionSection(items, { oob = false, fo
 }
 
 export function renderMenuAccordion(venueId, categories, hiddenCategoryIds, items) {
-  const sections = categories
+  const roots = categories.filter((c) => !c.parent_id);
+  const childrenOf = (parentId) => categories.filter((c) => c.parent_id === parentId);
+
+  const sections = roots
+    .map((cat) => {
+      const childSections = childrenOf(cat.id)
+        .map((child) =>
+          renderMenuCategoryAccordionSection(
+            child,
+            items.filter((i) => i.category_id === child.id),
+            venueId,
+            hiddenCategoryIds.includes(child.id)
+          )
+        )
+        .join('');
+      return renderMenuCategoryAccordionSection(
+        cat,
+        items.filter((i) => i.category_id === cat.id),
+        venueId,
+        hiddenCategoryIds.includes(cat.id),
+        { childrenHtml: childSections }
+      );
+    })
+    .join('');
+
+  // orphan subcategories without visible parent
+  const orphanSections = categories
+    .filter((c) => c.parent_id && !categories.some((p) => p.id === c.parent_id))
     .map((cat) =>
       renderMenuCategoryAccordionSection(
         cat,
@@ -183,15 +228,20 @@ export function renderMenuAccordion(venueId, categories, hiddenCategoryIds, item
       )
     )
     .join('');
+
   const uncategorizedSection = renderMenuUncategorizedAccordionSection(
     items.filter((i) => !i.category_id)
   );
-  return `<div id="menu-accordion">${sections}${uncategorizedSection}</div>`;
+  return `<div id="menu-accordion">${sections}${orphanSections}${uncategorizedSection}</div>`;
 }
 
 /* ---------- Модалки добавления ---------- */
 
-function renderAddMenuCategoryModal(venueId) {
+function renderAddMenuCategoryModal(venueId, categories = []) {
+  const parentOptions = categories
+    .filter((c) => !c.parent_id)
+    .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
+    .join('');
   return `
     <div class="modal-trigger" x-data="{ open: false }" @htmx:after-request="if ($event.detail.successful) open = false">
       <button type="button" class="btn-secondary" @click="open = true">+ Категория</button>
@@ -206,6 +256,10 @@ function renderAddMenuCategoryModal(venueId) {
           >
             <input type="text" name="name" placeholder="Название" required>
             <input type="text" name="icon" placeholder="Эмодзи-иконка, напр. 🍃" maxlength="8">
+            <select name="parent_id">
+              <option value="">Корневая категория</option>
+              ${parentOptions}
+            </select>
             <input type="hidden" name="venue_id" value="${venueId}">
             <div id="menu-category-form-error" class="error"></div>
             <div class="modal-actions">
@@ -254,7 +308,7 @@ export function renderMenuVenueContainer(venueId, categories, hiddenCategoryIds,
       <div class="subsection-header">
         <h2>Категории и позиции</h2>
         <div class="subsection-actions">
-          ${renderAddMenuCategoryModal(venueId)}
+          ${renderAddMenuCategoryModal(venueId, categories)}
           ${renderAddMenuItemModal(categories, venueId)}
         </div>
       </div>
