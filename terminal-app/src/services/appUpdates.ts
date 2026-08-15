@@ -1,13 +1,12 @@
 import { API_BASE_URL } from '../api/client';
 import {
-  applyJsBundleZip,
+  applyJsBundleZipAndRestart,
   canRequestPackageInstalls,
   downloadUpdateFile,
   getAppVersion,
   installApk,
   isUpdatesAvailable,
   openUnknownSourcesSettings,
-  restartApp,
 } from '../native/updates';
 
 export type RemoteUpdatesManifest = {
@@ -106,12 +105,6 @@ export async function applyApkUpdate(plan: Extract<UpdatePlan, { kind: 'apk' }>)
 export async function applyJsUpdate(plan: Extract<UpdatePlan, { kind: 'js' }>): Promise<void> {
   if (!plan.remote.url) throw new Error('Нет URL JS OTA');
   const path = await downloadUpdateFile(plan.remote.url, `js-ota-v${plan.remote.version}.zip`);
-  await applyJsBundleZip(path, plan.remote.version);
-  // Короткая пауза после commit prefs на native-стороне, затем жёсткий рестарт.
-  await new Promise((r) => setTimeout(r, 250));
-  const local = await getAppVersion();
-  if (Number(local.jsOtaVersion) < Number(plan.remote.version)) {
-    throw new Error('OTA не сохранилась на устройстве — попробуйте ещё раз или поставьте APK');
-  }
-  await restartApp();
+  // Native сам делает commit prefs и Runtime.exit — без гонки со старым JS-бандлом.
+  await applyJsBundleZipAndRestart(path, plan.remote.version);
 }

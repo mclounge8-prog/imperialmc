@@ -141,6 +141,28 @@ export default function OrderScreen({ route, navigation }: Props) {
     load();
   }, [load]);
 
+  // После рестарта OTA / возврата на экран — подтянуть актуальный состав с сервера.
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      if (!session || !venue) return;
+      void (async () => {
+        try {
+          const id = orderId ?? order?.id;
+          if (id == null) return;
+          const fresh = await fetchOrderById(id, session.token);
+          setOrder(fresh);
+          setSelectedGuestId((prev) => {
+            if (prev && fresh.guests.some((g) => g.id === prev)) return prev;
+            return fresh.guests[0]?.id ?? null;
+          });
+        } catch {
+          /* не шумим — пользователь уже в заказе */
+        }
+      })();
+    });
+    return unsub;
+  }, [navigation, session, venue, orderId, order?.id]);
+
   const handleAddGuest = async () => {
     if (!session || !order || busy) return;
     setBusy(true);

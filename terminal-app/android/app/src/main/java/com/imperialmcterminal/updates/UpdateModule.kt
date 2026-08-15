@@ -186,42 +186,28 @@ class UpdateModule(reactContext: ReactApplicationContext) :
   fun applyJsBundleZip(zipPath: String, jsVersion: Int, promise: Promise) {
     thread {
       try {
-        val zipFile = File(zipPath)
-        if (!zipFile.exists()) {
-          promise.reject("ZIP_MISSING", "ZIP не найден")
-          return@thread
-        }
+        val bundlePath = installJsBundleZip(zipPath, jsVersion)
+        promise.resolve(bundlePath)
+      } catch (e: Exception) {
+        promise.reject("JS_OTA_ERROR", e.message, e)
+      }
+    }
+  }
 
-        val otaRoot = File(reactApplicationContext.filesDir, "updates/ota").apply { mkdirs() }
-        val targetDir = File(otaRoot, "v$jsVersion").apply {
-          if (exists()) deleteRecursively()
-          mkdirs()
-        }
-
-        unzip(zipFile, targetDir)
-
-        val bundle = findBundle(targetDir)
-          ?: run {
-            promise.reject("BUNDLE_MISSING", "В ZIP нет index.android.bundle")
-            return@thread
-          }
-
-        val saved = reactApplicationContext
-          .getSharedPreferences(PREFS, MODE)
-          .edit()
-          .putString(KEY_JS_BUNDLE, bundle.absolutePath)
-          .putInt(KEY_JS_VERSION, jsVersion)
-          .putInt(KEY_JS_FOR_APK, BuildConfig.VERSION_CODE)
-          // commit(), не apply(): иначе Runtime.exit при рестарте убивает процесс
-          // до записи prefs — и планшет снова видит JS 0 → N в цикле.
-          .commit()
-
-        if (!saved) {
-          promise.reject("JS_OTA_PREFS", "Не удалось сохранить версию OTA")
-          return@thread
-        }
-
-        promise.resolve(bundle.absolutePath)
+  /**
+   * Атомарно: распаковать → commit prefs → проверить файл → рестарт процесса.
+   * Не возвращает управление в JS до рестарта — старый бандл не может «опередить» запись.
+   */
+  @ReactMethod
+  fun applyJsBundleZipAndRestart(zipPath: String, jsVersion: Int, promise: Promise) {
+    thread {
+      try {
+        installJsBundleZip(zipPath, jsVersion)
+        // Небольшая пауза, чтобы FileProvider/FS успели стабилизироваться на слабых планшетах.
+        Thread.sleep(150)
+        restartProcess()
+        // Сюда обычно не доходим.
+        promise.resolve(null)
       } catch (e: Exception) {
         promise.reject("JS_OTA_ERROR", e.message, e)
       }
@@ -242,20 +228,82 @@ class UpdateModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun restartApp(promise: Promise) {
     try {
-      val ctx = reactApplicationContext
-      val intent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
-      if (intent == null) {
-        promise.reject("RESTART_ERROR", "Не найден launch intent")
-        return
-      }
-      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-      ctx.startActivity(intent)
-      ctx.currentActivity?.finishAffinity()
-      Runtime.getRuntime().exit(0)
+      restartProcess()
       promise.resolve(null)
     } catch (e: Exception) {
       promise.reject("RESTART_ERROR", e.message, e)
     }
+  }
+
+  private fun installJsBundleZip(zipPath: String, jsVersion: Int): String {
+    val zipFile = File(zipPath)
+    if (!zipFile.exists()) {
+      throw IllegalStateException("ZIP не найден")
+    }
+
+    val otaRoot = File(reactApplicationContext.filesDir, "updates/ota").apply { mkdirs() }
+    val targetDir = File(otaRoot, "v$jsVersion").apply {
+      if (exists()) deleteRecursively()
+      mkdirs()
+    }
+
+    unzip(zipFile, targetDir)
+
+    val bundle = findBundle(targetDir)
+      ?: throw IllegalStateException("В ZIP нет index.android.bundle")
+
+    if (!bundle.exists() || bundle.length() < 64) {
+      throw IllegalStateException("Бандл OTA пустой или повреждён")
+    }
+
+    // Hermes bytecode начинается с magic c61fbc03. Plain Metro JS — нет.
+    // На Hermes-сборке APK plain JS приводит к падению/откату ощущению «OTA не встала».
+    val magic = ByteArray(4)
+    FileInputStream(bundle).use { it.read(magic) }
+    val isHermes =
+      magic[0] == 0xc6.toByte() &&
+        magic[1] == 0x1f.toByte() &&
+        magic[2] == 0xbc.toByte() &&
+        magic[3] == 0x03.toByte()
+    if (!isHermes) {
+      throw IllegalStateException(
+        "OTA-бандл не в формате Hermes — пересоберите JS OTA с hermesc"
+      )
+    }
+
+    val saved = reactApplicationContext
+      .getSharedPreferences(PREFS, MODE)
+      .edit()
+      .putString(KEY_JS_BUNDLE, bundle.absolutePath)
+      .putInt(KEY_JS_VERSION, jsVersion)
+      .putInt(KEY_JS_FOR_APK, BuildConfig.VERSION_CODE)
+      // commit(), не apply(): иначе Runtime.exit при рестарте убивает процесс
+      // до записи prefs — и планшет снова видит JS 0 → N в цикле.
+      .commit()
+
+    if (!saved) {
+      throw IllegalStateException("Не удалось сохранить версию OTA")
+    }
+
+    // Перечитываем с диска — убеждаемся, что значение реально на месте.
+    val prefs = reactApplicationContext.getSharedPreferences(PREFS, MODE)
+    val storedVersion = prefs.getInt(KEY_JS_VERSION, 0)
+    val storedPath = prefs.getString(KEY_JS_BUNDLE, null)
+    if (storedVersion != jsVersion || storedPath.isNullOrBlank() || !File(storedPath).exists()) {
+      throw IllegalStateException("OTA не сохранилась на устройстве (version=$storedVersion)")
+    }
+
+    return bundle.absolutePath
+  }
+
+  private fun restartProcess() {
+    val ctx = reactApplicationContext
+    val intent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
+      ?: throw IllegalStateException("Не найден launch intent")
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+    ctx.startActivity(intent)
+    ctx.currentActivity?.finishAffinity()
+    Runtime.getRuntime().exit(0)
   }
 
   private fun emitProgress(id: String, progress: Double) {
@@ -278,13 +326,17 @@ class UpdateModule(reactContext: ReactApplicationContext) :
     fun resolveJsBundlePath(context: android.content.Context): String? {
       val prefs = context.getSharedPreferences(PREFS, MODE)
       val forApk = prefs.getInt(KEY_JS_FOR_APK, -1)
-      if (forApk != BuildConfig.VERSION_CODE) {
+      if (forApk != -1 && forApk != BuildConfig.VERSION_CODE) {
         clearOtaPrefs(context)
         return null
       }
       val path = prefs.getString(KEY_JS_BUNDLE, null) ?: return null
       val file = File(path)
-      return if (file.exists()) file.absolutePath else null
+      if (!file.exists()) {
+        clearOtaPrefs(context)
+        return null
+      }
+      return file.absolutePath
     }
 
     fun clearOtaPrefs(context: android.content.Context) {
@@ -293,7 +345,7 @@ class UpdateModule(reactContext: ReactApplicationContext) :
         .remove(KEY_JS_BUNDLE)
         .remove(KEY_JS_VERSION)
         .remove(KEY_JS_FOR_APK)
-        .apply()
+        .commit()
     }
 
     private fun findBundle(root: File): File? {

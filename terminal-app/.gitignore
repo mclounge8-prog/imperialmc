@@ -1,5 +1,6 @@
-# Локальные секреты для publish-*.sh (SSHPASS и т.п.) — не коммитить
-.env.deploy
 
-# Собранные артефакты
+android/local.properties
 dist/
+.env.deploy
+# Локальные секреты для publish-*.sh (SSHPASS и т.п.) — не коммитить
+# Собранные артефакты
