@@ -21,6 +21,12 @@ npx react-native bundle \
 # Hermes bytecode — иначе release APK с Hermes не подхватит plain JS и OTA «не применится».
 HERMESC="$(find "$ROOT/node_modules/react-native/sdks/hermesc" -type f -name hermesc 2>/dev/null | head -1 || true)"
 if [[ -z "$HERMESC" ]]; then
+  HERMESC="$(find "$ROOT/node_modules/hermes-compiler" -type f -path '*/linux64-bin/hermesc' 2>/dev/null | head -1 || true)"
+fi
+if [[ -z "$HERMESC" ]]; then
+  HERMESC="$(find "$ROOT/node_modules" -type f -path '*/linux64-bin/hermesc' 2>/dev/null | head -1 || true)"
+fi
+if [[ -z "$HERMESC" ]]; then
   HERMESC="$(find "$ROOT/node_modules/react-native" -type f -name hermesc 2>/dev/null | head -1 || true)"
 fi
 
