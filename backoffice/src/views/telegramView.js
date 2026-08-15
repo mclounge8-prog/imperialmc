@@ -63,6 +63,7 @@ export function renderTelegramSection(settings, flash = null) {
       <h2 style="margin:0 0 .75rem;font-size:1.05rem;">Что приходит</h2>
       <ul style="margin:0;padding-left:1.1rem;line-height:1.55;font-size:.92rem;">
         <li>Оплата наличными</li>
+        <li>Чеки со скидкой (10–100%)</li>
         <li>Открытие / закрытие смены</li>
         <li>Внесение и инкассация</li>
         <li>Отмена пречека (с комментарием)</li>

@@ -31,12 +31,16 @@ export function renderReceiptRow(receipt) {
     receipt.cancel_comment
       ? `<div class="muted" style="font-size:12px;margin-top:2px;">${escapeHtml(receipt.cancel_comment)}</div>`
       : '';
+  const discountHint =
+    Number(receipt.discount_percent) > 0
+      ? `<div class="muted" style="font-size:12px;margin-top:2px;">скидка ${Number(receipt.discount_percent)}%</div>`
+      : '';
 
   return `
     <tr>
       <td>${formatDateTime(receipt.closed_at)}</td>
       <td>${escapeHtml(receipt.venue_name || '—')}</td>
-      <td>${tableLabel} · ${escapeHtml(receipt.guest_label || '')}${commentHint}</td>
+      <td>${tableLabel} · ${escapeHtml(receipt.guest_label || '')}${commentHint}${discountHint}</td>
       <td>${escapeHtml(receipt.staff_name || '—')}</td>
       <td>${methods}</td>
       <td><span class="badge ${statusClass}">${STATUS_LABELS[receipt.status] || receipt.status}</span>${precheckBadge}</td>
@@ -286,6 +290,14 @@ export function renderReceiptDetail(receipt, items, payments) {
       }
       <p><strong>Открыт:</strong> ${formatDateTime(receipt.opened_at)}</p>
       <p><strong>Закрыт:</strong> ${formatDateTime(receipt.closed_at)}</p>
+      <p><strong>Сумма без скидки:</strong> ${Number(receipt.subtotal).toFixed(2)} ₽</p>
+      ${
+        Number(receipt.discount) > 0.009 || Number(receipt.discount_percent) > 0
+          ? `<p><strong>Скидка:</strong> −${Number(receipt.discount).toFixed(2)} ₽${
+              receipt.discount_percent ? ` (${Number(receipt.discount_percent)}%)` : ''
+            }</p>`
+          : ''
+      }
     </div>
 
     <div class="subsection">

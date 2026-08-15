@@ -54,7 +54,7 @@ export async function fetchReceiptsPage({ venueId, dateFrom, dateTo, page }) {
   const { rows } = await pool.query(
     `SELECT r.id, r.venue_id, v.name AS venue_name, r.table_name, r.guest_label, r.staff_name,
             r.status, r.total, r.closed_at, r.opened_at,
-            r.cancel_comment, r.precheck_was_printed,
+            r.cancel_comment, r.precheck_was_printed, r.discount, r.discount_percent,
             (SELECT string_agg(DISTINCT rp.method, ',') FROM receipt_payments rp WHERE rp.receipt_id = r.id) AS payment_methods
      FROM receipts r
      LEFT JOIN venues v ON v.id = r.venue_id

@@ -562,6 +562,9 @@ ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS precheck_printed_by_name VARCH
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS cancel_comment TEXT;
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS precheck_was_printed BOOLEAN NOT NULL DEFAULT false;
 
+-- Процент скидки при оплате (0 / 10 / 15 / 20 / 25 / 100). Сумма скидки — в discount.
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS discount_percent INT NOT NULL DEFAULT 0;
+
 CREATE INDEX IF NOT EXISTS idx_receipts_cancelled_precheck
   ON receipts(venue_id, closed_at DESC)
   WHERE status = 'cancelled' AND precheck_was_printed = true;

@@ -4,6 +4,7 @@ import { requireStaffToken } from '../middleware/apiAuth.js';
 import { enqueuePrecheckFiscalJob, enqueueReceiptFiscalJob } from '../services/fiscalQueue.js';
 import {
   buildCashPaymentMessage,
+  buildDiscountPaymentMessage,
   buildItemDeleteMessage,
   buildPrecheckCancelMessage,
   buildZeroCloseMessage,
@@ -12,6 +13,19 @@ import {
 } from '../services/telegramNotify.js';
 
 const apiOrders = new Hono();
+
+const ALLOWED_DISCOUNT_PERCENTS = new Set([0, 10, 15, 20, 25, 100]);
+
+function roundMoney(value) {
+  return Math.round(Number(value) * 100) / 100;
+}
+
+function parseDiscountPercent(raw) {
+  if (raw == null || raw === '') return 0;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || !ALLOWED_DISCOUNT_PERCENTS.has(n)) return null;
+  return n;
+}
 
 async function fetchGuestPrecheckState(clientOrPool, guestId) {
   const { rows } = await clientOrPool.query(
@@ -341,11 +355,20 @@ async function requireOpenShiftId(client, venueId) {
   return shiftId;
 }
 
-async function createReceipt(client, { guest, staff, status, items, payments, cancelComment = null }) {
-  const subtotal = items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
-  // Чек на 0 ₽ можно закрыть без открытой смены (пустой стол / ошибочно открытый).
+async function createReceipt(
+  client,
+  { guest, staff, status, items, payments, cancelComment = null, discountPercent = 0 }
+) {
+  const subtotal = roundMoney(items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0));
+  const pct = ALLOWED_DISCOUNT_PERCENTS.has(Number(discountPercent))
+    ? Number(discountPercent)
+    : 0;
+  const discount = status === 'paid' ? roundMoney((subtotal * pct) / 100) : 0;
+  const total = roundMoney(subtotal - discount);
+
+  // Чек на 0 ₽ (пустой или 100% скидка) можно закрыть без открытой смены.
   const shiftId =
-    subtotal > 0.009
+    total > 0.009
       ? await requireOpenShiftId(client, guest.venue_id)
       : await fetchOpenShiftId(client, guest.venue_id);
 
@@ -355,8 +378,8 @@ async function createReceipt(client, { guest, staff, status, items, payments, ca
     `INSERT INTO receipts
        (venue_id, order_id, guest_id, table_id, table_name, guest_label,
         staff_id, staff_name, status, subtotal, discount, total, opened_at, closed_at, shift_id,
-        cancel_comment, precheck_was_printed)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $10, $11, now(), $12, $13, $14)
+        cancel_comment, precheck_was_printed, discount_percent)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now(), $14, $15, $16, $17)
      RETURNING id`,
     [
       guest.venue_id,
@@ -369,10 +392,13 @@ async function createReceipt(client, { guest, staff, status, items, payments, ca
       staff.name,
       status,
       subtotal,
+      discount,
+      total,
       guest.opened_at,
       shiftId,
       status === 'cancelled' ? cancelComment : null,
       precheckWasPrinted,
+      status === 'paid' ? pct : 0,
     ]
   );
   const receiptId = receiptRows[0].id;
@@ -406,6 +432,7 @@ async function createReceipt(client, { guest, staff, status, items, payments, ca
   }
 
   for (const p of payments) {
+    if (Number(p.amount) <= 0.009) continue;
     // eslint-disable-next-line no-await-in-loop
     await client.query('INSERT INTO receipt_payments (receipt_id, method, amount) VALUES ($1, $2, $3)', [
       receiptId,
@@ -417,18 +444,19 @@ async function createReceipt(client, { guest, staff, status, items, payments, ca
   // Фискализация — только для реально оплаченных чеков (cancelled — гость
   // ушёл не заплатив, денег не было, фискальный документ не нужен). Тихо
   // ничего не делает, если у заведения нет включённой кассы АТОЛ.
+  // При скидке в АТОЛ уходят пропорционально сниженные цены позиций и итоговая сумма.
   if (status === 'paid') {
     await enqueueReceiptFiscalJob(client, {
       venueId: guest.venue_id,
       receiptId,
       items,
-      payments,
-      total: subtotal,
+      payments: payments.filter((p) => Number(p.amount) > 0.009),
+      total,
       operatorName: staff.name,
     });
   }
 
-  return receiptId;
+  return { receiptId, subtotal, discount, total, discountPercent: pct };
 }
 
 // Оплатить конкретного гостя (его отдельный чек), не трогая остальных. Требует
@@ -440,16 +468,13 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
   const staff = c.get('staff');
   const body = await c.req.json().catch(() => null);
   const payments = body && Array.isArray(body.payments) ? body.payments : null;
+  const discountPercent = parseDiscountPercent(
+    body?.discount_percent ?? body?.discountPercent ?? 0
+  );
 
-  if (!payments || payments.length === 0) {
+  if (discountPercent == null) {
     c.status(400);
-    return c.json({ error: 'Не указан способ оплаты' });
-  }
-  for (const p of payments) {
-    if (!PAYMENT_METHODS.includes(p.method) || typeof p.amount !== 'number' || p.amount <= 0) {
-      c.status(400);
-      return c.json({ error: 'Некорректные данные оплаты' });
-    }
+    return c.json({ error: 'Скидка должна быть одной из: 0, 10, 15, 20, 25, 100%' });
   }
 
   const client = await pool.connect();
@@ -466,7 +491,10 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
 
     // В режиме пречека оплату разрешаем только после печати пречека (кроме 0 ₽).
     const items = await fetchGuestItemsSnapshot(guestId, client);
-    const subtotal = items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
+    const subtotal = roundMoney(items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0));
+    const discount = roundMoney((subtotal * discountPercent) / 100);
+    const payable = roundMoney(subtotal - discount);
+
     if (guest.precheck_enabled && subtotal > 0.009 && !guest.precheck_printed_at) {
       await client.query('ROLLBACK');
       c.status(409);
@@ -476,17 +504,44 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       });
     }
 
-    const paymentsTotal = payments.reduce((sum, p) => sum + p.amount, 0);
-
-    if (Math.abs(paymentsTotal - subtotal) > 0.01) {
-      await client.query('ROLLBACK');
-      c.status(400);
-      return c.json({
-        error: `Сумма оплаты (${paymentsTotal.toFixed(2)}) не совпадает с суммой чека (${subtotal.toFixed(2)})`,
-      });
+    let normalizedPayments = [];
+    if (payable <= 0.009) {
+      // 100% скидка или пустой чек — оплата не нужна.
+      normalizedPayments = [];
+    } else {
+      if (!payments || payments.length === 0) {
+        await client.query('ROLLBACK');
+        c.status(400);
+        return c.json({ error: 'Не указан способ оплаты' });
+      }
+      for (const p of payments) {
+        if (!PAYMENT_METHODS.includes(p.method) || typeof p.amount !== 'number' || p.amount <= 0) {
+          await client.query('ROLLBACK');
+          c.status(400);
+          return c.json({ error: 'Некорректные данные оплаты' });
+        }
+      }
+      normalizedPayments = payments;
+      const paymentsTotal = roundMoney(normalizedPayments.reduce((sum, p) => sum + p.amount, 0));
+      if (Math.abs(paymentsTotal - payable) > 0.01) {
+        await client.query('ROLLBACK');
+        c.status(400);
+        return c.json({
+          error: `Сумма оплаты (${paymentsTotal.toFixed(2)}) не совпадает с суммой к оплате (${payable.toFixed(2)}${
+            discountPercent ? `, скидка ${discountPercent}%` : ''
+          })`,
+        });
+      }
     }
 
-    await createReceipt(client, { guest, staff, status: 'paid', items, payments });
+    const receiptMeta = await createReceipt(client, {
+      guest,
+      staff,
+      status: 'paid',
+      items,
+      payments: normalizedPayments,
+      discountPercent,
+    });
     await client.query("UPDATE order_guests SET status = 'paid' WHERE id = $1", [guestId]);
 
     await client.query('COMMIT');
@@ -496,9 +551,14 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       tableName: guest.table_name,
       guestLabel: guest.label,
       cashier: staff.name,
-      cashAmount: payments
+      cashAmount: normalizedPayments
         .filter((p) => p.method === 'cash')
         .reduce((sum, p) => sum + Number(p.amount), 0),
+      discountPercent: receiptMeta.discountPercent,
+      subtotal: receiptMeta.subtotal,
+      discount: receiptMeta.discount,
+      total: receiptMeta.total,
+      payments: normalizedPayments,
     };
   } catch (err) {
     await client.query('ROLLBACK');
@@ -511,17 +571,33 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
     client.release();
   }
 
-  if (paidNotify && paidNotify.cashAmount > 0.009) {
+  if (paidNotify) {
     const venueName = paidNotify.venueName || (await fetchVenueName(paidNotify.venueId));
-    notifyTelegramSafe(
-      buildCashPaymentMessage({
-        venueName,
-        amount: paidNotify.cashAmount,
-        cashier: paidNotify.cashier,
-        tableName: paidNotify.tableName,
-        guestLabel: paidNotify.guestLabel,
-      })
-    );
+    if (paidNotify.discountPercent > 0) {
+      notifyTelegramSafe(
+        buildDiscountPaymentMessage({
+          venueName,
+          subtotal: paidNotify.subtotal,
+          discountPercent: paidNotify.discountPercent,
+          discountAmount: paidNotify.discount,
+          total: paidNotify.total,
+          payments: paidNotify.payments,
+          cashier: paidNotify.cashier,
+          tableName: paidNotify.tableName,
+          guestLabel: paidNotify.guestLabel,
+        })
+      );
+    } else if (paidNotify.cashAmount > 0.009) {
+      notifyTelegramSafe(
+        buildCashPaymentMessage({
+          venueName,
+          amount: paidNotify.cashAmount,
+          cashier: paidNotify.cashier,
+          tableName: paidNotify.tableName,
+          guestLabel: paidNotify.guestLabel,
+        })
+      );
+    }
   }
 
   await maybeCloseOrderIfAllGuestsSettled(orderId);

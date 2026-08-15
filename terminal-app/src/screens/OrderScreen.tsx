@@ -38,7 +38,7 @@ import {
 } from '../api/client';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import CommentPromptModal from '../components/CommentPromptModal';
-import type { MenuItem, MenuResponse, Order, OrderGuest, OrderItem, PaymentMethod, Zone } from '../api/client';
+import type { DiscountPercent, MenuItem, MenuResponse, Order, OrderGuest, OrderItem, PaymentMethod, Zone } from '../api/client';
 import type { RootStackParamList } from '../../App';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Order'>;
@@ -74,6 +74,12 @@ const CASH_KEY_ROWS = [
   ['.', '0', '⌫'],
 ];
 
+const DISCOUNT_OPTIONS: DiscountPercent[] = [0, 10, 15, 20, 25, 100];
+
+function roundMoney(value: number): number {
+  return Math.round(Number(value) * 100) / 100;
+}
+
 export default function OrderScreen({ route, navigation }: Props) {
   const { orderId, tableId, tableName } = route.params;
   const { session } = useSession();
@@ -96,6 +102,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [cashEntryMode, setCashEntryMode] = useState(false);
   const [cashReceivedText, setCashReceivedText] = useState('');
+  const [discountPercent, setDiscountPercent] = useState<DiscountPercent>(0);
   const [compositionTarget, setCompositionTarget] = useState<CompositionTarget>(null);
   const [customizeTarget, setCustomizeTarget] = useState<MenuItem | null>(null);
   const [cancelCommentGuest, setCancelCommentGuest] = useState<OrderGuest | null>(null);
@@ -309,6 +316,7 @@ export default function OrderScreen({ route, navigation }: Props) {
     setPaymentTarget(null);
     setCashEntryMode(false);
     setCashReceivedText('');
+    setDiscountPercent(0);
   };
 
   const handleCashKeyPress = (key: string) => {
@@ -386,24 +394,61 @@ export default function OrderScreen({ route, navigation }: Props) {
     }
   };
 
+  const payableAmount = paymentTarget
+    ? roundMoney(paymentTarget.total * (1 - discountPercent / 100))
+    : 0;
+  const discountAmount = paymentTarget ? roundMoney(paymentTarget.total - payableAmount) : 0;
   const cashReceivedAmount = parseFloat(cashReceivedText.replace(',', '.')) || 0;
-  const changeAmount = paymentTarget ? cashReceivedAmount - paymentTarget.total : 0;
-  const canConfirmCash = paymentTarget != null && cashReceivedAmount >= paymentTarget.total;
+  const changeAmount = cashReceivedAmount - payableAmount;
+  const canConfirmCash = paymentTarget != null && cashReceivedAmount >= payableAmount - 0.001;
 
   const confirmPayment = async (method: PaymentMethod) => {
     if (!session || !order || !paymentTarget) return;
-    if (!(await ensureShiftOpen(paymentTarget.total))) {
+    if (!(await ensureShiftOpen(payableAmount))) {
+      closePaymentModal();
+      return;
+    }
+    const guest = paymentTarget;
+    const pct = discountPercent;
+    setPaymentBusy(true);
+    try {
+      const updated = await payGuest(
+        order.id,
+        guest.id,
+        method,
+        payableAmount,
+        session.token,
+        pct
+      );
+      closePaymentModal();
+      // Не ждём фискализацию — она не должна задерживать закрытие модалки
+      // оплаты, при сбое чек останется в очереди и разберётся фоном.
+      if (venue && payableAmount > 0.009) runPendingFiscalJobs(venue.id, session.token);
+      if (updated.guests.length === 0) {
+        navigation.goBack();
+      } else {
+        setOrder(updated);
+        setSelectedGuestId(updated.guests[0].id);
+      }
+    } catch (e) {
+      closePaymentModal();
+      showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось провести оплату');
+    } finally {
+      setPaymentBusy(false);
+    }
+  };
+
+  const confirmComplimentary = async () => {
+    if (!session || !order || !paymentTarget || discountPercent !== 100) return;
+    if (!(await ensureShiftOpen(0))) {
       closePaymentModal();
       return;
     }
     const guest = paymentTarget;
     setPaymentBusy(true);
     try {
-      const updated = await payGuest(order.id, guest.id, method, guest.total, session.token);
+      const updated = await payGuest(order.id, guest.id, 'cash', 0, session.token, 100);
       closePaymentModal();
-      // Не ждём фискализацию — она не должна задерживать закрытие модалки
-      // оплаты, при сбое чек останется в очереди и разберётся фоном.
-      if (venue) runPendingFiscalJobs(venue.id, session.token);
       if (updated.guests.length === 0) {
         navigation.goBack();
       } else {
@@ -772,7 +817,15 @@ export default function OrderScreen({ route, navigation }: Props) {
         <Pressable style={styles.modalBackdrop} onPress={() => !paymentBusy && closePaymentModal()}>
           <Pressable style={styles.paymentModalBox} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.modalTitle}>Оплата — {paymentTarget?.label}</Text>
-            <Text style={styles.paymentAmount}>{paymentTarget?.total.toFixed(2)} ₽</Text>
+            <Text style={styles.paymentAmount}>{payableAmount.toFixed(2)} ₽</Text>
+            {discountPercent > 0 ? (
+              <Text style={styles.discountHint}>
+                было {paymentTarget?.total.toFixed(2)} ₽ · скидка {discountPercent}% (−
+                {discountAmount.toFixed(2)} ₽)
+              </Text>
+            ) : (
+              <Text style={styles.discountHint}>без скидки</Text>
+            )}
 
             {paymentBusy ? (
               <ActivityIndicator color={colors.accent2} style={{ marginVertical: 24 }} />
@@ -818,21 +871,58 @@ export default function OrderScreen({ route, navigation }: Props) {
               </>
             ) : (
               <>
-                <Text style={styles.modalSubtitle}>Выбери способ оплаты</Text>
-                <Pressable
-                  style={[styles.paymentMethodButton, styles.paymentMethodCash]}
-                  onPress={() => setCashEntryMode(true)}
-                >
-                  <Text style={styles.paymentMethodIcon}>💵</Text>
-                  <Text style={styles.paymentMethodLabel}>Наличные</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.paymentMethodButton, styles.paymentMethodCard]}
-                  onPress={() => confirmPayment('card')}
-                >
-                  <Text style={styles.paymentMethodIcon}>💳</Text>
-                  <Text style={styles.paymentMethodLabel}>Безналичный</Text>
-                </Pressable>
+                <Text style={styles.modalSubtitle}>Скидка</Text>
+                <View style={styles.discountRow}>
+                  {DISCOUNT_OPTIONS.map((pct) => (
+                    <Pressable
+                      key={pct}
+                      style={[
+                        styles.discountChip,
+                        discountPercent === pct && styles.discountChipActive,
+                      ]}
+                      onPress={() => setDiscountPercent(pct)}
+                    >
+                      <Text
+                        style={[
+                          styles.discountChipText,
+                          discountPercent === pct && styles.discountChipTextActive,
+                        ]}
+                      >
+                        {pct === 0 ? '0%' : `${pct}%`}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {discountPercent === 100 ? (
+                  <>
+                    <Text style={styles.modalSubtitle}>Чек будет закрыт как комплимент (0 ₽)</Text>
+                    <Pressable
+                      style={[styles.paymentMethodButton, styles.paymentMethodComp]}
+                      onPress={confirmComplimentary}
+                    >
+                      <Text style={styles.paymentMethodLabel}>Закрыть со скидкой 100%</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.modalSubtitle}>Выбери способ оплаты</Text>
+                    <Pressable
+                      style={[styles.paymentMethodButton, styles.paymentMethodCash]}
+                      onPress={() => setCashEntryMode(true)}
+                    >
+                      <Text style={styles.paymentMethodIcon}>💵</Text>
+                      <Text style={styles.paymentMethodLabel}>Наличные</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.paymentMethodButton, styles.paymentMethodCard]}
+                      onPress={() => confirmPayment('card')}
+                    >
+                      <Text style={styles.paymentMethodIcon}>💳</Text>
+                      <Text style={styles.paymentMethodLabel}>Безналичный</Text>
+                    </Pressable>
+                  </>
+                )}
                 <Pressable style={styles.modalCancel} onPress={closePaymentModal}>
                   <Text style={styles.modalCancelText}>Отмена</Text>
                 </Pressable>
@@ -1194,6 +1284,42 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 4,
   },
+  discountHint: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  discountRow: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  discountChip: {
+    minWidth: 56,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+  },
+  discountChipActive: {
+    borderColor: colors.accent2,
+    backgroundColor: 'rgba(63, 99, 230, 0.18)',
+  },
+  discountChipText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  discountChipTextActive: {
+    color: colors.text,
+  },
   paymentMethodButton: {
     width: '100%',
     minHeight: 96,
@@ -1211,6 +1337,11 @@ const styles = StyleSheet.create({
   paymentMethodCard: {
     backgroundColor: 'rgba(63, 99, 230, 0.12)',
     borderColor: colors.accent2,
+  },
+  paymentMethodComp: {
+    backgroundColor: 'rgba(230, 160, 63, 0.14)',
+    borderColor: '#e6a03f',
+    minHeight: 72,
   },
   paymentMethodIcon: { fontSize: 40, lineHeight: 44 },
   paymentMethodLabel: { color: colors.text, fontSize: 20, fontWeight: '700' },
