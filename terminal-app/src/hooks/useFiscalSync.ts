@@ -1,36 +1,53 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
-import { fetchFiscalJobs } from '../api/client';
+import { fetchAtolSettings, fetchFiscalJobs } from '../api/client';
 import { useFiscalAlerts } from '../context/FiscalAlertsContext';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 
-const POLL_INTERVAL_MS = 20000;
+const POLL_INTERVAL_MS = 15000;
 
-// Периодически разбирает очередь АТОЛ и подтягивает счётчик ошибок для
-// чипа в шапке. Монтируется один раз на верхнем уровне (см. App.tsx).
+/**
+ * Периодически:
+ * - разбирает очередь АТОЛ;
+ * - обновляет счётчик ошибок фискальных заданий;
+ * - проверяет связь с сервером (чип «Сервер» в шапке).
+ */
 export function useFiscalSync(venueId: number | null | undefined, token: string | null | undefined): void {
-  const { setServerErrorCount, clearAlerts } = useFiscalAlerts();
+  const {
+    setServerErrorCount,
+    setAtolEnabled,
+    setPendingJobCount,
+    setServerOnline,
+    clearAlerts,
+  } = useFiscalAlerts();
 
   useEffect(() => {
     if (!venueId || !token) return undefined;
 
     let cancelled = false;
 
-    const refreshErrorCount = async () => {
+    const refreshStatus = async () => {
       try {
-        const { errorCount } = await fetchFiscalJobs(venueId, token, 1);
+        const [jobsRes, settings] = await Promise.all([
+          fetchFiscalJobs(venueId, token, 50),
+          fetchAtolSettings(venueId, token),
+        ]);
         if (cancelled) return;
-        setServerErrorCount(errorCount);
-        if (errorCount === 0) clearAlerts();
-      } catch {
-        // Счётчик не критичен — ошибки worker'а всё равно попадут в notifyFiscalError
+        setServerOnline(true);
+        setServerErrorCount(jobsRes.errorCount);
+        setPendingJobCount(jobsRes.pendingCount ?? 0);
+        setAtolEnabled(Boolean(settings.enabled));
+        if (jobsRes.errorCount === 0) clearAlerts('atol');
+      } catch (err) {
+        if (cancelled) return;
+        setServerOnline(false, err instanceof Error ? err.message : 'Нет связи с сервером');
       }
     };
 
     const tick = () => {
       if (cancelled) return;
       runPendingFiscalJobs(venueId, token).finally(() => {
-        if (!cancelled) refreshErrorCount();
+        if (!cancelled) void refreshStatus();
       });
     };
 
@@ -45,5 +62,13 @@ export function useFiscalSync(venueId: number | null | undefined, token: string 
       clearInterval(interval);
       subscription.remove();
     };
-  }, [venueId, token, setServerErrorCount, clearAlerts]);
+  }, [
+    venueId,
+    token,
+    setServerErrorCount,
+    setAtolEnabled,
+    setPendingJobCount,
+    setServerOnline,
+    clearAlerts,
+  ]);
 }

@@ -11,10 +11,13 @@ import type { RootStackParamList } from '../../App';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
+const OK_GREEN = '#3d9a6a';
+
 export default function TerminalHeaderRight() {
   const { session, logout } = useSession();
   const { status } = useDevice();
-  const { errorCount, lastError } = useFiscalAlerts();
+  const { errorCount, lastError, atolEnabled, pendingJobCount, serverOnline, serverMessage } =
+    useFiscalAlerts();
   const venue = status?.venue ?? null;
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute();
@@ -25,22 +28,62 @@ export default function TerminalHeaderRight() {
   const showSettingsButton = !['Settings', 'XReport', 'ShiftReceipts', 'AtolStatus', 'Cash'].includes(
     route.name
   );
-  const showAtolChip = errorCount > 0 && route.name !== 'AtolStatus';
+  const onStatusScreen = route.name === 'AtolStatus';
+
+  const serverOk = serverOnline !== false;
+  const serverLabel =
+    serverOnline === false
+      ? `Сервер · ошибка${serverMessage ? `: ${serverMessage}` : ''}`
+      : 'Сервер · OK';
+
+  let atolLabel = 'АТОЛ · —';
+  let atolOk = true;
+  if (atolEnabled === false) {
+    atolLabel = 'АТОЛ · выкл';
+    atolOk = true;
+  } else if (errorCount > 0) {
+    atolOk = false;
+    atolLabel = `АТОЛ · ${errorCount}${lastError ? `: ${lastError.message}` : ''}`;
+  } else if (pendingJobCount > 0) {
+    atolOk = true;
+    atolLabel = `АТОЛ · очередь ${pendingJobCount}`;
+  } else if (atolEnabled === true) {
+    atolLabel = 'АТОЛ · OK';
+    atolOk = true;
+  }
 
   return (
     <View style={styles.container}>
-      {showAtolChip ? (
+      {!onStatusScreen ? (
         <Pressable
-          style={styles.atolChip}
+          style={[styles.statusChip, serverOk ? styles.chipOk : styles.chipError]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           onPress={() => navigation.navigate('AtolStatus')}
         >
-          <Text style={styles.atolChipText} numberOfLines={1}>
-            АТОЛ · {errorCount}
-            {lastError ? `: ${lastError.message}` : ''}
+          <Text
+            style={[styles.statusChipText, { color: serverOk ? OK_GREEN : colors.danger }]}
+            numberOfLines={1}
+          >
+            {serverLabel}
           </Text>
         </Pressable>
       ) : null}
+
+      {!onStatusScreen ? (
+        <Pressable
+          style={[styles.statusChip, atolOk ? styles.chipOk : styles.chipError]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => navigation.navigate('AtolStatus')}
+        >
+          <Text
+            style={[styles.statusChipText, { color: atolOk ? OK_GREEN : colors.danger }]}
+            numberOfLines={1}
+          >
+            {atolLabel}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {showReferenceButton && (
         <Pressable
           style={styles.referenceButton}
@@ -84,24 +127,29 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     marginRight: 8,
-    maxWidth: 520,
+    maxWidth: 620,
   },
-  atolChip: {
-    maxWidth: 180,
+  statusChip: {
+    maxWidth: 150,
     borderWidth: 1,
-    borderColor: colors.danger,
-    backgroundColor: 'rgba(225, 76, 76, 0.15)',
     borderRadius: 10,
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     minHeight: ICON_BUTTON_SIZE,
     justifyContent: 'center',
   },
-  atolChipText: {
-    color: colors.danger,
-    fontSize: 12,
+  chipOk: {
+    borderColor: 'rgba(61, 154, 106, 0.55)',
+    backgroundColor: 'rgba(61, 154, 106, 0.12)',
+  },
+  chipError: {
+    borderColor: colors.danger,
+    backgroundColor: 'rgba(225, 76, 76, 0.15)',
+  },
+  statusChipText: {
+    fontSize: 11,
     fontWeight: '700',
   },
   referenceButton: {
@@ -109,7 +157,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 10,
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     minHeight: ICON_BUTTON_SIZE,
     justifyContent: 'center',
   },

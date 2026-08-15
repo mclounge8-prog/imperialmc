@@ -12,6 +12,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   fetchAtolSettings,
   fetchFiscalJobs,
+  deleteFiscalJob,
+  retryAllFiscalJobs,
   retryFiscalJob,
   type AtolSettings,
   type FiscalJobListItem,
@@ -22,6 +24,8 @@ import { useSession } from '../context/SessionContext';
 import { isAtolDriverAppInstalled } from '../native/atol';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import { colors } from '../theme/colors';
+
+const OK_GREEN = '#3d9a6a';
 
 const TYPE_LABELS: Record<string, string> = {
   open_shift: 'Открытие смены',
@@ -55,16 +59,36 @@ function formatWhen(value: string | null | undefined): string {
 
 function statusColor(status: string): string {
   if (status === 'error') return colors.danger;
-  if (status === 'done') return '#3d9a6a';
+  if (status === 'done') return OK_GREEN;
   if (status === 'in_progress') return colors.accent2;
   return colors.textMuted;
+}
+
+function isStuck(job: FiscalJobListItem): boolean {
+  if (job.status !== 'in_progress' || !job.updatedAt) return false;
+  const ageMs = Date.now() - new Date(job.updatedAt).getTime();
+  return ageMs > 2 * 60 * 1000;
+}
+
+function canRetry(job: FiscalJobListItem): boolean {
+  return job.status === 'error' || isStuck(job);
 }
 
 export default function AtolStatusScreen() {
   const { session } = useSession();
   const { status: deviceStatus } = useDevice();
   const venueId = deviceStatus?.venue?.id ?? null;
-  const { setServerErrorCount, clearAlerts } = useFiscalAlerts();
+  const {
+    setServerErrorCount,
+    setPendingJobCount,
+    setAtolEnabled,
+    setServerOnline,
+    clearAlerts,
+    serverOnline,
+    serverMessage,
+    errorCount,
+    pendingJobCount,
+  } = useFiscalAlerts();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,7 +97,9 @@ export default function AtolStatusScreen() {
   const [jobs, setJobs] = useState<FiscalJobListItem[]>([]);
   const [driverInstalled, setDriverInstalled] = useState<boolean | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [draining, setDraining] = useState(false);
+  const [retryingAll, setRetryingAll] = useState(false);
 
   const load = useCallback(async () => {
     if (!venueId || !session?.token) return;
@@ -81,23 +107,34 @@ export default function AtolStatusScreen() {
     try {
       const [settingsRes, jobsRes, driver] = await Promise.all([
         fetchAtolSettings(venueId, session.token),
-        fetchFiscalJobs(venueId, session.token, 40),
+        fetchFiscalJobs(venueId, session.token, 50),
         isAtolDriverAppInstalled(),
       ]);
       setSettings(settingsRes);
       setJobs(jobsRes.jobs);
+      setServerOnline(true);
       setServerErrorCount(jobsRes.errorCount);
+      setPendingJobCount(jobsRes.pendingCount ?? 0);
+      setAtolEnabled(Boolean(settingsRes.enabled));
       setDriverInstalled(driver);
-      if (jobsRes.errorCount === 0) {
-        clearAlerts();
-      }
+      if (jobsRes.errorCount === 0) clearAlerts('atol');
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setServerOnline(false, message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [venueId, session?.token, setServerErrorCount, clearAlerts]);
+  }, [
+    venueId,
+    session?.token,
+    setServerErrorCount,
+    setPendingJobCount,
+    setAtolEnabled,
+    setServerOnline,
+    clearAlerts,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -114,6 +151,7 @@ export default function AtolStatusScreen() {
   const onRetry = async (jobId: number) => {
     if (!venueId || !session?.token) return;
     setRetryingId(jobId);
+    setError(null);
     try {
       await retryFiscalJob(jobId, venueId, session.token);
       await runPendingFiscalJobs(venueId, session.token);
@@ -125,12 +163,44 @@ export default function AtolStatusScreen() {
     }
   };
 
+  const onDelete = async (jobId: number) => {
+    if (!venueId || !session?.token) return;
+    setDeletingId(jobId);
+    setError(null);
+    try {
+      await deleteFiscalJob(jobId, venueId, session.token);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const onRetryAll = async () => {
+    if (!venueId || !session?.token) return;
+    setRetryingAll(true);
+    setError(null);
+    try {
+      await retryAllFiscalJobs(venueId, session.token, { includeStuck: true });
+      await runPendingFiscalJobs(venueId, session.token);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRetryingAll(false);
+    }
+  };
+
   const onDrainQueue = async () => {
     if (!venueId || !session?.token) return;
     setDraining(true);
+    setError(null);
     try {
       await runPendingFiscalJobs(venueId, session.token);
       await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setDraining(false);
     }
@@ -144,6 +214,10 @@ export default function AtolStatusScreen() {
     );
   }
 
+  const serverOk = serverOnline !== false;
+  const atolOk = errorCount === 0;
+  const errorJobs = jobs.filter((j) => j.status === 'error' || isStuck(j));
+
   return (
     <ScrollView
       style={styles.container}
@@ -152,11 +226,37 @@ export default function AtolStatusScreen() {
     >
       {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
 
-      <Text style={styles.sectionLabel}>Состояние</Text>
+      <Text style={styles.sectionLabel}>Уведомления</Text>
+      <View style={styles.card}>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoKey}>Сервер</Text>
+          <Text style={[styles.infoValue, { color: serverOk ? OK_GREEN : colors.danger }]}>
+            {serverOk ? 'OK' : serverMessage || 'нет связи'}
+          </Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoKey}>АТОЛ / фискализация</Text>
+          <Text style={[styles.infoValue, { color: atolOk ? OK_GREEN : colors.danger }]}>
+            {atolOk
+              ? pendingJobCount > 0
+                ? `OK · в очереди ${pendingJobCount}`
+                : 'OK · ошибок нет'
+              : `ошибок: ${errorCount}`}
+          </Text>
+        </View>
+        <View style={[styles.infoRow, styles.infoRowLast]}>
+          <Text style={styles.infoKey}>Что покрываем</Text>
+          <Text style={styles.infoValueMuted}>
+            чеки, смена, внесение/инкассация, обрыв связи, зависания
+          </Text>
+        </View>
+      </View>
+
+      <Text style={styles.sectionLabel}>Касса</Text>
       <View style={styles.card}>
         <View style={styles.infoRow}>
           <Text style={styles.infoKey}>Касса в заведении</Text>
-          <Text style={[styles.infoValue, { color: settings?.enabled ? '#3d9a6a' : colors.textMuted }]}>
+          <Text style={[styles.infoValue, { color: settings?.enabled ? OK_GREEN : colors.textMuted }]}>
             {settings?.enabled ? 'включена' : 'выключена'}
           </Text>
         </View>
@@ -165,7 +265,7 @@ export default function AtolStatusScreen() {
           <Text
             style={[
               styles.infoValue,
-              { color: driverInstalled ? '#3d9a6a' : colors.danger },
+              { color: driverInstalled ? OK_GREEN : colors.danger },
             ]}
           >
             {driverInstalled == null ? '—' : driverInstalled ? 'установлен' : 'не найден'}
@@ -188,7 +288,11 @@ export default function AtolStatusScreen() {
               <Text style={styles.infoValue}>{settings.operatorName || '—'}</Text>
             </View>
           </>
-        ) : null}
+        ) : (
+          <View style={[styles.infoRow, styles.infoRowLast]}>
+            <Text style={styles.infoValueMuted}>Фискализация отключена в бэкофисе</Text>
+          </View>
+        )}
       </View>
 
       {!driverInstalled && settings?.enabled ? (
@@ -206,6 +310,20 @@ export default function AtolStatusScreen() {
         )}
       </Pressable>
 
+      <Pressable
+        style={[styles.secondaryButton, errorJobs.length === 0 && styles.buttonDisabled]}
+        disabled={retryingAll || errorJobs.length === 0}
+        onPress={onRetryAll}
+      >
+        {retryingAll ? (
+          <ActivityIndicator color={colors.accent2} />
+        ) : (
+          <Text style={styles.secondaryButtonText}>
+            Повторить все ошибки{errorJobs.length ? ` (${errorJobs.length})` : ''}
+          </Text>
+        )}
+      </Pressable>
+
       <Text style={styles.sectionLabel}>Задания</Text>
       {jobs.length === 0 ? (
         <Text style={styles.empty}>Заданий пока не было</Text>
@@ -217,26 +335,40 @@ export default function AtolStatusScreen() {
                 <Text style={styles.jobType}>{TYPE_LABELS[job.type] || job.type}</Text>
                 <Text style={[styles.jobStatus, { color: statusColor(job.status) }]}>
                   {STATUS_LABELS[job.status] || job.status}
+                  {isStuck(job) ? ' · зависло' : ''}
                 </Text>
               </View>
               <Text style={styles.jobMeta}>
-                #{job.id} · {formatWhen(job.createdAt)}
+                #{job.id} · попыток {job.attempts} · {formatWhen(job.createdAt)}
                 {job.fiscalDocNumber != null ? ` · ФД ${job.fiscalDocNumber}` : ''}
                 {job.fiscalSign ? ` · ФПД ${job.fiscalSign}` : ''}
               </Text>
               {job.lastError ? <Text style={styles.jobError}>{job.lastError}</Text> : null}
-              {job.status === 'error' ? (
-                <Pressable
-                  style={styles.retryButton}
-                  disabled={retryingId === job.id}
-                  onPress={() => onRetry(job.id)}
-                >
-                  {retryingId === job.id ? (
-                    <ActivityIndicator color={colors.text} size="small" />
-                  ) : (
-                    <Text style={styles.retryButtonText}>Повторить</Text>
-                  )}
-                </Pressable>
+              {canRetry(job) ? (
+                <View style={styles.jobActions}>
+                  <Pressable
+                    style={styles.retryButton}
+                    disabled={retryingId === job.id || deletingId === job.id}
+                    onPress={() => onRetry(job.id)}
+                  >
+                    {retryingId === job.id ? (
+                      <ActivityIndicator color={colors.text} size="small" />
+                    ) : (
+                      <Text style={styles.retryButtonText}>Повторить</Text>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    style={styles.deleteButton}
+                    disabled={retryingId === job.id || deletingId === job.id}
+                    onPress={() => onDelete(job.id)}
+                  >
+                    {deletingId === job.id ? (
+                      <ActivityIndicator color={colors.danger} size="small" />
+                    ) : (
+                      <Text style={styles.deleteButtonText}>Удалить</Text>
+                    )}
+                  </Pressable>
+                </View>
               ) : null}
             </View>
           ))}
@@ -279,6 +411,7 @@ const styles = StyleSheet.create({
   infoRowLast: { borderBottomWidth: 0 },
   infoKey: { color: colors.textMuted, fontSize: 13, flexShrink: 1 },
   infoValue: { color: colors.text, fontSize: 13, fontWeight: '600', textAlign: 'right', flexShrink: 1 },
+  infoValueMuted: { color: colors.textMuted, fontSize: 12, textAlign: 'right', flex: 1 },
   hint: { color: colors.textMuted, fontSize: 12, marginHorizontal: 4, marginBottom: 4 },
   primaryButton: {
     marginTop: 8,
@@ -290,6 +423,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   primaryButtonText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: colors.surface,
+  },
+  secondaryButtonText: { color: colors.accent2, fontSize: 14, fontWeight: '700' },
+  buttonDisabled: { opacity: 0.45 },
   empty: { color: colors.textMuted, fontSize: 13, marginLeft: 4 },
   jobRow: { paddingHorizontal: 14, paddingVertical: 12, gap: 4 },
   jobBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -298,9 +443,8 @@ const styles = StyleSheet.create({
   jobStatus: { fontSize: 13, fontWeight: '700' },
   jobMeta: { color: colors.textMuted, fontSize: 12 },
   jobError: { color: colors.danger, fontSize: 12, marginTop: 2 },
+  jobActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   retryButton: {
-    alignSelf: 'flex-start',
-    marginTop: 8,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 10,
@@ -310,6 +454,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   retryButtonText: { color: colors.accent2, fontSize: 13, fontWeight: '600' },
+  deleteButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(225, 76, 76, 0.45)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    minWidth: 110,
+    alignItems: 'center',
+  },
+  deleteButtonText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
   errorBanner: {
     color: colors.danger,
     backgroundColor: colors.surface2,
