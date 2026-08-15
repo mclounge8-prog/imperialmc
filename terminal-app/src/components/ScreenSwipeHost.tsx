@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import { Dimensions, PanResponder, StyleSheet, View, type ViewProps } from 'react-native';
+import { PanResponder, StyleSheet, View, type ViewProps } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../App';
@@ -15,17 +15,15 @@ type Props = ViewProps & {
   children: React.ReactNode;
 };
 
-const EDGE_PX = 56;
-const MIN_DX = 64;
-const MIN_VX = 0.35;
+/** Невидимые полосы по краям — жест не отбирают ScrollView в центре. */
+const EDGE_WIDTH = 72;
+const MIN_DX = 56;
+const MIN_VX = 0.3;
 
 /**
- * Оборачивает экран и ловит горизонтальные свайпы для перехода
- * Tables ↔ Состав ↔ Настройки.
- *
- * Жест берётся:
- * - от левого/правого края (не мешает скроллам в центре),
- * - либо уверенный горизонтальный свайп по центру (dx и скорость).
+ * Переходы Tables ↔ Состав ↔ Настройки:
+ * 1) свайп по левому/правому краю (поверх контента — надёжно),
+ * 2) уверенный горизонтальный свайп по всему экрану (capture, если dx >> dy).
  */
 export default function ScreenSwipeHost({ screen, children, style, ...rest }: Props) {
   const navigation = useNavigation<NavigationProp>();
@@ -36,51 +34,108 @@ export default function ScreenSwipeHost({ screen, children, style, ...rest }: Pr
   const indexRef = useRef(index);
   indexRef.current = index;
 
-  const panResponder = useMemo(
+  const goNext = () => {
+    const idx = indexRef.current;
+    if (idx >= 0 && idx < MAIN_HUB_SCREENS.length - 1) {
+      navigationRef.current.navigate(MAIN_HUB_SCREENS[idx + 1]);
+    }
+  };
+
+  const goPrev = () => {
+    const idx = indexRef.current;
+    if (idx > 0) {
+      navigationRef.current.navigate(MAIN_HUB_SCREENS[idx - 1]);
+    }
+  };
+
+  const applySwipe = (dx: number, vx: number) => {
+    if (dx < -MIN_DX || vx < -MIN_VX) {
+      goNext();
+      return;
+    }
+    if (dx > MIN_DX || vx > MIN_VX) {
+      goPrev();
+    }
+  };
+
+  const leftEdgePan = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (evt, gesture) => {
-          const absDx = Math.abs(gesture.dx);
-          const absDy = Math.abs(gesture.dy);
-          if (absDx < 14 || absDx < absDy * 1.4) return false;
-
-          const startX = evt.nativeEvent.pageX - gesture.dx;
-          const width = Dimensions.get('window').width;
-          const fromLeft = startX <= EDGE_PX;
-          const fromRight = startX >= width - EDGE_PX;
-
-          if (fromLeft && gesture.dx > 0) return true;
-          if (fromRight && gesture.dx < 0) return true;
-
-          // Центр экрана — только «уверенный» жест, чтобы не воевать со ScrollView
-          return absDx > 48 && absDx > absDy * 2.2;
-        },
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
         onPanResponderTerminationRequest: () => false,
-        onPanResponderRelease: (_evt, gesture) => {
-          const idx = indexRef.current;
-          const goLeft = gesture.dx < -MIN_DX || gesture.vx < -MIN_VX;
-          const goRight = gesture.dx > MIN_DX || gesture.vx > MIN_VX;
-
-          if (goLeft && idx < MAIN_HUB_SCREENS.length - 1) {
-            navigationRef.current.navigate(MAIN_HUB_SCREENS[idx + 1]);
-            return;
-          }
-          if (goRight && idx > 0) {
-            navigationRef.current.navigate(MAIN_HUB_SCREENS[idx - 1]);
-          }
+        onPanResponderRelease: (_e, g) => {
+          if (g.dx > MIN_DX || g.vx > MIN_VX) goPrev();
         },
       }),
     []
   );
 
+  const rightEdgePan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderRelease: (_e, g) => {
+          if (g.dx < -MIN_DX || g.vx < -MIN_VX) goNext();
+        },
+      }),
+    []
+  );
+
+  // Захват уверенного горизонтального жеста до ScrollView-детей
+  const pagePan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponderCapture: (_e, g) => {
+          const absDx = Math.abs(g.dx);
+          const absDy = Math.abs(g.dy);
+          return absDx > 28 && absDx > absDy * 2.5;
+        },
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderRelease: (_e, g) => applySwipe(g.dx, g.vx),
+        onPanResponderTerminate: (_e, g) => applySwipe(g.dx, g.vx),
+      }),
+    []
+  );
+
+  const canGoPrev = index > 0;
+  const canGoNext = index >= 0 && index < MAIN_HUB_SCREENS.length - 1;
+
   return (
-    <View style={[styles.root, style]} {...rest} {...panResponder.panHandlers}>
+    <View style={[styles.root, style]} {...rest} {...pagePan.panHandlers}>
       {children}
+      {canGoPrev ? (
+        <View style={styles.leftEdge} collapsable={false} {...leftEdgePan.panHandlers} />
+      ) : null}
+      {canGoNext ? (
+        <View style={styles.rightEdge} collapsable={false} {...rightEdgePan.panHandlers} />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  leftEdge: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: EDGE_WIDTH,
+    zIndex: 50,
+    elevation: 50,
+  },
+  rightEdge: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: EDGE_WIDTH,
+    zIndex: 50,
+    elevation: 50,
+  },
 });
