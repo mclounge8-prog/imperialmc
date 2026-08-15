@@ -300,7 +300,11 @@ async function requireOpenShiftId(client, venueId) {
 
 async function createReceipt(client, { guest, staff, status, items, payments }) {
   const subtotal = items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
-  const shiftId = await requireOpenShiftId(client, guest.venue_id);
+  // Чек на 0 ₽ можно закрыть без открытой смены (пустой стол / ошибочно открытый).
+  const shiftId =
+    subtotal > 0.009
+      ? await requireOpenShiftId(client, guest.venue_id)
+      : await fetchOpenShiftId(client, guest.venue_id);
 
   const { rows: receiptRows } = await client.query(
     `INSERT INTO receipts
