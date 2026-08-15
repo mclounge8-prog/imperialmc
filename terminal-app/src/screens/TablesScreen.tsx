@@ -33,8 +33,6 @@ const STATUS_COLORS: Record<string, string> = {
   dirty: colors.textMuted,
 };
 
-const TABLES_POLL_MS = 5000;
-
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const GRADIENT_BLUE: [string, string] = [colors.accent, colors.accent2];
@@ -106,14 +104,11 @@ export default function TablesScreen() {
     [session, venue]
   );
 
-  // При фокусе экрана и каждые 5 с — подтягиваем схему из бэкофиса без спиннера
+  // Обновляем схему только при входе на экран (из заказов/настроек и т.п.),
+  // без фонового poll — лишняя нагрузка на API не нужна.
   useFocusEffect(
     useCallback(() => {
       void load({ silent: hasLoadedRef.current });
-      const interval = setInterval(() => {
-        void load({ silent: true });
-      }, TABLES_POLL_MS);
-      return () => clearInterval(interval);
     }, [load])
   );
 
