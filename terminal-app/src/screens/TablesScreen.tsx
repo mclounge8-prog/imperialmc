@@ -18,7 +18,7 @@ import { fetchTables, fetchOpenOrders, fetchPaidReceipts } from '../api/client';
 import type { OpenOrderSummary, PaidReceiptSummary, Zone } from '../api/client';
 import PaidReceiptDetailModal from '../components/PaidReceiptDetailModal';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
-import { FLOOR_PLAN_HEIGHT, FLOOR_PLAN_WIDTH, layoutSizeForTable, normalizeTableSize, snapToGrid } from '../utils/tableLayout';
+import { layoutSizeForTable, layoutTablesOnViewport, normalizeTableSize, snapToGrid } from '../utils/tableLayout';
 import type { RootStackParamList } from '../../App';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -51,6 +51,7 @@ export default function TablesScreen() {
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const hasLoadedRef = useRef(false);
 
   const load = useCallback(
@@ -190,6 +191,10 @@ export default function TablesScreen() {
   }
 
   const selectedZone = zones.find((z) => z.id === selectedZoneId) ?? zones[0];
+  const layout =
+    selectedZone && selectedZone.tables.length > 0 && viewport.width > 0 && viewport.height > 0
+      ? layoutTablesOnViewport(selectedZone.tables, viewport.width, viewport.height)
+      : null;
 
   return (
     <ScreenSwipeHost screen="Tables">
@@ -218,34 +223,54 @@ export default function TablesScreen() {
             <Text style={styles.emptyText}>Зоны пока не заведены в бэкофисе</Text>
           </View>
         ) : (
-          <View style={styles.floorArea}>
+          <View style={[styles.floorArea, { marginBottom: Math.max(8, insets.bottom) }]}>
             {!selectedZone || selectedZone.tables.length === 0 ? (
               <View style={styles.center}>
                 <Text style={styles.emptyText}>В этой зоне пока нет столов</Text>
               </View>
             ) : (
-              <ScrollView
-                horizontal
-                style={styles.floorScroll}
-                contentContainerStyle={styles.floorScrollContent}
+              <View
+                style={styles.floorPlan}
+                onLayout={(e) => {
+                  const { width, height } = e.nativeEvent.layout;
+                  // layout уже без бордера — клетки заполняют видимую область целиком
+                  setViewport((prev) =>
+                    prev.width === width && prev.height === height ? prev : { width, height }
+                  );
+                }}
               >
-                <ScrollView contentContainerStyle={styles.floorScrollContent}>
-                  <View
-                    style={[
-                      styles.floorPlan,
-                      { width: FLOOR_PLAN_WIDTH, height: FLOOR_PLAN_HEIGHT },
-                    ]}
-                  >
-                    {selectedZone.tables.map((table) => (
+                {layout ? (
+                  <>
+                    {Array.from({ length: 19 }, (_, i) => (
+                      <View
+                        key={`v-${i}`}
+                        pointerEvents="none"
+                        style={[
+                          styles.gridLineV,
+                          { left: Math.round((i + 1) * layout.cellW) },
+                        ]}
+                      />
+                    ))}
+                    {Array.from({ length: 11 }, (_, i) => (
+                      <View
+                        key={`h-${i}`}
+                        pointerEvents="none"
+                        style={[
+                          styles.gridLineH,
+                          { top: Math.round((i + 1) * layout.cellH) },
+                        ]}
+                      />
+                    ))}
+                    {layout.tables.map((table) => (
                       <Pressable
                         key={table.id}
                         style={[
                           styles.tableTile,
                           {
-                            left: table.posX,
-                            top: table.posY,
-                            width: table.width,
-                            height: table.height,
+                            left: table.left,
+                            top: table.top,
+                            width: table.tileWidth,
+                            height: table.tileHeight,
                             borderColor: STATUS_COLORS[table.status],
                           },
                         ]}
@@ -260,9 +285,9 @@ export default function TablesScreen() {
                         </Text>
                       </Pressable>
                     ))}
-                  </View>
-                </ScrollView>
-              </ScrollView>
+                  </>
+                ) : null}
+              </View>
             )}
           </View>
         )}
@@ -371,21 +396,33 @@ const styles = StyleSheet.create({
 
   floorArea: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: 12,
     marginRight: 8,
     marginTop: 12,
-    marginBottom: 8,
     minHeight: 120,
   },
-  floorScroll: { flex: 1 },
-  floorScrollContent: { flexGrow: 1 },
   floorPlan: {
+    flex: 1,
     position: 'relative',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  gridLineV: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  gridLineH: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   tableTile: {
     position: 'absolute',
