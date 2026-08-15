@@ -2,6 +2,37 @@ import ExcelJS from 'exceljs';
 
 const LOCATION_SEP = /\s*→\s*/;
 
+/** Подкатегории QuickResto сворачиваем в родительские (плоский каталог). */
+const CATEGORY_FOLD = {
+  'зеленый чай': 'Чай',
+  'чёрный чай': 'Чай',
+  'черный чай': 'Чай',
+  пуэр: 'Чай',
+  улун: 'Чай',
+  'авторский чай': 'Чай',
+  'лимонады на энергетике': 'Лимонады',
+  'лимонады на энергетиках': 'Лимонады',
+  'классические лимонады': 'Лимонады',
+  'мангалы на фруктах': 'Мангалы',
+  стаф: 'Стафф',
+};
+
+/** Иконки по умолчанию для известных категорий меню. */
+export const DEFAULT_CATEGORY_ICONS = {
+  мангалы: '💨',
+  стафф: '👤',
+  напитки: '🥤',
+  игры: '🎮',
+  чай: '🍵',
+  'мангалы для блотиков': '🫧',
+  услуги: '✨',
+  пиво: '🍺',
+  лимонады: '🍋',
+  милкшейки: '🥛',
+  'пиво б/а': '🥂',
+  'премиум напитки': '🍸',
+};
+
 function cellText(value) {
   if (value == null || value === '') return '';
   if (typeof value === 'object' && value.text != null) return String(value.text).trim();
@@ -31,6 +62,13 @@ function splitLocation(location) {
 function leafCategory(location) {
   const parts = splitLocation(location);
   return parts.length ? parts[parts.length - 1] : null;
+}
+
+/** Сворачивает имя подкатегории в родительскую, если есть правило. */
+export function foldCategoryName(name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return null;
+  return CATEGORY_FOLD[trimmed.toLowerCase()] || trimmed;
 }
 
 function normalizeHeader(value) {
@@ -115,12 +153,12 @@ export async function parseMenuExcel(buffer) {
   const items = [];
 
   function rememberCategory(name) {
-    const trimmed = String(name || '').trim();
-    if (!trimmed) return;
-    const key = trimmed.toLowerCase();
+    const folded = foldCategoryName(name);
+    if (!folded) return;
+    const key = folded.toLowerCase();
     if (categorySeen.has(key)) return;
     categorySeen.add(key);
-    categoryOrder.push(trimmed);
+    categoryOrder.push(folded);
   }
 
   for (let r = headerRow + 1; r <= worksheet.rowCount; r += 1) {
@@ -144,10 +182,9 @@ export async function parseMenuExcel(buffer) {
 
     let category = null;
     if (explicitCategory) {
-      category = explicitCategory;
+      category = foldCategoryName(explicitCategory);
     } else if (location) {
-      category = leafCategory(location);
-      for (const part of splitLocation(location)) rememberCategory(part);
+      category = foldCategoryName(leafCategory(location));
     }
 
     if (category) rememberCategory(category);

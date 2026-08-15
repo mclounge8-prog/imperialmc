@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
-import { parseMenuExcel, buildMenuExportWorkbook } from '../utils/menuExcel.js';
+import { parseMenuExcel, buildMenuExportWorkbook, DEFAULT_CATEGORY_ICONS, foldCategoryName } from '../utils/menuExcel.js';
 import { escapeHtml } from '../views/escapeHtml.js';
 import {
   renderMenuCategoryAccordionSection,
@@ -46,11 +46,13 @@ async function applyMenuImport({ categories, items }) {
       existingCats.reduce((max, c) => Math.max(max, Number(c.sort_order) || 0), 0) + 1;
 
     for (const catName of categories) {
-      const key = catName.toLowerCase();
+      const folded = foldCategoryName(catName) || catName;
+      const key = folded.toLowerCase();
       if (catByLower.has(key)) continue;
+      const icon = DEFAULT_CATEGORY_ICONS[key] || null;
       const { rows } = await client.query(
-        'INSERT INTO menu_categories (name, sort_order) VALUES ($1, $2) RETURNING id, name, sort_order',
-        [catName, nextSort]
+        'INSERT INTO menu_categories (name, icon, sort_order) VALUES ($1, $2, $3) RETURNING id, name, sort_order',
+        [folded, icon, nextSort]
       );
       nextSort += 1;
       catByLower.set(key, rows[0]);
@@ -70,7 +72,8 @@ async function applyMenuImport({ categories, items }) {
 
       let categoryId = null;
       if (item.category) {
-        const cat = catByLower.get(item.category.toLowerCase());
+        const folded = foldCategoryName(item.category) || item.category;
+        const cat = catByLower.get(folded.toLowerCase());
         categoryId = cat ? cat.id : null;
       }
 
