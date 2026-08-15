@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
 import {
-  renderZoneRow,
   renderZonesList,
   renderTableTile,
   renderTableEditTile,

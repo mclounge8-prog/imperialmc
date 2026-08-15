@@ -198,6 +198,7 @@ apiShifts.post('/close', async (c) => {
   const body = await c.req.json().catch(() => null);
   const venueId = body && body.venue_id ? Number(body.venue_id) : null;
   const countedCash = parseMoney(body?.closing_cash ?? body?.closingCash ?? body?.counted_cash);
+  const forcePin = body?.force_pin != null ? String(body.force_pin) : body?.forcePin != null ? String(body.forcePin) : null;
 
   if (!venueId) {
     c.status(400);
@@ -216,6 +217,28 @@ apiShifts.post('/close', async (c) => {
 
   const stats = await fetchShiftStats(shift);
   const expectedCash = stats.cash.expectedCash;
+  const mismatch = Math.abs(countedCash - expectedCash) > 0.009;
+  const FORCE_CLOSE_PIN = '3467';
+
+  // Пока наличность не сходится — закрытие запрещено, кроме спец. PIN 3467.
+  // Открытие при расхождении счётчика ФР не блокируем.
+  if (mismatch) {
+    if (forcePin == null || forcePin === '') {
+      c.status(409);
+      return c.json({
+        error:
+          `Наличность не сходится: по учёту ${expectedCash.toFixed(0)} ₽, факт ${countedCash.toFixed(0)} ₽. ` +
+          `Пересчитайте кассу или введите PIN для принудительного закрытия.`,
+        code: 'CASH_MISMATCH',
+        expectedCash,
+        countedCash,
+      });
+    }
+    if (forcePin !== FORCE_CLOSE_PIN) {
+      c.status(403);
+      return c.json({ error: 'Неверный PIN для принудительного закрытия', code: 'FORCE_PIN_INVALID' });
+    }
+  }
 
   const client = await pool.connect();
   try {
@@ -247,7 +270,10 @@ apiShifts.post('/close', async (c) => {
 
     await client.query('COMMIT');
     const closedStats = await fetchShiftStats(rows[0]);
-    return c.json({ shift: serializeShift(rows[0], closedStats) });
+    return c.json({
+      shift: serializeShift(rows[0], closedStats),
+      forcedClose: Boolean(mismatch && forcePin === FORCE_CLOSE_PIN),
+    });
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

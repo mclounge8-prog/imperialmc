@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import { colors } from '../theme/colors';
 import { useCurrentShift } from '../hooks/useCurrentShift';
-import { openShift, closeShift } from '../api/client';
+import { openShift, closeShift, ApiRequestError } from '../api/client';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import AmountPromptModal from './AmountPromptModal';
+import PinPromptModal from './PinPromptModal';
 
 const KNOB_SIZE = 52;
 const TRACK_HEIGHT = 60;
@@ -33,6 +34,10 @@ export default function ShiftToggle() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const [prompt, setPrompt] = useState<null | 'open' | 'close'>(null);
+  const [pendingCloseCash, setPendingCloseCash] = useState<number | null>(null);
+  const [forcePinVisible, setForcePinVisible] = useState(false);
+  const [forcePinError, setForcePinError] = useState<string | null>(null);
+  const [mismatchHint, setMismatchHint] = useState<string | null>(null);
 
   const isOpen = Boolean(shift);
   const maxTravel = Math.max(0, trackWidth - KNOB_SIZE);
@@ -85,6 +90,7 @@ export default function ShiftToggle() {
     setPrompt(null);
     setToggling(true);
     try {
+      // Открытие разрешено даже при расхождении счётчика ФР — сверки ККТ здесь нет.
       const opened = await openShift(liveVenue.id, liveSession.token, openingCash);
       setShift(opened);
       runPendingFiscalJobs(liveVenue.id, liveSession.token);
@@ -96,13 +102,19 @@ export default function ShiftToggle() {
     }
   };
 
-  const confirmClose = async (closingCash: number) => {
+  const performClose = async (closingCash: number, forcePin?: string) => {
     const { session: liveSession, venue: liveVenue, maxTravel: liveMaxTravel } = liveRef.current;
     if (!liveSession || !liveVenue) return;
-    setPrompt(null);
     setToggling(true);
+    setForcePinError(null);
     try {
-      const closed = await closeShift(liveVenue.id, liveSession.token, closingCash);
+      const closed = await closeShift(liveVenue.id, liveSession.token, closingCash, {
+        forcePin,
+      });
+      setForcePinVisible(false);
+      setPendingCloseCash(null);
+      setMismatchHint(null);
+      setPrompt(null);
       setShift(null);
       runPendingFiscalJobs(liveVenue.id, liveSession.token);
       const expected = closed.cash?.expectedCash;
@@ -111,13 +123,35 @@ export default function ShiftToggle() {
       if (expected != null && counted != null && diff != null) {
         const sign = diff > 0 ? '+' : '';
         Alert.alert(
-          'Смена закрыта',
+          forcePin ? 'Смена закрыта принудительно' : 'Смена закрыта',
           `По учёту: ${Math.round(expected).toLocaleString('ru-RU')} ₽\n` +
             `Факт: ${Math.round(counted).toLocaleString('ru-RU')} ₽\n` +
             `Разница: ${sign}${Math.round(diff).toLocaleString('ru-RU')} ₽`
         );
       }
     } catch (e) {
+      if (e instanceof ApiRequestError && e.code === 'CASH_MISMATCH') {
+        const expected = e.expectedCash ?? 0;
+        const counted = e.countedCash ?? closingCash;
+        setPendingCloseCash(closingCash);
+        setPrompt(null);
+        setMismatchHint(
+          `По учёту ${Math.round(expected).toLocaleString('ru-RU')} ₽, факт ${Math.round(counted).toLocaleString('ru-RU')} ₽`
+        );
+        setForcePinVisible(true);
+        snapTo(liveMaxTravel);
+        return;
+      }
+      if (e instanceof ApiRequestError && e.code === 'FORCE_PIN_INVALID') {
+        setForcePinError('Неверный PIN');
+        snapTo(liveMaxTravel);
+        return;
+      }
+      if (forcePin) {
+        setForcePinError(e instanceof Error ? e.message : 'Не удалось закрыть смену');
+        snapTo(liveMaxTravel);
+        return;
+      }
       setActionError(e instanceof Error ? e.message : 'Не удалось закрыть смену');
       snapTo(liveMaxTravel);
     } finally {
@@ -125,8 +159,16 @@ export default function ShiftToggle() {
     }
   };
 
+  const confirmClose = async (closingCash: number) => {
+    await performClose(closingCash);
+  };
+
   const cancelPrompt = () => {
     setPrompt(null);
+    setForcePinVisible(false);
+    setPendingCloseCash(null);
+    setForcePinError(null);
+    setMismatchHint(null);
     snapTo(liveRef.current.isOpen ? liveRef.current.maxTravel : 0);
   };
 
@@ -257,7 +299,7 @@ export default function ShiftToggle() {
       <AmountPromptModal
         visible={prompt === 'open'}
         title="Остаток наличных"
-        subtitle="Сколько наличных лежит в кассе при открытии смены? На АТОЛ уйдёт учётный чек внесения."
+        subtitle="Обязательно укажите, сколько наличных в кассе при открытии смены. Расхождение со счётчиком ФР открытие не блокирует."
         confirmLabel="Открыть смену"
         initialValue="0"
         allowZero
@@ -269,14 +311,28 @@ export default function ShiftToggle() {
         title="Пересчёт наличных"
         subtitle={
           shift?.cash
-            ? `По учёту должно быть ${Math.round(shift.cash.expectedCash).toLocaleString('ru-RU')} ₽. Введите фактическую сумму в ящике.`
-            : 'Введите фактическую сумму наличных в кассе.'
+            ? `По учёту должно быть ${Math.round(shift.cash.expectedCash).toLocaleString('ru-RU')} ₽. Введите фактическую сумму — при расхождении закрытие будет заблокировано.`
+            : 'Обязательно введите фактическую сумму наличных в кассе.'
         }
         confirmLabel="Закрыть смену"
         initialValue={shift?.cash ? String(Math.round(shift.cash.expectedCash)) : '0'}
         allowZero
         onCancel={cancelPrompt}
         onConfirm={confirmClose}
+      />
+      <PinPromptModal
+        visible={forcePinVisible}
+        title="Наличность не сходится"
+        subtitle={
+          (mismatchHint ? `${mismatchHint}. ` : '') +
+          'Пересчитайте кассу или введите PIN для принудительного закрытия.'
+        }
+        error={forcePinError}
+        onCancel={cancelPrompt}
+        onSubmit={(pin) => {
+          if (pendingCloseCash == null) return;
+          void performClose(pendingCloseCash, pin);
+        }}
       />
     </View>
   );

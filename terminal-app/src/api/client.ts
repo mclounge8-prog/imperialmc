@@ -13,7 +13,29 @@ export type StaffLoginResponse = {
 
 type ApiErrorBody = {
   error?: string;
+  code?: string;
+  expectedCash?: number;
+  countedCash?: number;
 };
+
+export class ApiRequestError extends Error {
+  code?: string;
+  expectedCash?: number;
+  countedCash?: number;
+  status: number;
+
+  constructor(
+    message: string,
+    opts: { status: number; code?: string; expectedCash?: number; countedCash?: number } 
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = opts.status;
+    this.code = opts.code;
+    this.expectedCash = opts.expectedCash;
+    this.countedCash = opts.countedCash;
+  }
+}
 
 async function parseJsonResponse(response: Response): Promise<unknown> {
   const text = await response.text();
@@ -217,8 +239,14 @@ async function authorizedRequest<T>(
   const data = await parseJsonResponse(response);
 
   if (!response.ok) {
-    const message = (data as ApiErrorBody).error || 'Ошибка запроса';
-    throw new Error(message);
+    const body = data as ApiErrorBody;
+    const message = body.error || 'Ошибка запроса';
+    throw new ApiRequestError(message, {
+      status: response.status,
+      code: body.code,
+      expectedCash: body.expectedCash,
+      countedCash: body.countedCash,
+    });
   }
 
   return data as T;
@@ -498,11 +526,16 @@ export async function openShift(
 export async function closeShift(
   venueId: number,
   token: string,
-  closingCash: number
+  closingCash: number,
+  options?: { forcePin?: string }
 ): Promise<Shift> {
   const { shift } = await authorizedRequest<{ shift: Shift }>('/api/shifts/close', token, {
     method: 'POST',
-    body: { venue_id: venueId, closing_cash: closingCash },
+    body: {
+      venue_id: venueId,
+      closing_cash: closingCash,
+      ...(options?.forcePin ? { force_pin: options.forcePin } : {}),
+    },
   });
   return shift;
 }
