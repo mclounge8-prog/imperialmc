@@ -192,10 +192,10 @@ export default function OrderScreen({ route, navigation }: Props) {
   // ингредиенты сняты, какие платные добавки включены. Именно это решает
   // задачу "шаурма без огурцов + картофель фри" без создания отдельной позиции.
   const buildModifierSummary = (item: OrderItem): string => {
+    const flattenCats = (cats: NonNullable<typeof menu>['categories']): MenuItem[] =>
+      cats.flatMap((c) => [...c.items, ...flattenCats(c.children || [])]);
     const menuItem = menu
-      ? [...menu.categories.flatMap((c) => c.items), ...menu.uncategorized].find(
-          (mi) => mi.id === item.menuItemId
-        )
+      ? [...flattenCats(menu.categories), ...menu.uncategorized].find((mi) => mi.id === item.menuItemId)
       : undefined;
     if (!menuItem) {
       return item.modifiers.map((m) => m.name).join(', ');

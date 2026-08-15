@@ -63,7 +63,7 @@ apiTerminal.get('/menu', requireStaffToken, async (c) => {
   }
 
   const { rows: categories } = await pool.query(
-    `SELECT mc.id, mc.name, mc.icon
+    `SELECT mc.id, mc.name, mc.icon, mc.parent_id, mc.sort_order
      FROM menu_categories mc
      WHERE NOT EXISTS (
        SELECT 1 FROM venue_hidden_menu_categories vhmc
@@ -134,12 +134,22 @@ apiTerminal.get('/menu', requireStaffToken, async (c) => {
     modifierGroups: buildModifierGroups(item.id),
   });
 
-  const categoriesWithItems = categories.map((cat) => ({
-    id: cat.id,
-    name: cat.name,
-    icon: cat.icon,
-    items: itemRows.filter((item) => item.category_id === cat.id).map(mapItem),
-  }));
+  // Дерево категорий: в корне только parent_id IS NULL, дети — в children.
+  // Скрытая родительская категория уже отфильтрована запросом выше.
+  function buildCategoryTree(parentId) {
+    return categories
+      .filter((cat) => (cat.parent_id || null) === parentId)
+      .map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        icon: cat.icon,
+        parentId: cat.parent_id || null,
+        items: itemRows.filter((item) => item.category_id === cat.id).map(mapItem),
+        children: buildCategoryTree(cat.id),
+      }));
+  }
+
+  const categoriesWithItems = buildCategoryTree(null);
 
   // Позиции без категории видны всегда — прятать по заведению можно только категории
   const uncategorized = itemRows.filter((item) => !item.category_id).map(mapItem);

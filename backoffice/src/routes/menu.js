@@ -21,7 +21,7 @@ menu.use('*', requireAuthApi);
 
 async function fetchMenuCategories() {
   const { rows } = await pool.query(
-    'SELECT id, name, icon FROM menu_categories ORDER BY sort_order, name'
+    'SELECT id, name, icon, parent_id, sort_order FROM menu_categories ORDER BY sort_order, name'
   );
   return rows;
 }
@@ -145,12 +145,13 @@ menu.post('/categories', async (c) => {
   const body = await c.req.parseBody();
   const name = String(body.name || '').trim();
   const icon = String(body.icon || '').trim() || null;
+  const parentId = body.parent_id ? Number(body.parent_id) : null;
   const venueId = body.venue_id;
   if (!name) return c.html('<p>Укажи название категории</p>');
 
   const { rows } = await pool.query(
-    'INSERT INTO menu_categories (name, icon) VALUES ($1, $2) RETURNING id, name, icon',
-    [name, icon]
+    'INSERT INTO menu_categories (name, icon, parent_id) VALUES ($1, $2, $3) RETURNING id, name, icon, parent_id',
+    [name, icon, parentId]
   );
 
   const categories = await fetchMenuCategories();

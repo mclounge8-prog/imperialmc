@@ -1223,6 +1223,11 @@ input[type="radio"] {
   background: var(--surface);
 }
 
+.accordion-section-nested {
+  margin: 8px 8px 8px 16px;
+  background: var(--surface-2, var(--surface));
+}
+
 .accordion-header {
   display: flex;
   align-items: center;

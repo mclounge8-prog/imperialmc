@@ -145,7 +145,9 @@ export type MenuCategory = {
   id: number;
   name: string;
   icon: string | null;
+  parentId?: number | null;
   items: MenuItem[];
+  children?: MenuCategory[];
 };
 
 export type MenuResponse = {
