@@ -149,7 +149,7 @@ menu.post('/import', async (c) => {
     const buffer = Buffer.from(await file.arrayBuffer());
     parsed = await parseMenuExcel(buffer);
   } catch (err) {
-    return c.html(`<p class="field-error">${String(err.message || err)}</p>`);
+    return c.html(`<p class="field-error">${escapeHtml(String(err.message || err))}</p>`);
   }
 
   if (parsed.items.length === 0 && parsed.categories.length === 0) {
