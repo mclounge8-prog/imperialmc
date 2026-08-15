@@ -1,6 +1,5 @@
 package com.imperialmcterminal.updates
 
-import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -244,8 +243,7 @@ class UpdateModule(reactContext: ReactApplicationContext) :
       }
       intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
       ctx.startActivity(intent)
-      val activity: Activity? = currentActivity
-      activity?.finishAffinity()
+      ctx.currentActivity?.finishAffinity()
       Runtime.getRuntime().exit(0)
       promise.resolve(null)
     } catch (e: Exception) {
