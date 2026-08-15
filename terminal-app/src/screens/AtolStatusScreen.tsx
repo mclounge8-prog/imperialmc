@@ -12,6 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   fetchAtolSettings,
   fetchFiscalJobs,
+  deleteFiscalJob,
   retryAllFiscalJobs,
   retryFiscalJob,
   type AtolSettings,
@@ -96,6 +97,7 @@ export default function AtolStatusScreen() {
   const [jobs, setJobs] = useState<FiscalJobListItem[]>([]);
   const [driverInstalled, setDriverInstalled] = useState<boolean | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [draining, setDraining] = useState(false);
   const [retryingAll, setRetryingAll] = useState(false);
 
@@ -158,6 +160,20 @@ export default function AtolStatusScreen() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setRetryingId(null);
+    }
+  };
+
+  const onDelete = async (jobId: number) => {
+    if (!venueId || !session?.token) return;
+    setDeletingId(jobId);
+    setError(null);
+    try {
+      await deleteFiscalJob(jobId, venueId, session.token);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -329,17 +345,30 @@ export default function AtolStatusScreen() {
               </Text>
               {job.lastError ? <Text style={styles.jobError}>{job.lastError}</Text> : null}
               {canRetry(job) ? (
-                <Pressable
-                  style={styles.retryButton}
-                  disabled={retryingId === job.id}
-                  onPress={() => onRetry(job.id)}
-                >
-                  {retryingId === job.id ? (
-                    <ActivityIndicator color={colors.text} size="small" />
-                  ) : (
-                    <Text style={styles.retryButtonText}>Повторить</Text>
-                  )}
-                </Pressable>
+                <View style={styles.jobActions}>
+                  <Pressable
+                    style={styles.retryButton}
+                    disabled={retryingId === job.id || deletingId === job.id}
+                    onPress={() => onRetry(job.id)}
+                  >
+                    {retryingId === job.id ? (
+                      <ActivityIndicator color={colors.text} size="small" />
+                    ) : (
+                      <Text style={styles.retryButtonText}>Повторить</Text>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    style={styles.deleteButton}
+                    disabled={retryingId === job.id || deletingId === job.id}
+                    onPress={() => onDelete(job.id)}
+                  >
+                    {deletingId === job.id ? (
+                      <ActivityIndicator color={colors.danger} size="small" />
+                    ) : (
+                      <Text style={styles.deleteButtonText}>Удалить</Text>
+                    )}
+                  </Pressable>
+                </View>
               ) : null}
             </View>
           ))}
@@ -414,9 +443,8 @@ const styles = StyleSheet.create({
   jobStatus: { fontSize: 13, fontWeight: '700' },
   jobMeta: { color: colors.textMuted, fontSize: 12 },
   jobError: { color: colors.danger, fontSize: 12, marginTop: 2 },
+  jobActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   retryButton: {
-    alignSelf: 'flex-start',
-    marginTop: 8,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 10,
@@ -426,6 +454,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   retryButtonText: { color: colors.accent2, fontSize: 13, fontWeight: '600' },
+  deleteButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(225, 76, 76, 0.45)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    minWidth: 110,
+    alignItems: 'center',
+  },
+  deleteButtonText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
   errorBanner: {
     color: colors.danger,
     backgroundColor: colors.surface2,

@@ -194,6 +194,59 @@ apiFiscal.post('/jobs/:id/retry', async (c) => {
   return c.json({ ok: true });
 });
 
+// Удалить ошибочное (или зависшее) задание вручную — если повторять уже не нужно.
+apiFiscal.delete('/jobs/:id', async (c) => {
+  const jobId = c.req.param('id');
+  const venueId = c.req.query('venueId');
+  if (!venueId) {
+    c.status(400);
+    return c.json({ error: 'Не указано заведение' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `SELECT id, type, receipt_id, status
+       FROM fiscal_jobs
+       WHERE id = $1 AND venue_id = $2
+       FOR UPDATE`,
+      [jobId, venueId]
+    );
+    const job = rows[0];
+    if (!job) {
+      await client.query('ROLLBACK');
+      c.status(404);
+      return c.json({ error: 'Задание не найдено' });
+    }
+    if (job.status !== 'error' && job.status !== 'in_progress') {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({ error: 'Удалять можно только задания со статусом error или зависшие in_progress' });
+    }
+
+    await client.query('DELETE FROM fiscal_jobs WHERE id = $1', [jobId]);
+
+    // Снимаем «вечный» error с чека, если задание удалили вручную.
+    if (job.type === 'receipt' && job.receipt_id) {
+      await client.query(
+        `UPDATE receipts
+         SET fiscal_status = NULL
+         WHERE id = $1 AND fiscal_status = 'error'`,
+        [job.receipt_id]
+      );
+    }
+
+    await client.query('COMMIT');
+    return c.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+});
+
 // Терминал репортит результат выполнения задания на кассе.
 apiFiscal.post('/jobs/:id/result', async (c) => {
   const jobId = c.req.param('id');

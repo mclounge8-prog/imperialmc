@@ -695,3 +695,9 @@ export async function retryAllFiscalJobs(
     }
   );
 }
+
+export async function deleteFiscalJob(jobId: number, venueId: number, token: string): Promise<void> {
+  await authorizedRequest(`/api/fiscal/jobs/${jobId}?venueId=${venueId}`, token, {
+    method: 'DELETE',
+  });
+}

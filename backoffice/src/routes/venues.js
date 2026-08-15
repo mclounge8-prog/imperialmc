@@ -241,4 +241,36 @@ venues.post('/:id/atol/jobs/:jobId/retry', async (c) => {
   return c.html(renderVenueAtolJobsRows(jobs, venueId));
 });
 
+venues.delete('/:id/atol/jobs/:jobId', async (c) => {
+  const { id: venueId, jobId } = c.req.param();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `SELECT id, type, receipt_id, status FROM fiscal_jobs
+       WHERE id = $1 AND venue_id = $2 FOR UPDATE`,
+      [jobId, venueId]
+    );
+    const job = rows[0];
+    if (job && (job.status === 'error' || job.status === 'in_progress')) {
+      await client.query('DELETE FROM fiscal_jobs WHERE id = $1', [jobId]);
+      if (job.type === 'receipt' && job.receipt_id) {
+        await client.query(
+          `UPDATE receipts SET fiscal_status = NULL WHERE id = $1 AND fiscal_status = 'error'`,
+          [job.receipt_id]
+        );
+      }
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const jobs = await fetchRecentFiscalJobs(venueId);
+  return c.html(renderVenueAtolJobsRows(jobs, venueId));
+});
+
 export default venues;

@@ -127,14 +127,22 @@ function renderFiscalJobRow(job, venueId) {
     ? `<div class="fiscal-job-error">${escapeHtml(job.last_error)}</div>`
     : '';
   const retryHtml =
-    job.status === 'error'
+    job.status === 'error' || job.status === 'in_progress'
       ? `<button
            type="button"
            class="secondary fiscal-job-retry"
            hx-post="/venues/${venueId}/atol/jobs/${job.id}/retry"
            hx-target="#atol-jobs-tbody-${venueId}"
            hx-swap="innerHTML"
-         >Повторить</button>`
+         >Повторить</button>
+         <button
+           type="button"
+           class="danger fiscal-job-delete"
+           hx-delete="/venues/${venueId}/atol/jobs/${job.id}"
+           hx-target="#atol-jobs-tbody-${venueId}"
+           hx-swap="innerHTML"
+           hx-confirm="Удалить задание #${job.id}? Повторить его будет нельзя."
+         >Удалить</button>`
       : '';
   return `
     <tr class="fiscal-job-row fiscal-job-${job.status}">
