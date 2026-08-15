@@ -5,6 +5,7 @@ import { renderStaffSection } from '../views/staffView.js';
 import { renderWarehouseSection } from '../views/warehouseView.js';
 import { renderMenuSection } from '../views/menuView.js';
 import { renderTablesSection } from '../views/tablesView.js';
+import { withTableDimensions } from '../tableSizes.js';
 import { renderVenuesSection } from '../views/venuesView.js';
 import { renderDevicesSection } from '../views/devicesView.js';
 import { renderReceiptsSection } from '../views/reportsView.js';
@@ -120,17 +121,18 @@ export async function renderFragmentHtml(key, c) {
     let selectedZone = null;
     let tableRows = [];
     if (selectedVenue) {
-      const { rows } = await pool.query('SELECT id, name FROM zones WHERE venue_id = $1 ORDER BY name', [
-        selectedVenue.id,
-      ]);
+      const { rows } = await pool.query(
+        'SELECT id, name, sort_order FROM zones WHERE venue_id = $1 ORDER BY sort_order ASC, id ASC',
+        [selectedVenue.id]
+      );
       zones = rows;
       selectedZone = zones[0] || null;
       if (selectedZone) {
         const { rows: tRows } = await pool.query(
-          'SELECT id, zone_id, name, capacity, pos_x, pos_y, status FROM tables WHERE zone_id = $1 ORDER BY id',
+          'SELECT id, zone_id, name, capacity, pos_x, pos_y, width, height, size, status FROM tables WHERE zone_id = $1 ORDER BY id',
           [selectedZone.id]
         );
-        tableRows = tRows;
+        tableRows = tRows.map(withTableDimensions);
       }
     }
     return renderTablesSection(

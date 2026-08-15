@@ -1,14 +1,13 @@
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +18,7 @@ import { fetchTables, fetchOpenOrders, fetchPaidReceipts } from '../api/client';
 import type { OpenOrderSummary, PaidReceiptSummary, Zone } from '../api/client';
 import PaidReceiptDetailModal from '../components/PaidReceiptDetailModal';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
+import { layoutSizeForTable, layoutTablesOnViewport, normalizeTableSize, snapToGrid } from '../utils/tableLayout';
 import type { RootStackParamList } from '../../App';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -43,7 +43,6 @@ export default function TablesScreen() {
   const venue = status?.venue ?? null;
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
   const [zones, setZones] = useState<Zone[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [openOrders, setOpenOrders] = useState<OpenOrderSummary[]>([]);
@@ -52,39 +51,63 @@ export default function TablesScreen() {
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [contentHeight, setContentHeight] = useState(0);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const hasLoadedRef = useRef(false);
 
-  const load = useCallback(async () => {
-    if (!session || !venue) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const [tablesData, ordersData, paidData] = await Promise.all([
-        fetchTables(venue.id, session.token),
-        fetchOpenOrders(venue.id, session.token),
-        fetchPaidReceipts(venue.id, session.token),
-      ]);
-      setZones(tablesData.zones);
-      setSelectedZoneId((prev) => prev ?? tablesData.zones[0]?.id ?? null);
-      setOpenOrders(ordersData.orders);
-      setPaidReceipts(paidData);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось загрузить столы');
-    } finally {
-      setLoading(false);
-    }
-  }, [session, venue]);
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!session || !venue) return;
+      const silent = opts?.silent === true;
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
+      try {
+        const [tablesData, ordersData, paidData] = await Promise.all([
+          fetchTables(venue.id, session.token),
+          fetchOpenOrders(venue.id, session.token),
+          fetchPaidReceipts(venue.id, session.token),
+        ]);
+        const nextZones = tablesData.zones.map((zone) => ({
+          ...zone,
+          tables: zone.tables.map((table) => {
+            const size = normalizeTableSize(table.size);
+            const dims = layoutSizeForTable({ ...table, size });
+            return {
+              ...table,
+              size,
+              width: dims.width,
+              height: dims.height,
+              posX: snapToGrid(table.posX),
+              posY: snapToGrid(table.posY),
+            };
+          }),
+        }));
+        setZones(nextZones);
+        setSelectedZoneId((prev) => {
+          if (prev != null && nextZones.some((z) => z.id === prev)) return prev;
+          return nextZones[0]?.id ?? null;
+        });
+        setOpenOrders(ordersData.orders);
+        setPaidReceipts(paidData);
+        hasLoadedRef.current = true;
+        if (silent) setError(null);
+      } catch (e) {
+        if (!silent) {
+          setError(e instanceof Error ? e.message : 'Не удалось загрузить столы');
+        }
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [session, venue]
+  );
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // Обновляем схему при возврате на экран (например, после закрытия заказа) —
-  // статусы столов и список открытых заказов могли поменяться
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', load);
-    return unsubscribe;
-  }, [navigation, load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load({ silent: hasLoadedRef.current });
+    }, [load])
+  );
 
   const goToPrevZone = useCallback(() => {
     setSelectedZoneId((prev) => {
@@ -104,8 +127,6 @@ export default function TablesScreen() {
     });
   }, [zones]);
 
-  // Зоны переехали в шапку — по умолчанию видна только одна, переключение
-  // стрелочками между "Music Community Terminal" слева и сотрудником справа
   useLayoutEffect(() => {
     const currentZone = zones.find((z) => z.id === selectedZoneId) ?? zones[0];
 
@@ -170,6 +191,10 @@ export default function TablesScreen() {
   }
 
   const selectedZone = zones.find((z) => z.id === selectedZoneId) ?? zones[0];
+  const layout =
+    selectedZone && selectedZone.tables.length > 0 && viewport.width > 0 && viewport.height > 0
+      ? layoutTablesOnViewport(selectedZone.tables, viewport.width, viewport.height)
+      : null;
 
   return (
     <ScreenSwipeHost screen="Tables">
@@ -189,7 +214,7 @@ export default function TablesScreen() {
         {error ? (
           <View style={styles.center}>
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retryButton} onPress={load}>
+            <Pressable style={styles.retryButton} onPress={() => void load()}>
               <Text style={styles.retryText}>Повторить</Text>
             </Pressable>
           </View>
@@ -198,55 +223,71 @@ export default function TablesScreen() {
             <Text style={styles.emptyText}>Зоны пока не заведены в бэкофисе</Text>
           </View>
         ) : (
-          <View style={{ flex: 1 }} onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>
+          <View style={[styles.floorArea, { marginBottom: Math.max(8, insets.bottom) }]}>
             {!selectedZone || selectedZone.tables.length === 0 ? (
               <View style={styles.center}>
                 <Text style={styles.emptyText}>В этой зоне пока нет столов</Text>
               </View>
             ) : (
-              (() => {
-                // Ширина — минимум по ширине левой рабочей области, высота — минимум по
-                // реально измеренному остатку пространства, чтобы зал не выглядел
-                // маленьким островком; если стол расставлен за пределами — работает скролл
-                const maxX = Math.max(...selectedZone.tables.map((t) => t.posX), 0) + 140;
-                const maxY = Math.max(...selectedZone.tables.map((t) => t.posY), 0) + 120;
-                const floorPlanWidth = Math.max(maxX, windowWidth * 0.6 - 32);
-                const floorPlanHeight = Math.max(maxY, contentHeight - 16);
-
-                return (
-                  <ScrollView
-                    contentContainerStyle={{ paddingBottom: 16 + insets.bottom }}
-                    horizontal
-                  >
-                    <ScrollView>
+              <View
+                style={styles.floorPlan}
+                onLayout={(e) => {
+                  const { width, height } = e.nativeEvent.layout;
+                  // layout уже без бордера — клетки заполняют видимую область целиком
+                  setViewport((prev) =>
+                    prev.width === width && prev.height === height ? prev : { width, height }
+                  );
+                }}
+              >
+                {layout ? (
+                  <>
+                    {Array.from({ length: 19 }, (_, i) => (
                       <View
-                        style={[styles.floorPlan, { width: floorPlanWidth, height: floorPlanHeight }]}
+                        key={`v-${i}`}
+                        pointerEvents="none"
+                        style={[
+                          styles.gridLineV,
+                          { left: Math.round((i + 1) * layout.cellW) },
+                        ]}
+                      />
+                    ))}
+                    {Array.from({ length: 11 }, (_, i) => (
+                      <View
+                        key={`h-${i}`}
+                        pointerEvents="none"
+                        style={[
+                          styles.gridLineH,
+                          { top: Math.round((i + 1) * layout.cellH) },
+                        ]}
+                      />
+                    ))}
+                    {layout.tables.map((table) => (
+                      <Pressable
+                        key={table.id}
+                        style={[
+                          styles.tableTile,
+                          {
+                            left: table.left,
+                            top: table.top,
+                            width: table.tileWidth,
+                            height: table.tileHeight,
+                            borderColor: STATUS_COLORS[table.status],
+                          },
+                        ]}
+                        onPress={() => handleTablePress(table.id, table.name)}
                       >
-                        {selectedZone.tables.map((table) => (
-                          <Pressable
-                            key={table.id}
-                            style={[
-                              styles.tableTile,
-                              {
-                                left: table.posX,
-                                top: table.posY,
-                                borderColor: STATUS_COLORS[table.status],
-                              },
-                            ]}
-                            onPress={() => handleTablePress(table.id, table.name)}
-                          >
-                            <Text style={styles.tileName}>{table.name}</Text>
-                            <Text style={styles.tileCapacity}>{table.capacity} мест</Text>
-                            <Text style={[styles.tileStatus, { color: STATUS_COLORS[table.status] }]}>
-                              {STATUS_LABELS[table.status] || table.status}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </ScrollView>
-                );
-              })()
+                        <Text style={styles.tileName} numberOfLines={2}>
+                          {table.name}
+                        </Text>
+                        <Text style={styles.tileCapacity}>{table.capacity} мест</Text>
+                        <Text style={[styles.tileStatus, { color: STATUS_COLORS[table.status] }]}>
+                          {STATUS_LABELS[table.status] || table.status}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </>
+                ) : null}
+              </View>
             )}
           </View>
         )}
@@ -353,26 +394,48 @@ const styles = StyleSheet.create({
   },
   quickOrderText: { color: '#f1f1f3', fontSize: 16, fontWeight: '700' },
 
+  floorArea: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+    marginTop: 12,
+    minHeight: 120,
+  },
   floorPlan: {
+    flex: 1,
     position: 'relative',
-    margin: 16,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
+    overflow: 'hidden',
+  },
+  gridLineV: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  gridLineH: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   tableTile: {
     position: 'absolute',
-    width: 92,
-    height: 72,
     borderRadius: 10,
     borderWidth: 2,
     backgroundColor: colors.surface2,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 1,
+    paddingHorizontal: 4,
+    overflow: 'hidden',
   },
-  tileName: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  tileName: { color: colors.text, fontSize: 13, fontWeight: '600', textAlign: 'center' },
   tileCapacity: { color: colors.textMuted, fontSize: 11 },
   tileStatus: { fontSize: 11, fontWeight: '500' },
 
@@ -382,7 +445,6 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.border,
     padding: 16,
   },
-  ordersPaneTitle: { color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 12 },
   ordersTabBar: {
     flexDirection: 'row',
     backgroundColor: colors.surface2,

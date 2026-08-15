@@ -40,9 +40,10 @@ CREATE INDEX IF NOT EXISTS idx_staff_venues_venue ON staff_venues(venue_id);
 
 -- Зоны заведения (зал, терраса и т.д.) — привязаны к конкретному заведению
 CREATE TABLE IF NOT EXISTS zones (
-  id        SERIAL PRIMARY KEY,
-  venue_id  INT REFERENCES venues(id) ON DELETE CASCADE,
-  name      VARCHAR(100) NOT NULL
+  id         SERIAL PRIMARY KEY,
+  venue_id   INT REFERENCES venues(id) ON DELETE CASCADE,
+  name       VARCHAR(100) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0
 );
 
 -- Столы
@@ -53,6 +54,9 @@ CREATE TABLE IF NOT EXISTS tables (
   capacity  INT DEFAULT 4,
   pos_x     INT DEFAULT 0,                  -- координаты под визуальную схему зала
   pos_y     INT DEFAULT 0,
+  width     INT NOT NULL DEFAULT 120,        -- px пресета (синхронизируется с size / сеткой)
+  height    INT NOT NULL DEFAULT 80,
+  size      VARCHAR(10) NOT NULL DEFAULT 'medium', -- small | medium | large
   status    VARCHAR(20) NOT NULL DEFAULT 'free' -- free, occupied, dirty
 );
 
@@ -365,6 +369,14 @@ CREATE INDEX IF NOT EXISTS idx_recipe_menu_item ON menu_item_recipe(menu_item_id
 -- ALTER здесь идемпотентны, безопасно перезапускать сколько угодно раз)
 -- ============================================================
 ALTER TABLE zones ADD COLUMN IF NOT EXISTS venue_id INT REFERENCES venues(id) ON DELETE CASCADE;
+ALTER TABLE zones ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 0;
+UPDATE zones z
+SET sort_order = sub.rn
+FROM (
+  SELECT id, (ROW_NUMBER() OVER (PARTITION BY venue_id ORDER BY sort_order, id) - 1) AS rn
+  FROM zones
+) sub
+WHERE z.id = sub.id;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS venue_id INT REFERENCES venues(id) ON DELETE SET NULL;
 ALTER TABLE warehouse_items DROP COLUMN IF EXISTS stock_qty;
 ALTER TABLE warehouse_items DROP COLUMN IF EXISTS min_stock_qty;
@@ -373,6 +385,23 @@ ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS icon VARCHAR(10);
 ALTER TABLE menu_categories ADD COLUMN IF NOT EXISTS parent_id INT REFERENCES menu_categories(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_menu_categories_parent ON menu_categories(parent_id);
 ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS width INT NOT NULL DEFAULT 120;
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS height INT NOT NULL DEFAULT 80;
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS size VARCHAR(10) NOT NULL DEFAULT 'medium';
+UPDATE tables
+SET size = CASE
+  WHEN width >= 160 OR height >= 120 THEN 'large'
+  WHEN width <= 80 OR height <= 80 THEN 'small'
+  ELSE 'medium'
+END
+WHERE size IS NULL OR size NOT IN ('small', 'medium', 'large');
+UPDATE tables SET width = 80, height = 80 WHERE size = 'small';
+UPDATE tables SET width = 120, height = 80 WHERE size = 'medium';
+UPDATE tables SET width = 160, height = 120 WHERE size = 'large';
+-- Привязка позиций к сетке 40px
+UPDATE tables SET pos_x = GREATEST(0, ROUND(pos_x::numeric / 40) * 40);
+UPDATE tables SET pos_y = GREATEST(0, ROUND(pos_y::numeric / 40) * 40);
+UPDATE tables SET pos_x = LEAST(pos_x, 800 - width), pos_y = LEAST(pos_y, 480 - height);
 ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'open';
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS shift_id INT REFERENCES shifts(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_receipts_shift ON receipts(shift_id);

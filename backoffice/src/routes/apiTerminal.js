@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
+import { withTableDimensions } from '../tableSizes.js';
 
 const apiTerminal = new Hono();
 // Заведения, назначенные вошедшему сотруднику — терминал спрашивает,
@@ -25,11 +26,11 @@ apiTerminal.get('/tables', requireStaffToken, async (c) => {
   }
 
   const { rows: zones } = await pool.query(
-    'SELECT id, name FROM zones WHERE venue_id = $1 ORDER BY name',
+    'SELECT id, name FROM zones WHERE venue_id = $1 ORDER BY sort_order ASC, id ASC',
     [venueId]
   );
   const { rows: tableRows } = await pool.query(
-    `SELECT t.id, t.zone_id, t.name, t.capacity, t.status, t.pos_x, t.pos_y
+    `SELECT t.id, t.zone_id, t.name, t.capacity, t.status, t.pos_x, t.pos_y, t.width, t.height, t.size
      FROM tables t
      JOIN zones z ON z.id = t.zone_id
      WHERE z.venue_id = $1
@@ -42,14 +43,20 @@ apiTerminal.get('/tables', requireStaffToken, async (c) => {
     name: zone.name,
     tables: tableRows
       .filter((t) => t.zone_id === zone.id)
-      .map((t) => ({
-        id: t.id,
-        name: t.name,
-        capacity: t.capacity,
-        status: t.status,
-        posX: t.pos_x,
-        posY: t.pos_y,
-      })),
+      .map((t) => {
+        const normalized = withTableDimensions(t);
+        return {
+          id: normalized.id,
+          name: normalized.name,
+          capacity: normalized.capacity,
+          status: normalized.status,
+          posX: normalized.pos_x,
+          posY: normalized.pos_y,
+          size: normalized.size,
+          width: normalized.width,
+          height: normalized.height,
+        };
+      }),
   }));
 
   return c.json({ zones: zonesWithTables });
