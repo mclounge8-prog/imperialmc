@@ -47,6 +47,12 @@ export const sections = {
     emptyText: 'Пока нет ни одного устройства',
     actionText: 'Сгенерировать код регистрации',
   },
+  updates: {
+    title: 'Обновления',
+    hint: 'APK и JS OTA для Android-терминалов',
+    emptyText: 'Обновления ещё не опубликованы',
+    actionText: 'Загрузить APK',
+  },
   reports: {
     title: 'Отчёты',
     hint: 'Чеки и статистика продаж',

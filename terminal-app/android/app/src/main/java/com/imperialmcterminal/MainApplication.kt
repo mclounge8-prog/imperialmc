@@ -7,18 +7,24 @@ import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.imperialmcterminal.atol.AtolPackage
+import com.imperialmcterminal.updates.UpdateModule
+import com.imperialmcterminal.updates.UpdatePackage
 
 class MainApplication : Application(), ReactApplication {
 
   override val reactHost: ReactHost by lazy {
+    // В debug всегда Metro. В release — OTA-бандл, если он есть и совместим с APK.
+    val otaBundle =
+      if (BuildConfig.DEBUG) null else UpdateModule.resolveJsBundlePath(applicationContext)
+
     getDefaultReactHost(
       context = applicationContext,
       packageList =
         PackageList(this).packages.apply {
-          // Packages that cannot be autolinked yet can be added manually here, for example:
-          // add(MyReactNativePackage())
           add(AtolPackage())
+          add(UpdatePackage())
         },
+      jsBundleFilePath = otaBundle,
     )
   }
 

@@ -19,6 +19,7 @@ import { FiscalAlertsProvider } from './src/context/FiscalAlertsContext';
 import { useFiscalSync } from './src/hooks/useFiscalSync';
 import AtolStatusScreen from './src/screens/AtolStatusScreen';
 import CashScreen from './src/screens/CashScreen';
+import AppUpdateGate from './src/components/AppUpdateGate';
 import { colors } from './src/theme/colors';
 
 export type RootStackParamList = {
@@ -132,6 +133,8 @@ export default function App() {
             <NavigationContainer>
               <RootNavigator />
             </NavigationContainer>
+            {/* Проверка APK / JS OTA при каждом запуске */}
+            <AppUpdateGate autoCheck />
           </FiscalAlertsProvider>
         </SessionProvider>
       </DeviceProvider>

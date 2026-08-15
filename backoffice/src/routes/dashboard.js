@@ -8,6 +8,7 @@ import { renderTablesSection } from '../views/tablesView.js';
 import { withTableDimensions } from '../tableSizes.js';
 import { renderVenuesSection } from '../views/venuesView.js';
 import { renderDevicesSection } from '../views/devicesView.js';
+import { renderUpdatesSection } from '../views/updatesView.js';
 import { renderReceiptsSection } from '../views/reportsView.js';
 import { fetchReceiptsPage, defaultDateRange, PAGE_SIZE } from './reports.js';
 import { renderDashboardFragment } from './stats.js';
@@ -15,6 +16,7 @@ import { renderModifiersFragment } from './modifiers.js';
 import { fetchAllVenues } from '../utils/venues.js';
 import { readSelectedVenueId, resolveSelectedVenue, writeLastSection } from '../utils/preferences.js';
 import { pool } from '../db.js';
+import { manifestForClient, publicBaseUrl, readManifest } from '../services/terminalUpdates.js';
 
 /**
  * Рендер HTML для конкретного раздела дэшборда по ключу.
@@ -150,6 +152,11 @@ export async function renderFragmentHtml(key, c) {
     );
     const { rows: venueRows } = await pool.query('SELECT id, name FROM venues ORDER BY name');
     return renderDevicesSection(deviceRows, venueRows);
+  }
+
+  if (key === 'updates') {
+    const manifest = await readManifest();
+    return renderUpdatesSection(manifest, manifestForClient(manifest, publicBaseUrl(c)));
   }
 
   if (key === 'reports') {

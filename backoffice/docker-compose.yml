@@ -24,6 +24,8 @@ services:
       - "3000"
     volumes:
       - menu_uploads:/app/public/uploads
+      # APK и JS OTA манифест/файлы — переживают пересборку контейнера
+      - terminal_updates:/app/public/updates
 
   postgres:
     image: postgres:16-alpine
@@ -48,3 +50,4 @@ volumes:
   caddy_data:
   caddy_config:
   menu_uploads:
+  terminal_updates:

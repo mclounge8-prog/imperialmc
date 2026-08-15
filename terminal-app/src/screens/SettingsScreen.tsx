@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import ShiftToggle from '../components/ShiftToggle';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
+import UpdateCheckRow from '../components/UpdateCheckRow';
 import type { RootStackParamList } from '../../App';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -61,6 +62,9 @@ export default function SettingsScreen() {
             <Text style={styles.rowChevron}>›</Text>
           </Pressable>
         </View>
+
+        <Text style={styles.sectionLabel}>Приложение</Text>
+        <UpdateCheckRow />
       </ScrollView>
     </ScreenSwipeHost>
   );
