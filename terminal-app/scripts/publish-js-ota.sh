@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
-# Собрать JS OTA и сразу опубликовать на сервер (без браузера).
-#
-# Использование:
-#   export SSHPASS='пароль-сервера'   # если нет SSH-ключа
-#   ./scripts/publish-js-ota.sh 1
-#   ./scripts/publish-js-ota.sh 1 "Убрали свайпы" 1
-#   ./scripts/publish-js-ota.sh 1 "" 1 --skip-build
+# Собрать JS OTA и опубликовать на сервер.
+# Пароль: terminal-app/.env.deploy → SSHPASS=...
 set -euo pipefail
+
+echo "==> publish-js-ota.sh стартовал"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-JS_VERSION="${1:?Укажите JS version, например: ./scripts/publish-js-ota.sh 1}"
+if [[ -f "$ROOT/.env.deploy" ]]; then
+  echo "==> Читаю .env.deploy"
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/.env.deploy"
+  set +a
+fi
+
+JS_VERSION="${1:?Укажите JS version: ./scripts/publish-js-ota.sh 1}"
 NOTES="${2:-}"
 MIN_APK="${3:-}"
 SKIP_BUILD=0
-if [[ "${4:-}" == "--skip-build" ]] || [[ "${3:-}" == "--skip-build" ]]; then
+if [[ "${4:-}" == "--skip-build" || "${3:-}" == "--skip-build" ]]; then
   SKIP_BUILD=1
   if [[ "${3:-}" == "--skip-build" ]]; then
     MIN_APK=""
@@ -26,24 +31,20 @@ DEPLOY_HOST="${TERMINAL_DEPLOY_HOST:-root@176.57.218.9}"
 APP_CONTAINER="${TERMINAL_APP_CONTAINER:-imperial-mc-backoffice-app-1}"
 REMOTE_TMP="/tmp/imperial-terminal-js-$$.zip"
 
-ssh_cmd() {
-  if [[ -n "${SSHPASS:-}" ]] && command -v sshpass >/dev/null 2>&1; then
-    sshpass -e ssh -o StrictHostKeyChecking=no "$@"
-  else
-    ssh -o StrictHostKeyChecking=no "$@"
-  fi
-}
+if [[ -z "${SSHPASS:-}" ]]; then
+  echo "Нет SSHPASS. Создайте $ROOT/.env.deploy с строкой SSHPASS=пароль" >&2
+  exit 1
+fi
+if ! command -v sshpass >/dev/null 2>&1; then
+  echo "Не найден sshpass. Установите: brew install hudochenkov/sshpass/sshpass" >&2
+  exit 1
+fi
 
-scp_cmd() {
-  if [[ -n "${SSHPASS:-}" ]] && command -v sshpass >/dev/null 2>&1; then
-    sshpass -e scp -o StrictHostKeyChecking=no "$@"
-  else
-    scp -o StrictHostKeyChecking=no "$@"
-  fi
-}
+ssh_cmd() { sshpass -e ssh -o StrictHostKeyChecking=no "$@"; }
+scp_cmd() { sshpass -e scp -o StrictHostKeyChecking=no "$@"; }
 
 if [[ "$SKIP_BUILD" -eq 0 ]]; then
-  echo "==> Сборка JS OTA…"
+  echo "==> Сборка JS OTA v${JS_VERSION}…"
   "$ROOT/scripts/build-js-ota.sh" "$JS_VERSION"
 fi
 
@@ -53,13 +54,12 @@ if [[ ! -f "$ZIP" ]]; then
   exit 1
 fi
 
-# Если min APK не задан — возьмём текущий versionCode из gradle
 if [[ -z "$MIN_APK" ]]; then
   MIN_APK="$(grep -oE 'versionCode [0-9]+' android/app/build.gradle | head -1 | awk '{print $2}')"
 fi
 
 REMOTE_NAME="js-ota-v${JS_VERSION}-$(date +%s).zip"
-echo "==> Загрузка $(basename "$ZIP") → ${DEPLOY_HOST} (${REMOTE_NAME})"
+echo "==> SCP → ${DEPLOY_HOST}"
 scp_cmd "$ZIP" "${DEPLOY_HOST}:${REMOTE_TMP}"
 
 ssh_cmd "$DEPLOY_HOST" bash -s <<EOF
@@ -89,6 +89,7 @@ console.log("Published JS OTA", JSON.stringify(manifest.js));
 '
 EOF
 
+echo "==> Проверка API…"
+curl -sS "https://imperial-mc.online/api/terminal/updates"
 echo ""
-echo "Готово. Проверка: curl -s https://imperial-mc.online/api/terminal/updates"
-echo "На планшете: Настройки → Обновления (или перезапуск)."
+echo "Готово."
