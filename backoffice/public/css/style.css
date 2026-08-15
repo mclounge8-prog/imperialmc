@@ -1833,6 +1833,32 @@ input[type="radio"] {
   color: var(--text-muted);
 }
 
+/* Раздел «Обновления» терминала */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.stack-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 420px;
+}
+
+.stack-form button.danger,
+button.danger {
+  background: transparent;
+  color: #c44;
+  border: 1px solid #c44;
+}
+
 @media (max-width: 960px) {
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr);

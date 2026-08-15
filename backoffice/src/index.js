@@ -18,6 +18,8 @@ import apiDevicesRoutes from './routes/apiDevices.js';
 import apiShiftsRoutes from './routes/apiShifts.js';
 import apiReceiptsRoutes from './routes/apiReceipts.js';
 import apiFiscalRoutes from './routes/apiFiscal.js';
+import apiTerminalUpdatesRoutes from './routes/apiTerminalUpdates.js';
+import terminalUpdatesRoutes from './routes/terminalUpdates.js';
 import reportsRoutes from './routes/reports.js';
 import statsRoutes from './routes/stats.js';
 import modifiersRoutes from './routes/modifiers.js';
@@ -28,6 +30,7 @@ import { sections } from './views/sections.js';
 import { fetchAllVenues } from './utils/venues.js';
 import { readLastSection, readSelectedVenueId, resolveSelectedVenue } from './utils/preferences.js';
 import { startFiscalJobsCleanup } from './services/fiscalCleanup.js';
+import { ensureUpdatesDir } from './services/terminalUpdates.js';
 
 const app = new Hono();
 
@@ -40,6 +43,7 @@ app.route('/menu', menuRoutes); // CRUD меню (категории + пози�
 app.route('/tables', tablesRoutes); // CRUD столов (зоны + визуальная схема зала)
 app.route('/venues', venuesRoutes); // CRUD заведений + назначение сотрудников
 app.route('/devices', devicesRoutes); // CRUD устройств: регистрация, заведение, активация
+app.route('/terminal-updates', terminalUpdatesRoutes); // загрузка APK / JS OTA
 app.route('/api/staff', apiStaffAuthRoutes); // JSON API для Android-терминала: вход по PIN
 app.route('/api', apiTerminalRoutes); // JSON API для Android-терминала: /api/tables, /api/menu
 app.route('/api', apiOrdersRoutes); // JSON API заказов: открытие/позиции/оплата/закрытие
@@ -47,6 +51,7 @@ app.route('/api/devices', apiDevicesRoutes); // JSON API устройств: р�
 app.route('/api/shifts', apiShiftsRoutes); // JSON API смен: открытие/закрытие, X-отчёт, чеки смены
 app.route('/api/receipts', apiReceiptsRoutes); // JSON API чеков: список оплаченных за сегодня + состав конкретного
 app.route('/api/fiscal', apiFiscalRoutes); // JSON API фискализации АТОЛ — очередь заданий, разбирает сам terminal-app
+app.route('/api', apiTerminalUpdatesRoutes); // манифест обновлений терминала
 app.route('/reports', reportsRoutes); // Отчёты: чеки с фильтрами по заведению/датам
 app.route('/stats', statsRoutes); // Главный экран: сводная статистика продаж (графики)
 app.route('/preferences', preferencesRoutes); // Общий выбор заведения в шапке (cookie)
@@ -85,14 +90,22 @@ app.use('/uploads/*', async (c, next) => {
   c.header('Cache-Control', 'public, max-age=31536000, immutable');
 });
 
+// Манифест и APK/JS-бандлы обновлений — без агрессивного кеша, иначе планшет
+// может долго видеть старую версию после публикации.
+app.use('/updates/*', async (c, next) => {
+  await next();
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+});
+
 // Статика (login.html, css, вендорные htmx/alpine) — после явных роутов,
 // чтобы /dashboard и /fragments/* не перехватывались как файлы
 app.use('/*', serveStatic({ root: './public' }));
 
 const port = Number(process.env.PORT || 3000);
 
-serve({ fetch: app.fetch, port }, (info) => {
+serve({ fetch: app.fetch, port }, async (info) => {
   console.log(`Бэкофис запущен: http://localhost:${info.port}`);
+  await ensureUpdatesDir();
   // Раз в час чистим старые done/error задания — журнал не раздувается.
   startFiscalJobsCleanup();
 });
