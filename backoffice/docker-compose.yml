@@ -51,3 +51,13 @@ volumes:
   caddy_config:
   menu_uploads:
   terminal_updates:
+
+# Telegram API на этом хосте доступен только по IPv6; без IPv6 в bridge
+# контейнер app получает fetch failed при sendMessage.
+networks:
+  default:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+        - subnet: fd00:dead:beef:2::/64

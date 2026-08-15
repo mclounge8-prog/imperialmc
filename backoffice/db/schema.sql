@@ -565,3 +565,18 @@ ALTER TABLE receipts ADD COLUMN IF NOT EXISTS precheck_was_printed BOOLEAN NOT N
 CREATE INDEX IF NOT EXISTS idx_receipts_cancelled_precheck
   ON receipts(venue_id, closed_at DESC)
   WHERE status = 'cancelled' AND precheck_was_printed = true;
+
+-- ============================================================
+-- Telegram-уведомления (один глобальный бот на бэкофис).
+-- Токен/chat_id можно задать здесь или через TELEGRAM_* в .env.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS telegram_settings (
+  id         INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  enabled    BOOLEAN NOT NULL DEFAULT false,
+  bot_token  TEXT,
+  chat_id    TEXT,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+INSERT INTO telegram_settings (id, enabled) VALUES (1, false)
+ON CONFLICT (id) DO NOTHING;

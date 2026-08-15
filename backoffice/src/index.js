@@ -20,6 +20,7 @@ import apiReceiptsRoutes from './routes/apiReceipts.js';
 import apiFiscalRoutes from './routes/apiFiscal.js';
 import apiTerminalUpdatesRoutes from './routes/apiTerminalUpdates.js';
 import terminalUpdatesRoutes from './routes/terminalUpdates.js';
+import telegramRoutes from './routes/telegram.js';
 import reportsRoutes from './routes/reports.js';
 import statsRoutes from './routes/stats.js';
 import modifiersRoutes from './routes/modifiers.js';
@@ -31,6 +32,7 @@ import { fetchAllVenues } from './utils/venues.js';
 import { readLastSection, readSelectedVenueId, resolveSelectedVenue } from './utils/preferences.js';
 import { startFiscalJobsCleanup } from './services/fiscalCleanup.js';
 import { ensureUpdatesDir } from './services/terminalUpdates.js';
+import { ensureTelegramSettingsRow } from './services/telegramNotify.js';
 
 const app = new Hono();
 
@@ -44,6 +46,7 @@ app.route('/tables', tablesRoutes); // CRUD столов (зоны + визуа�
 app.route('/venues', venuesRoutes); // CRUD заведений + назначение сотрудников
 app.route('/devices', devicesRoutes); // CRUD устройств: регистрация, заведение, активация
 app.route('/terminal-updates', terminalUpdatesRoutes); // загрузка APK / JS OTA
+app.route('/telegram', telegramRoutes); // настройки Telegram-бота
 app.route('/api/staff', apiStaffAuthRoutes); // JSON API для Android-терминала: вход по PIN
 app.route('/api', apiTerminalRoutes); // JSON API для Android-терминала: /api/tables, /api/menu
 app.route('/api', apiOrdersRoutes); // JSON API заказов: открытие/позиции/оплата/закрытие
@@ -106,6 +109,7 @@ const port = Number(process.env.PORT || 3000);
 serve({ fetch: app.fetch, port }, async (info) => {
   console.log(`Бэкофис запущен: http://localhost:${info.port}`);
   await ensureUpdatesDir();
+  await ensureTelegramSettingsRow();
   // Раз в час чистим старые done/error задания — журнал не раздувается.
   startFiscalJobsCleanup();
 });
