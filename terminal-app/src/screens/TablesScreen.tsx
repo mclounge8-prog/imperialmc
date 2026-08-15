@@ -18,6 +18,7 @@ import { useDevice } from '../context/DeviceContext';
 import { fetchTables, fetchOpenOrders, fetchPaidReceipts } from '../api/client';
 import type { OpenOrderSummary, PaidReceiptSummary, Zone } from '../api/client';
 import PaidReceiptDetailModal from '../components/PaidReceiptDetailModal';
+import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import type { RootStackParamList } from '../../App';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -160,15 +161,18 @@ export default function TablesScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent2} size="large" />
-      </View>
+      <ScreenSwipeHost screen="Tables">
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.accent2} size="large" />
+        </View>
+      </ScreenSwipeHost>
     );
   }
 
   const selectedZone = zones.find((z) => z.id === selectedZoneId) ?? zones[0];
 
   return (
+    <ScreenSwipeHost screen="Tables">
     <View style={styles.container}>
       <View style={styles.leftPane}>
         <Pressable style={styles.quickOrderWrapper} onPress={handleQuickOrder}>
@@ -317,6 +321,7 @@ export default function TablesScreen() {
         onClose={() => setSelectedReceiptId(null)}
       />
     </View>
+    </ScreenSwipeHost>
   );
 }
 
