@@ -233,7 +233,7 @@ venues.get('/:id/atol/jobs', async (c) => {
 venues.post('/:id/atol/jobs/:jobId/retry', async (c) => {
   const { id: venueId, jobId } = c.req.param();
   await pool.query(
-    "UPDATE fiscal_jobs SET status = 'pending', last_error = NULL WHERE id = $1 AND venue_id = $2 AND status = 'error'",
+    "UPDATE fiscal_jobs SET status = 'pending', last_error = NULL, updated_at = now() WHERE id = $1 AND venue_id = $2 AND status IN ('error', 'in_progress')",
     [jobId, venueId]
   );
 
