@@ -8,11 +8,20 @@ cd "$ROOT"
 VERSION_CODE="${1:-}"
 VERSION_NAME="${2:-}"
 
+# macOS sed требует sed -i '', Linux — sed -i
+sed_inplace() {
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
+}
+
 if [[ -n "$VERSION_CODE" ]]; then
-  sed -i "s/versionCode [0-9]\\+/versionCode ${VERSION_CODE}/" android/app/build.gradle
+  sed_inplace "s/versionCode [0-9][0-9]*/versionCode ${VERSION_CODE}/" android/app/build.gradle
 fi
 if [[ -n "$VERSION_NAME" ]]; then
-  sed -i "s/versionName \"[^\"]*\"/versionName \"${VERSION_NAME}\"/" android/app/build.gradle
+  sed_inplace "s/versionName \"[^\"]*\"/versionName \"${VERSION_NAME}\"/" android/app/build.gradle
 fi
 
 echo "==> Bundling + assembling release APK…"
