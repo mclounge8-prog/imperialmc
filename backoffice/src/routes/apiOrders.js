@@ -1,9 +1,29 @@
 import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
-import { enqueueReceiptFiscalJob } from '../services/fiscalQueue.js';
+import { enqueuePrecheckFiscalJob, enqueueReceiptFiscalJob } from '../services/fiscalQueue.js';
 
 const apiOrders = new Hono();
+
+async function fetchGuestPrecheckState(clientOrPool, guestId) {
+  const { rows } = await clientOrPool.query(
+    'SELECT precheck_printed_at FROM order_guests WHERE id = $1',
+    [guestId]
+  );
+  return rows[0]?.precheck_printed_at || null;
+}
+
+async function assertGuestEditable(clientOrPool, guestId) {
+  const printedAt = await fetchGuestPrecheckState(clientOrPool, guestId);
+  if (printedAt) {
+    const err = new Error(
+      'Пречек уже напечатан — состав менять нельзя. Отмените чек с комментарием или проведите оплату.'
+    );
+    err.status = 409;
+    err.code = 'PRECHECK_LOCKED';
+    throw err;
+  }
+}
 
 // Список всех открытых заказов заведения (столы + быстрые) — чтобы можно было
 // вернуться в ранее открытый быстрый заказ, а не только в занятые столы
@@ -40,9 +60,11 @@ apiOrders.get('/orders/open', requireStaffToken, async (c) => {
 
 async function fetchOrderDetail(orderId) {
   const { rows: orderRows } = await pool.query(
-    `SELECT o.id, o.status, o.table_id, o.venue_id, t.name AS table_name
+    `SELECT o.id, o.status, o.table_id, o.venue_id, t.name AS table_name,
+            COALESCE(v.precheck_enabled, false) AS precheck_enabled
      FROM orders o
      LEFT JOIN tables t ON t.id = o.table_id
+     LEFT JOIN venues v ON v.id = o.venue_id
      WHERE o.id = $1`,
     [orderId]
   );
@@ -52,7 +74,10 @@ async function fetchOrderDetail(orderId) {
   // Только открытые гости — оплаченный/закрытый гость пропадает из активного
   // списка на терминале, его чек уже рассчитан и к нему нечего добавлять
   const { rows: guestRows } = await pool.query(
-    "SELECT id, label FROM order_guests WHERE order_id = $1 AND status = 'open' ORDER BY id",
+    `SELECT id, label, precheck_printed_at, precheck_printed_by_name
+     FROM order_guests
+     WHERE order_id = $1 AND status = 'open'
+     ORDER BY id`,
     [orderId]
   );
 
@@ -102,6 +127,10 @@ async function fetchOrderDetail(orderId) {
       label: g.label,
       items: guestItems.map(({ guestId, ...rest }) => rest),
       total: guestTotal,
+      precheckPrintedAt: g.precheck_printed_at
+        ? new Date(g.precheck_printed_at).toISOString()
+        : null,
+      precheckPrintedByName: g.precheck_printed_by_name || null,
     };
   });
 
@@ -110,6 +139,8 @@ async function fetchOrderDetail(orderId) {
   return {
     id: order.id,
     status: order.status,
+    venueId: order.venue_id,
+    precheckEnabled: !!order.precheck_enabled,
     table: order.table_id ? { id: order.table_id, name: order.table_name } : null,
     guests,
     total,
@@ -247,10 +278,14 @@ const PAYMENT_METHODS = ['cash', 'card', 'other'];
 
 async function fetchGuestForSettlement(orderId, guestId, client) {
   const { rows } = await client.query(
-    `SELECT og.id, og.label, og.order_id, o.venue_id, o.table_id, o.opened_at, t.name AS table_name
+    `SELECT og.id, og.label, og.order_id, og.precheck_printed_at,
+            o.venue_id, o.table_id, o.opened_at, t.name AS table_name,
+            COALESCE(v.precheck_enabled, false) AS precheck_enabled,
+            v.name AS venue_name
      FROM order_guests og
      JOIN orders o ON o.id = og.order_id
      LEFT JOIN tables t ON t.id = o.table_id
+     LEFT JOIN venues v ON v.id = o.venue_id
      WHERE og.id = $1 AND og.order_id = $2 AND og.status = 'open'
      FOR UPDATE OF og`,
     [guestId, orderId]
@@ -298,7 +333,7 @@ async function requireOpenShiftId(client, venueId) {
   return shiftId;
 }
 
-async function createReceipt(client, { guest, staff, status, items, payments }) {
+async function createReceipt(client, { guest, staff, status, items, payments, cancelComment = null }) {
   const subtotal = items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
   // Чек на 0 ₽ можно закрыть без открытой смены (пустой стол / ошибочно открытый).
   const shiftId =
@@ -306,11 +341,14 @@ async function createReceipt(client, { guest, staff, status, items, payments }) 
       ? await requireOpenShiftId(client, guest.venue_id)
       : await fetchOpenShiftId(client, guest.venue_id);
 
+  const precheckWasPrinted = !!guest.precheck_printed_at;
+
   const { rows: receiptRows } = await client.query(
     `INSERT INTO receipts
        (venue_id, order_id, guest_id, table_id, table_name, guest_label,
-        staff_id, staff_name, status, subtotal, discount, total, opened_at, closed_at, shift_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $10, $11, now(), $12)
+        staff_id, staff_name, status, subtotal, discount, total, opened_at, closed_at, shift_id,
+        cancel_comment, precheck_was_printed)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $10, $11, now(), $12, $13, $14)
      RETURNING id`,
     [
       guest.venue_id,
@@ -325,6 +363,8 @@ async function createReceipt(client, { guest, staff, status, items, payments }) 
       subtotal,
       guest.opened_at,
       shiftId,
+      status === 'cancelled' ? cancelComment : null,
+      precheckWasPrinted,
     ]
   );
   const receiptId = receiptRows[0].id;
@@ -415,8 +455,18 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       return c.json({ error: 'Гость не найден или уже закрыт' });
     }
 
+    // В режиме пречека оплату разрешаем только после печати пречека (кроме 0 ₽).
     const items = await fetchGuestItemsSnapshot(guestId, client);
     const subtotal = items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
+    if (guest.precheck_enabled && subtotal > 0.009 && !guest.precheck_printed_at) {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({
+        error: 'Сначала напечатайте пречек, затем проводите оплату',
+        code: 'PRECHECK_REQUIRED',
+      });
+    }
+
     const paymentsTotal = payments.reduce((sum, p) => sum + p.amount, 0);
 
     if (Math.abs(paymentsTotal - subtotal) > 0.01) {
@@ -433,7 +483,7 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
-    if (err && err.code === 'SHIFT_REQUIRED') {
+    if (err && (err.code === 'SHIFT_REQUIRED' || err.code === 'PRECHECK_LOCKED')) {
       c.status(err.status || 409);
       return c.json({ error: err.message, code: err.code });
     }
@@ -451,9 +501,13 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
 // Закрыть чек гостя без оплаты (ушёл не заплатив/ошибка) — тоже создаёт запись
 // в receipts (со статусом cancelled, без оплаты), чтобы такие случаи были видны
 // в отчётах, а не просто исчезали бесследно. Не трогает остальных гостей заказа.
+// После пречека комментарий обязателен.
 apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, async (c) => {
   const { orderId, guestId } = c.req.param();
   const staff = c.get('staff');
+  const body = await c.req.json().catch(() => null);
+  const cancelComment =
+    body && typeof body.comment === 'string' ? body.comment.trim() : '';
 
   const client = await pool.connect();
   try {
@@ -466,14 +520,30 @@ apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, asy
       return c.json({ error: 'Гость не найден или уже закрыт' });
     }
 
+    if (guest.precheck_printed_at && cancelComment.length < 3) {
+      await client.query('ROLLBACK');
+      c.status(400);
+      return c.json({
+        error: 'Укажите комментарий к отмене (после пречека это обязательно)',
+        code: 'CANCEL_COMMENT_REQUIRED',
+      });
+    }
+
     const items = await fetchGuestItemsSnapshot(guestId, client);
-    await createReceipt(client, { guest, staff, status: 'cancelled', items, payments: [] });
+    await createReceipt(client, {
+      guest,
+      staff,
+      status: 'cancelled',
+      items,
+      payments: [],
+      cancelComment: cancelComment || null,
+    });
     await client.query("UPDATE order_guests SET status = 'cancelled' WHERE id = $1", [guestId]);
 
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
-    if (err && err.code === 'SHIFT_REQUIRED') {
+    if (err && (err.code === 'SHIFT_REQUIRED' || err.code === 'PRECHECK_LOCKED')) {
       c.status(err.status || 409);
       return c.json({ error: err.message, code: err.code });
     }
@@ -486,6 +556,72 @@ apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, asy
 
   const order = await fetchOrderDetail(orderId);
   return c.json({ order });
+});
+
+// Печать пречека (нефискальный документ) + фиксация состава чека.
+apiOrders.post('/orders/:orderId/guests/:guestId/precheck', requireStaffToken, async (c) => {
+  const { orderId, guestId } = c.req.param();
+  const staff = c.get('staff');
+
+  const client = await pool.connect();
+  let jobId = null;
+  try {
+    await client.query('BEGIN');
+
+    const guest = await fetchGuestForSettlement(orderId, guestId, client);
+    if (!guest) {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({ error: 'Гость не найден или уже закрыт' });
+    }
+    if (!guest.precheck_enabled) {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({ error: 'Режим пречека выключен для этого заведения', code: 'PRECHECK_DISABLED' });
+    }
+    if (guest.precheck_printed_at) {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({ error: 'Пречек уже напечатан', code: 'PRECHECK_ALREADY' });
+    }
+
+    const items = await fetchGuestItemsSnapshot(guestId, client);
+    const subtotal = items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
+    if (subtotal <= 0.009) {
+      await client.query('ROLLBACK');
+      c.status(400);
+      return c.json({ error: 'Нельзя напечатать пречек на пустой чек' });
+    }
+
+    await client.query(
+      `UPDATE order_guests
+       SET precheck_printed_at = now(),
+           precheck_printed_by = $2,
+           precheck_printed_by_name = $3
+       WHERE id = $1`,
+      [guestId, staff.sub, staff.name]
+    );
+
+    jobId = await enqueuePrecheckFiscalJob(client, {
+      venueId: guest.venue_id,
+      items,
+      total: subtotal,
+      tableName: guest.table_name,
+      guestLabel: guest.label,
+      operatorName: staff.name,
+      venueName: guest.venue_name,
+    });
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const order = await fetchOrderDetail(orderId);
+  return c.json({ order, fiscalJobId: jobId });
 });
 
 // ---------- Модификаторы позиции заказа: расчёт цены, ограничения групп,
@@ -601,6 +737,8 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
     }
     const venueId = orderRows[0].venue_id;
 
+    await assertGuestEditable(client, guestId);
+
     const { rows: menuRows } = await client.query(
       'SELECT id, name, price FROM menu_items WHERE id = $1 AND is_active = true',
       [menuItemId]
@@ -698,6 +836,10 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
+    if (err && err.code === 'PRECHECK_LOCKED') {
+      c.status(err.status || 409);
+      return c.json({ error: err.message, code: err.code });
+    }
     throw err;
   } finally {
     client.release();
@@ -719,39 +861,50 @@ apiOrders.put('/orders/:orderId/items/:itemId/guest', requireStaffToken, async (
     return c.json({ error: 'Не указан гость' });
   }
 
-  const { rows: itemRows } = await pool.query(
-    'SELECT id, menu_item_id, qty FROM order_items WHERE id = $1 AND order_id = $2',
-    [itemId, orderId]
-  );
-  const item = itemRows[0];
-  if (!item) {
-    c.status(404);
-    return c.json({ error: 'Позиция не найдена' });
-  }
-
-  if (item.menu_item_id) {
-    const itemModifierIds = await fetchOrderItemModifierIds(pool, item.id);
-    const { rows: existing } = await pool.query(
-      'SELECT id, qty FROM order_items WHERE order_id = $1 AND guest_id = $2 AND menu_item_id = $3 AND id != $4',
-      [orderId, targetGuestId, item.menu_item_id, itemId]
+  try {
+    const { rows: itemRows } = await pool.query(
+      'SELECT id, menu_item_id, qty, guest_id FROM order_items WHERE id = $1 AND order_id = $2',
+      [itemId, orderId]
     );
-    let matched = null;
-    for (const candidate of existing) {
-      // eslint-disable-next-line no-await-in-loop
-      const candidateModifierIds = await fetchOrderItemModifierIds(pool, candidate.id);
-      if (sameModifierSet(candidateModifierIds, itemModifierIds)) {
-        matched = candidate;
-        break;
-      }
+    const item = itemRows[0];
+    if (!item) {
+      c.status(404);
+      return c.json({ error: 'Позиция не найдена' });
     }
-    if (matched) {
-      await pool.query('UPDATE order_items SET qty = qty + $1 WHERE id = $2', [item.qty, matched.id]);
-      await pool.query('DELETE FROM order_items WHERE id = $1', [itemId]);
+
+    await assertGuestEditable(pool, item.guest_id);
+    await assertGuestEditable(pool, targetGuestId);
+
+    if (item.menu_item_id) {
+      const itemModifierIds = await fetchOrderItemModifierIds(pool, item.id);
+      const { rows: existing } = await pool.query(
+        'SELECT id, qty FROM order_items WHERE order_id = $1 AND guest_id = $2 AND menu_item_id = $3 AND id != $4',
+        [orderId, targetGuestId, item.menu_item_id, itemId]
+      );
+      let matched = null;
+      for (const candidate of existing) {
+        // eslint-disable-next-line no-await-in-loop
+        const candidateModifierIds = await fetchOrderItemModifierIds(pool, candidate.id);
+        if (sameModifierSet(candidateModifierIds, itemModifierIds)) {
+          matched = candidate;
+          break;
+        }
+      }
+      if (matched) {
+        await pool.query('UPDATE order_items SET qty = qty + $1 WHERE id = $2', [item.qty, matched.id]);
+        await pool.query('DELETE FROM order_items WHERE id = $1', [itemId]);
+      } else {
+        await pool.query('UPDATE order_items SET guest_id = $1 WHERE id = $2', [targetGuestId, itemId]);
+      }
     } else {
       await pool.query('UPDATE order_items SET guest_id = $1 WHERE id = $2', [targetGuestId, itemId]);
     }
-  } else {
-    await pool.query('UPDATE order_items SET guest_id = $1 WHERE id = $2', [targetGuestId, itemId]);
+  } catch (err) {
+    if (err && err.code === 'PRECHECK_LOCKED') {
+      c.status(err.status || 409);
+      return c.json({ error: err.message, code: err.code });
+    }
+    throw err;
   }
 
   const order = await fetchOrderDetail(orderId);
@@ -772,7 +925,7 @@ apiOrders.delete('/orders/:orderId/items/:itemId', requireStaffToken, async (c) 
     const venueId = orderRows[0] ? orderRows[0].venue_id : null;
 
     const { rows: itemRows } = await client.query(
-      'SELECT id, menu_item_id, qty FROM order_items WHERE id = $1 AND order_id = $2 FOR UPDATE',
+      'SELECT id, menu_item_id, qty, guest_id FROM order_items WHERE id = $1 AND order_id = $2 FOR UPDATE',
       [itemId, orderId]
     );
     const item = itemRows[0];
@@ -781,6 +934,8 @@ apiOrders.delete('/orders/:orderId/items/:itemId', requireStaffToken, async (c) 
       c.status(404);
       return c.json({ error: 'Позиция не найдена в заказе' });
     }
+
+    await assertGuestEditable(client, item.guest_id);
 
     if (item.menu_item_id && venueId) {
       const modifierSnapshots = await fetchOrderItemModifierSnapshots(client, item.id);
@@ -796,6 +951,10 @@ apiOrders.delete('/orders/:orderId/items/:itemId', requireStaffToken, async (c) 
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
+    if (err && err.code === 'PRECHECK_LOCKED') {
+      c.status(err.status || 409);
+      return c.json({ error: err.message, code: err.code });
+    }
     throw err;
   } finally {
     client.release();
@@ -820,7 +979,7 @@ apiOrders.delete('/orders/:orderId/items/:itemId/full', requireStaffToken, async
     const venueId = orderRows[0] ? orderRows[0].venue_id : null;
 
     const { rows: itemRows } = await client.query(
-      'SELECT id, menu_item_id, qty FROM order_items WHERE id = $1 AND order_id = $2 FOR UPDATE',
+      'SELECT id, menu_item_id, qty, guest_id FROM order_items WHERE id = $1 AND order_id = $2 FOR UPDATE',
       [itemId, orderId]
     );
     const item = itemRows[0];
@@ -829,6 +988,8 @@ apiOrders.delete('/orders/:orderId/items/:itemId/full', requireStaffToken, async
       c.status(404);
       return c.json({ error: 'Позиция не найдена в заказе' });
     }
+
+    await assertGuestEditable(client, item.guest_id);
 
     if (item.menu_item_id && venueId) {
       const modifierSnapshots = await fetchOrderItemModifierSnapshots(client, item.id);
@@ -840,6 +1001,10 @@ apiOrders.delete('/orders/:orderId/items/:itemId/full', requireStaffToken, async
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
+    if (err && err.code === 'PRECHECK_LOCKED') {
+      c.status(err.status || 409);
+      return c.json({ error: err.message, code: err.code });
+    }
     throw err;
   } finally {
     client.release();

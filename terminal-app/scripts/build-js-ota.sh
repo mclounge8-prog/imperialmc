@@ -15,11 +15,24 @@ npx react-native bundle \
   --platform android \
   --dev false \
   --entry-file index.js \
-  --bundle-output "$WORKDIR/index.android.bundle" \
+  --bundle-output "$WORKDIR/index.android.bundle.js" \
   --assets-dest "$WORKDIR/assets"
 
-# В ZIP кладём бандл в корень — UpdateModule ищет index.android.bundle.
-# Локальные require()-картинки остаются из APK; менять ассеты через JS OTA нельзя.
+# Hermes bytecode — иначе release APK с Hermes не подхватит plain JS и OTA «не применится».
+HERMESC="$(find "$ROOT/node_modules/react-native/sdks/hermesc" -type f -name hermesc 2>/dev/null | head -1 || true)"
+if [[ -z "$HERMESC" ]]; then
+  HERMESC="$(find "$ROOT/node_modules/react-native" -type f -name hermesc 2>/dev/null | head -1 || true)"
+fi
+
+BUNDLE_OUT="$WORKDIR/index.android.bundle"
+if [[ -n "$HERMESC" && -x "$HERMESC" ]]; then
+  echo "==> Hermes compile ($HERMESC)…"
+  "$HERMESC" -O -emit-binary -out "$BUNDLE_OUT" "$WORKDIR/index.android.bundle.js"
+else
+  echo "WARN: hermesc не найден — кладём plain JS (на Hermes-сборке OTA может не взлететь)"
+  mv "$WORKDIR/index.android.bundle.js" "$BUNDLE_OUT"
+fi
+
 ZIP_DIR="$ROOT/dist"
 mkdir -p "$ZIP_DIR"
 ZIP="$ZIP_DIR/js-ota-v${JS_VERSION}.zip"
@@ -31,5 +44,5 @@ rm -f "$ZIP"
 
 echo ""
 echo "Готово: $ZIP"
-echo "Дальше: бэкофис → Обновления → Загрузить JS OTA"
-echo "  version=$JS_VERSION  (minApkVersionCode = текущий versionCode установленных планшетов)"
+echo "Опубликовать: ./scripts/publish-js-ota.sh $JS_VERSION"
+echo "  (minApkVersionCode = текущий versionCode установленных планшетов)"

@@ -73,6 +73,89 @@ function buildCashOutPayload({ amount, operatorName }) {
   };
 }
 
+/** Нефискальный пречек (счёт гостю) — без ФФД, только печать на ККТ. */
+export function buildPrecheckPayload({
+  items,
+  total,
+  tableName,
+  guestLabel,
+  operatorName,
+  venueName,
+}) {
+  const lines = [];
+  lines.push({ type: 'text', text: '=== ПРЕДЧЕК ===', alignment: 'center' });
+  lines.push({ type: 'text', text: 'НЕ ФИСКАЛЬНЫЙ ДОКУМЕНТ', alignment: 'center' });
+  if (venueName) lines.push({ type: 'text', text: String(venueName), alignment: 'center' });
+  lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
+  if (tableName) lines.push({ type: 'text', text: `Стол: ${tableName}` });
+  if (guestLabel) lines.push({ type: 'text', text: `Чек: ${guestLabel}` });
+  if (operatorName) lines.push({ type: 'text', text: `Официант: ${operatorName}` });
+  lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
+
+  for (const item of items) {
+    const price = Number(item.price);
+    const qty = Number(item.qty);
+    const lineTotal = Math.round(price * qty * 100) / 100;
+    lines.push({
+      type: 'text',
+      text: `${item.name}`,
+    });
+    lines.push({
+      type: 'text',
+      text: `  ${qty} x ${price.toFixed(2)} = ${lineTotal.toFixed(2)}`,
+    });
+    for (const mod of item.modifiers || []) {
+      const modPrice = Number(mod.price) || 0;
+      if (modPrice > 0) {
+        lines.push({ type: 'text', text: `  + ${mod.name} ${modPrice.toFixed(2)}` });
+      } else {
+        lines.push({ type: 'text', text: `  · ${mod.name}` });
+      }
+    }
+  }
+
+  lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
+  lines.push({
+    type: 'text',
+    text: `ИТОГО: ${Number(total).toFixed(2)} руб.`,
+    alignment: 'right',
+  });
+  lines.push({ type: 'text', text: ' ' });
+  lines.push({ type: 'text', text: 'Ожидает оплату', alignment: 'center' });
+
+  return {
+    type: 'nonFiscal',
+    items: lines,
+  };
+}
+
+export async function enqueuePrecheckFiscalJob(
+  client,
+  { venueId, items, total, tableName, guestLabel, operatorName, venueName }
+) {
+  if (!venueId) return null;
+  const enabled = await isAtolEnabledForVenue(client, venueId);
+  if (!enabled) {
+    // Пречек всё равно можно «выбить» логически (зафиксировать состав),
+    // даже если касса выключена — печать просто не уйдёт в очередь.
+    return null;
+  }
+
+  const payload = buildPrecheckPayload({
+    items,
+    total,
+    tableName,
+    guestLabel,
+    operatorName,
+    venueName,
+  });
+  const { rows } = await client.query(
+    `INSERT INTO fiscal_jobs (venue_id, type, payload) VALUES ($1, 'precheck', $2) RETURNING id`,
+    [venueId, JSON.stringify(payload)]
+  );
+  return rows[0]?.id ?? null;
+}
+
 export async function enqueueReceiptFiscalJob(
   client,
   { venueId, receiptId, items, payments, total, operatorName }

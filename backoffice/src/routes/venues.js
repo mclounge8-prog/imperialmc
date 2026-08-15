@@ -14,7 +14,10 @@ const venues = new Hono();
 venues.use('*', requireAuthApi);
 
 async function fetchVenue(id) {
-  const { rows } = await pool.query('SELECT id, name, address FROM venues WHERE id = $1', [id]);
+  const { rows } = await pool.query(
+    'SELECT id, name, address, COALESCE(precheck_enabled, false) AS precheck_enabled FROM venues WHERE id = $1',
+    [id]
+  );
   return rows[0] || null;
 }
 
@@ -30,7 +33,9 @@ async function fetchAssignedStaffNames(venueId) {
 }
 
 async function fetchAllVenueCards() {
-  const { rows: venueRows } = await pool.query('SELECT id, name, address FROM venues ORDER BY name');
+  const { rows: venueRows } = await pool.query(
+    'SELECT id, name, address, COALESCE(precheck_enabled, false) AS precheck_enabled FROM venues ORDER BY name'
+  );
   const cards = [];
   for (const venue of venueRows) {
     // eslint-disable-next-line no-await-in-loop
@@ -93,6 +98,24 @@ venues.put('/:id', async (c) => {
     address || null,
     id,
   ]);
+
+  const updated = await fetchVenue(id);
+  const assignedNames = await fetchAssignedStaffNames(id);
+  return c.html(renderVenueCard(updated, assignedNames));
+});
+
+venues.post('/:id/precheck-toggle', async (c) => {
+  const id = c.req.param('id');
+  const current = await fetchVenue(id);
+  if (!current) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+
+  await pool.query(
+    'UPDATE venues SET precheck_enabled = NOT COALESCE(precheck_enabled, false) WHERE id = $1',
+    [id]
+  );
 
   const updated = await fetchVenue(id);
   const assignedNames = await fetchAssignedStaffNames(id);

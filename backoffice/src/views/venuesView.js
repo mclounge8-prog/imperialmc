@@ -6,6 +6,7 @@ export function renderVenueCard(venue, assignedNames) {
   const summaryText = assignedNames.length
     ? assignedNames.map((n) => escapeHtml(n)).join(', ')
     : 'Сотрудники не назначены';
+  const precheckOn = !!venue.precheck_enabled;
 
   return `
     <div class="venue-card" id="venue-card-${venue.id}">
@@ -13,6 +14,16 @@ export function renderVenueCard(venue, assignedNames) {
         <div class="venue-info">
           <div class="venue-name">${safeName}</div>
           <div class="venue-address">${safeAddress}</div>
+          <label class="venue-precheck-toggle">
+            <input
+              type="checkbox"
+              ${precheckOn ? 'checked' : ''}
+              hx-post="/venues/${venue.id}/precheck-toggle"
+              hx-target="#venue-card-${venue.id}"
+              hx-swap="outerHTML"
+            >
+            <span>Режим пречека${precheckOn ? ' · включён' : ''}</span>
+          </label>
         </div>
         <div class="venue-staff-summary" id="venue-staff-summary-${venue.id}">${summaryText}</div>
         <div class="venue-actions">
@@ -98,7 +109,8 @@ const FISCAL_JOB_TYPE_LABELS = {
   open_shift: 'Открытие смены',
   close_shift: 'Закрытие смены (Z-отчёт)',
   x_report: 'X-отчёт',
-  receipt: 'Чек',
+  receipt: 'Фискальный чек',
+  precheck: 'Пречек',
   cash_in: 'Внесение',
   cash_out: 'Инкассация',
 };

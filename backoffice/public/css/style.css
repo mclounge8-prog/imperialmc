@@ -1828,10 +1828,22 @@ input[type="radio"] {
   color: var(--text);
 }
 
-.top-item-qty {
-  font-size: 11px;
+.venue-precheck-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
 }
+
+.venue-precheck-toggle input {
+  width: 1rem;
+  height: 1rem;
+}
+
 
 /* Раздел «Обновления» терминала */
 .card {

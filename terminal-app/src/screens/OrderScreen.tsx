@@ -33,9 +33,11 @@ import {
   transferOrderTable,
   payGuest,
   cancelGuest,
+  printGuestPrecheck,
   fetchCurrentShift,
 } from '../api/client';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
+import CommentPromptModal from '../components/CommentPromptModal';
 import type { MenuItem, MenuResponse, Order, OrderGuest, OrderItem, PaymentMethod, Zone } from '../api/client';
 import type { RootStackParamList } from '../../App';
 
@@ -96,6 +98,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   const [cashReceivedText, setCashReceivedText] = useState('');
   const [compositionTarget, setCompositionTarget] = useState<CompositionTarget>(null);
   const [customizeTarget, setCustomizeTarget] = useState<MenuItem | null>(null);
+  const [cancelCommentGuest, setCancelCommentGuest] = useState<OrderGuest | null>(null);
 
   const showAlert = useCallback((title: string, message: string, buttons?: AlertButton[]) => {
     setAlertState({ title, message, buttons: buttons ?? [{ text: 'ОК' }] });
@@ -149,6 +152,11 @@ export default function OrderScreen({ route, navigation }: Props) {
   const handleAddItem = async (menuItemId: number, guestId?: number, modifierIds?: number[]) => {
     const targetGuestId = guestId ?? selectedGuestId;
     if (!session || !order || !targetGuestId || busy) return;
+    const guest = order.guests.find((g) => g.id === targetGuestId);
+    if (guest?.precheckPrintedAt) {
+      showAlert('Пречек напечатан', 'Состав чека зафиксирован. Можно только оплатить или отменить с комментарием.');
+      return;
+    }
     setBusy(true);
     try {
       const updated = await addOrderItem(order.id, menuItemId, targetGuestId, session.token, modifierIds);
@@ -345,8 +353,37 @@ export default function OrderScreen({ route, navigation }: Props) {
     if (!order) return;
     const guest = order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
     if (!guest) return;
+    if (order.precheckEnabled && guest.total > 0 && !guest.precheckPrintedAt) {
+      showAlert('Нужен пречек', 'Сначала напечатайте пречек, затем проводите оплату.');
+      return;
+    }
     if (!(await ensureShiftOpen(guest.total))) return;
     setPaymentTarget(guest);
+  };
+
+  const handlePrecheck = async () => {
+    if (!session || !order) return;
+    const guest = order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
+    if (!guest) return;
+    if (guest.total <= 0) {
+      showAlert('Пустой чек', 'Добавьте позиции перед печатью пречека');
+      return;
+    }
+    if (guest.precheckPrintedAt) {
+      showAlert('Уже напечатан', 'Пречек по этому чеку уже был напечатан');
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await printGuestPrecheck(order.id, guest.id, session.token);
+      setOrder(updated);
+      if (venue) runPendingFiscalJobs(venue.id, session.token);
+      showAlert('Пречек', 'Состав зафиксирован. Печать ушла на кассу (если АТОЛ включён).');
+    } catch (e) {
+      showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось напечатать пречек');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const cashReceivedAmount = parseFloat(cashReceivedText.replace(',', '.')) || 0;
@@ -381,33 +418,44 @@ export default function OrderScreen({ route, navigation }: Props) {
     }
   };
 
+  const performCancel = async (guest: OrderGuest, comment?: string) => {
+    if (!session || !order) return;
+    setBusy(true);
+    try {
+      const updated = await cancelGuest(order.id, guest.id, session.token, comment);
+      setCancelCommentGuest(null);
+      if (updated.guests.length === 0) {
+        navigation.goBack();
+      } else {
+        setOrder(updated);
+        setSelectedGuestId(updated.guests[0].id);
+      }
+    } catch (e) {
+      showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось закрыть чек');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleClose = async () => {
     if (!order) return;
     const guest = order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
     if (!guest) return;
     if (!(await ensureShiftOpen(guest.total))) return;
+
+    if (guest.precheckPrintedAt) {
+      setCancelCommentGuest(guest);
+      return;
+    }
+
     showAlert('Закрыть чек', `Чек «${guest.label}» будет закрыт без оплаты. Продолжить?`, [
       { text: 'Отмена', style: 'cancel' },
       {
         text: 'Закрыть',
         style: 'destructive',
         onPress: async () => {
-          if (!session) return;
           if (!(await ensureShiftOpen(guest.total))) return;
-          setBusy(true);
-          try {
-            const updated = await cancelGuest(order.id, guest.id, session.token);
-            if (updated.guests.length === 0) {
-              navigation.goBack();
-            } else {
-              setOrder(updated);
-              setSelectedGuestId(updated.guests[0].id);
-            }
-          } catch (e) {
-            showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось закрыть чек');
-          } finally {
-            setBusy(false);
-          }
+          await performCancel(guest);
         },
       },
     ]);
@@ -434,14 +482,25 @@ export default function OrderScreen({ route, navigation }: Props) {
 
   const selectedGuest: OrderGuest | undefined =
     order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
+  const precheckLocked = Boolean(selectedGuest?.precheckPrintedAt);
+  const precheckMode = Boolean(order.precheckEnabled);
   const moveTargetGuests = moveTarget
     ? order.guests.filter((g) => g.id !== moveTarget.currentGuestId)
     : [];
 
   return (
     <View style={styles.container}>
-      <View style={styles.menuPaneWrapper}>
-        <MenuBrowser menu={menu} busy={busy} onItemPress={handleMenuItemPress} />
+      <View style={[styles.menuPaneWrapper, precheckLocked && styles.menuPaneLocked]}>
+        <MenuBrowser
+          menu={menu}
+          busy={busy || precheckLocked}
+          onItemPress={handleMenuItemPress}
+        />
+        {precheckLocked ? (
+          <View style={styles.lockBanner} pointerEvents="none">
+            <Text style={styles.lockBannerText}>Пречек напечатан — состав зафиксирован</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Правая часть — гости и их чеки */}
@@ -450,6 +509,11 @@ export default function OrderScreen({ route, navigation }: Props) {
         {order.guests.length > 1 && (
           <Text style={styles.orderSubtotal}>Всего открыто по столу: {order.total.toFixed(2)} ₽</Text>
         )}
+        {precheckLocked ? (
+          <Text style={styles.precheckHint}>
+            Пречек · {selectedGuest?.precheckPrintedByName || 'сотрудник'}
+          </Text>
+        ) : null}
 
         <ScrollView
           horizontal
@@ -509,7 +573,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                 <View style={styles.qtyStepper}>
                   <Pressable
                     style={styles.qtyButton}
-                    disabled={busy}
+                    disabled={busy || precheckLocked}
                     hitSlop={6}
                     onPress={() => handleRemoveItem(item.id)}
                   >
@@ -518,7 +582,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                   <Text style={styles.qtyValue}>{item.qty}</Text>
                   <Pressable
                     style={styles.qtyButton}
-                    disabled={busy || !item.menuItemId}
+                    disabled={busy || precheckLocked || !item.menuItemId}
                     hitSlop={6}
                     onPress={() => item.menuItemId && handleRepeatItem(item, selectedGuest.id)}
                   >
@@ -527,7 +591,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                 </View>
                 <Pressable
                   style={styles.iconButton}
-                  disabled={busy}
+                  disabled={busy || precheckLocked}
                   hitSlop={4}
                   onPress={() =>
                     setMoveTarget({ itemId: item.id, itemName: item.name, currentGuestId: selectedGuest.id })
@@ -537,7 +601,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                 </Pressable>
                 <Pressable
                   style={styles.iconButton}
-                  disabled={busy}
+                  disabled={busy || precheckLocked}
                   hitSlop={4}
                   onPress={() => handleDeleteItemFully(item.id, item.name)}
                 >
@@ -559,9 +623,23 @@ export default function OrderScreen({ route, navigation }: Props) {
               <Text style={styles.transferButtonText}>🔀 Пересадить</Text>
             </Pressable>
           )}
+          {precheckMode && !precheckLocked ? (
+            <Pressable
+              style={[styles.actionButton, styles.precheckButton]}
+              disabled={busy || !selectedGuest || selectedGuest.total === 0}
+              onPress={() => void handlePrecheck()}
+            >
+              <Text style={styles.precheckButtonText}>Пречек</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             style={styles.payButtonWrapper}
-            disabled={busy || !selectedGuest || selectedGuest.total === 0}
+            disabled={
+              busy ||
+              !selectedGuest ||
+              selectedGuest.total === 0 ||
+              (precheckMode && !precheckLocked)
+            }
             onPress={handlePay}
           >
             <LinearGradient
@@ -570,10 +648,18 @@ export default function OrderScreen({ route, navigation }: Props) {
               end={{ x: 1, y: 0 }}
               style={[
                 styles.actionButton,
-                (busy || !selectedGuest || selectedGuest.total === 0) && styles.actionButtonDisabled,
+                (busy ||
+                  !selectedGuest ||
+                  selectedGuest.total === 0 ||
+                  (precheckMode && !precheckLocked)) &&
+                  styles.actionButtonDisabled,
               ]}
             >
-              <Text style={styles.payButtonText}>Оплата — {selectedGuest?.label ?? ''}</Text>
+              <Text style={styles.payButtonText}>
+                {precheckMode && !precheckLocked
+                  ? 'Сначала пречек'
+                  : `Оплата — ${selectedGuest?.label ?? ''}`}
+              </Text>
             </LinearGradient>
           </Pressable>
           <Pressable
@@ -581,7 +667,9 @@ export default function OrderScreen({ route, navigation }: Props) {
             disabled={busy || !selectedGuest}
             onPress={handleClose}
           >
-            <Text style={styles.closeButtonText}>Закрыть чек — {selectedGuest?.label ?? ''}</Text>
+            <Text style={styles.closeButtonText}>
+              {precheckLocked ? 'Отменить чек' : `Закрыть чек — ${selectedGuest?.label ?? ''}`}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -806,12 +894,44 @@ export default function OrderScreen({ route, navigation }: Props) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <CommentPromptModal
+        visible={cancelCommentGuest !== null}
+        title="Отмена после пречека"
+        subtitle={`Чек «${cancelCommentGuest?.label ?? ''}» будет отменён. Укажите причину — она сохранится в бэкофисе.`}
+        placeholder="Причина отмены"
+        confirmLabel="Отменить чек"
+        onCancel={() => setCancelCommentGuest(null)}
+        onConfirm={(comment) => {
+          if (cancelCommentGuest) void performCancel(cancelCommentGuest, comment);
+        }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: 'row', backgroundColor: colors.bg },
+  menuPaneLocked: { opacity: 0.55 },
+  lockBanner: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 12,
+    backgroundColor: 'rgba(20,20,24,0.92)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  lockBannerText: { color: colors.text, fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  precheckHint: {
+    color: colors.accent2,
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   errorText: { color: colors.danger, fontSize: 14, marginBottom: 16, textAlign: 'center' },
   retryButton: {
@@ -833,6 +953,7 @@ const styles = StyleSheet.create({
     flex: 1.3,
     borderRightWidth: 1,
     borderRightColor: colors.border,
+    position: 'relative',
   },
 
   orderPane: {
@@ -968,6 +1089,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   closeButtonText: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
+  precheckButton: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.accent2,
+  },
+  precheckButtonText: { color: colors.accent2, fontSize: 16, fontWeight: '700' },
 
   modalBackdrop: {
     flex: 1,

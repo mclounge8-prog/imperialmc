@@ -70,7 +70,7 @@ export async function loginWithPin(pin: string, deviceToken: string): Promise<St
 
 export type DeviceStatus = {
   active: boolean;
-  venue: { id: number; name: string } | null;
+  venue: { id: number; name: string; precheckEnabled?: boolean } | null;
 };
 
 export async function registerDevice(code: string): Promise<{ token: string }> {
@@ -208,6 +208,8 @@ export type OrderGuest = {
   label: string;
   items: OrderItem[];
   total: number;
+  precheckPrintedAt?: string | null;
+  precheckPrintedByName?: string | null;
 };
 
 export type OrderStatus = 'open' | 'paid' | 'cancelled';
@@ -215,6 +217,8 @@ export type OrderStatus = 'open' | 'paid' | 'cancelled';
 export type Order = {
   id: number;
   status: OrderStatus;
+  venueId?: number | null;
+  precheckEnabled?: boolean;
   table: { id: number; name: string } | null;
   guests: OrderGuest[];
   total: number;
@@ -367,9 +371,27 @@ export async function payGuest(
   return order;
 }
 
-export async function cancelGuest(orderId: number, guestId: number, token: string): Promise<Order> {
+export async function cancelGuest(
+  orderId: number,
+  guestId: number,
+  token: string,
+  comment?: string
+): Promise<Order> {
   const { order } = await authorizedRequest<OrderEnvelope>(
     `/api/orders/${orderId}/guests/${guestId}/cancel`,
+    token,
+    { method: 'POST', body: { comment: comment || undefined } }
+  );
+  return order;
+}
+
+export async function printGuestPrecheck(
+  orderId: number,
+  guestId: number,
+  token: string
+): Promise<Order> {
+  const { order } = await authorizedRequest<OrderEnvelope>(
+    `/api/orders/${orderId}/guests/${guestId}/precheck`,
     token,
     { method: 'POST', body: {} }
   );

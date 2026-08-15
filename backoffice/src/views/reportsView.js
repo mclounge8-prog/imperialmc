@@ -23,15 +23,23 @@ export function renderReceiptRow(receipt) {
         .join(', ')
     : '—';
   const tableLabel = receipt.table_name ? escapeHtml(receipt.table_name) : 'Быстрый заказ';
+  const precheckBadge =
+    receipt.status === 'cancelled' && receipt.precheck_was_printed
+      ? ' <span class="badge badge-inactive">после пречека</span>'
+      : '';
+  const commentHint =
+    receipt.cancel_comment
+      ? `<div class="muted" style="font-size:12px;margin-top:2px;">${escapeHtml(receipt.cancel_comment)}</div>`
+      : '';
 
   return `
     <tr>
       <td>${formatDateTime(receipt.closed_at)}</td>
       <td>${escapeHtml(receipt.venue_name || '—')}</td>
-      <td>${tableLabel} · ${escapeHtml(receipt.guest_label || '')}</td>
+      <td>${tableLabel} · ${escapeHtml(receipt.guest_label || '')}${commentHint}</td>
       <td>${escapeHtml(receipt.staff_name || '—')}</td>
       <td>${methods}</td>
-      <td><span class="badge ${statusClass}">${STATUS_LABELS[receipt.status] || receipt.status}</span></td>
+      <td><span class="badge ${statusClass}">${STATUS_LABELS[receipt.status] || receipt.status}</span>${precheckBadge}</td>
       <td>${Number(receipt.total).toFixed(2)} ₽</td>
       <td class="row-actions">
         <button hx-get="/reports/receipts/${receipt.id}" hx-target="#main-content" hx-push-url="false">Открыть</button>
@@ -268,7 +276,14 @@ export function renderReceiptDetail(receipt, items, payments) {
     <div class="subsection">
       <p><strong>Стол/гость:</strong> ${tableLabel} · ${escapeHtml(receipt.guest_label || '')}</p>
       <p><strong>Сотрудник:</strong> ${escapeHtml(receipt.staff_name || '—')}</p>
-      <p><strong>Статус:</strong> ${STATUS_LABELS[receipt.status] || receipt.status}</p>
+      <p><strong>Статус:</strong> ${STATUS_LABELS[receipt.status] || receipt.status}${
+        receipt.precheck_was_printed ? ' · был пречек' : ''
+      }</p>
+      ${
+        receipt.cancel_comment
+          ? `<p><strong>Комментарий отмены:</strong> ${escapeHtml(receipt.cancel_comment)}</p>`
+          : ''
+      }
       <p><strong>Открыт:</strong> ${formatDateTime(receipt.opened_at)}</p>
       <p><strong>Закрыт:</strong> ${formatDateTime(receipt.closed_at)}</p>
     </div>
