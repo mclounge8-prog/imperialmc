@@ -22,18 +22,44 @@ function sizeSelectHtml(selectedSize) {
     .join('');
 }
 
-export function renderZoneRow(zone, { oob = false } = {}) {
+export function renderZoneRow(zone, { oob = false, index = 0, total = 1 } = {}) {
   const oobAttr = oob ? ' hx-swap-oob="beforeend:#zones-list"' : '';
   const safeName = escapeHtml(zone.name);
+  const atStart = index <= 0;
+  const atEnd = index >= total - 1;
 
   return `
     <div class="list-row" id="zone-row-${zone.id}"${oobAttr}>
-      <button
-        class="list-row-name zone-select-btn"
-        hx-get="/tables/zones/${zone.id}/floor-plan"
-        hx-target="#floor-plan-container"
-        hx-swap="innerHTML"
-      >${safeName}</button>
+      <div class="zone-row-main">
+        <div class="zone-order-btns">
+          <button
+            type="button"
+            class="zone-order-btn"
+            title="Выше"
+            ${atStart ? 'disabled' : ''}
+            hx-post="/tables/zones/${zone.id}/move"
+            hx-vals='{"dir":"up"}'
+            hx-target="#zones-list"
+            hx-swap="innerHTML"
+          >↑</button>
+          <button
+            type="button"
+            class="zone-order-btn"
+            title="Ниже"
+            ${atEnd ? 'disabled' : ''}
+            hx-post="/tables/zones/${zone.id}/move"
+            hx-vals='{"dir":"down"}'
+            hx-target="#zones-list"
+            hx-swap="innerHTML"
+          >↓</button>
+        </div>
+        <button
+          class="list-row-name zone-select-btn"
+          hx-get="/tables/zones/${zone.id}/floor-plan"
+          hx-target="#floor-plan-container"
+          hx-swap="innerHTML"
+        >${safeName}</button>
+      </div>
       <button
         class="danger"
         hx-delete="/tables/zones/${zone.id}"
@@ -43,6 +69,12 @@ export function renderZoneRow(zone, { oob = false } = {}) {
       >Удалить</button>
     </div>
   `;
+}
+
+export function renderZonesList(zones) {
+  return zones
+    .map((z, index) => renderZoneRow(z, { index, total: zones.length }))
+    .join('');
 }
 
 /**
@@ -140,23 +172,22 @@ export function renderFloorPlan(zone, tableList) {
 
 /** Зоны + схема зала для конкретного заведения — то, что перерисовывается при смене заведения */
 export function renderVenueZonesAndFloorPlan(venueId, zones, selectedZone, tableList) {
-  const zoneRows = zones.map((z) => renderZoneRow(z)).join('');
-
   return `
     <div class="subsection">
       <h2>Зоны</h2>
-      <div class="list" id="zones-list">${zoneRows}</div>
+      <p class="hint">Порядок зон (стрелки ↑↓) — тот же, что в терминале при переключении.</p>
+      <div class="list" id="zones-list">${renderZonesList(zones)}</div>
       <form
         class="section-form section-form-compact"
         hx-post="/tables/venues/${venueId}/zones"
-        hx-target="#zone-form-error"
+        hx-target="#zones-list"
         hx-swap="innerHTML"
         hx-on::after-request="if(event.detail.successful) this.reset()"
       >
         <input type="text" name="name" placeholder="Новая зона" required>
         <button type="submit">Добавить зону</button>
-        <div id="zone-form-error" class="error"></div>
       </form>
+      <div id="zone-form-error" class="error"></div>
     </div>
 
     <div class="subsection">

@@ -40,9 +40,10 @@ CREATE INDEX IF NOT EXISTS idx_staff_venues_venue ON staff_venues(venue_id);
 
 -- Зоны заведения (зал, терраса и т.д.) — привязаны к конкретному заведению
 CREATE TABLE IF NOT EXISTS zones (
-  id        SERIAL PRIMARY KEY,
-  venue_id  INT REFERENCES venues(id) ON DELETE CASCADE,
-  name      VARCHAR(100) NOT NULL
+  id         SERIAL PRIMARY KEY,
+  venue_id   INT REFERENCES venues(id) ON DELETE CASCADE,
+  name       VARCHAR(100) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0
 );
 
 -- Столы
@@ -368,6 +369,14 @@ CREATE INDEX IF NOT EXISTS idx_recipe_menu_item ON menu_item_recipe(menu_item_id
 -- ALTER здесь идемпотентны, безопасно перезапускать сколько угодно раз)
 -- ============================================================
 ALTER TABLE zones ADD COLUMN IF NOT EXISTS venue_id INT REFERENCES venues(id) ON DELETE CASCADE;
+ALTER TABLE zones ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 0;
+UPDATE zones z
+SET sort_order = sub.rn
+FROM (
+  SELECT id, (ROW_NUMBER() OVER (PARTITION BY venue_id ORDER BY sort_order, id) - 1) AS rn
+  FROM zones
+) sub
+WHERE z.id = sub.id;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS venue_id INT REFERENCES venues(id) ON DELETE SET NULL;
 ALTER TABLE warehouse_items DROP COLUMN IF EXISTS stock_qty;
 ALTER TABLE warehouse_items DROP COLUMN IF EXISTS min_stock_qty;

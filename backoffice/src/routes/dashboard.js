@@ -121,9 +121,10 @@ export async function renderFragmentHtml(key, c) {
     let selectedZone = null;
     let tableRows = [];
     if (selectedVenue) {
-      const { rows } = await pool.query('SELECT id, name FROM zones WHERE venue_id = $1 ORDER BY name', [
-        selectedVenue.id,
-      ]);
+      const { rows } = await pool.query(
+        'SELECT id, name, sort_order FROM zones WHERE venue_id = $1 ORDER BY sort_order ASC, id ASC',
+        [selectedVenue.id]
+      );
       zones = rows;
       selectedZone = zones[0] || null;
       if (selectedZone) {

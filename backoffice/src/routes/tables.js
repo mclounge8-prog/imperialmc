@@ -3,6 +3,7 @@ import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
 import {
   renderZoneRow,
+  renderZonesList,
   renderTableTile,
   renderTableEditTile,
   renderFloorPlan,
@@ -23,6 +24,15 @@ tables.use('*', requireAuthApi);
 const STATUS_VALUES = ['free', 'occupied', 'dirty'];
 const TABLE_SELECT =
   'SELECT id, zone_id, name, capacity, pos_x, pos_y, width, height, size, status FROM tables';
+const ZONE_ORDER = 'ORDER BY sort_order ASC, id ASC';
+
+async function fetchZonesForVenue(venueId) {
+  const { rows } = await pool.query(
+    `SELECT id, name, sort_order FROM zones WHERE venue_id = $1 ${ZONE_ORDER}`,
+    [venueId]
+  );
+  return rows;
+}
 
 async function fetchTable(id) {
   const { rows } = await pool.query(`${TABLE_SELECT} WHERE id = $1`, [id]);
@@ -30,10 +40,7 @@ async function fetchTable(id) {
 }
 
 async function fetchZonesAndFirstFloorPlan(venueId) {
-  const { rows: zones } = await pool.query(
-    'SELECT id, name FROM zones WHERE venue_id = $1 ORDER BY name',
-    [venueId]
-  );
+  const zones = await fetchZonesForVenue(venueId);
   const selectedZone = zones[0] || null;
   let tableRows = [];
   if (selectedZone) {
@@ -59,13 +66,60 @@ tables.post('/venues/:venueId/zones', async (c) => {
   const venueId = c.req.param('venueId');
   const body = await c.req.parseBody();
   const name = String(body.name || '').trim();
-  if (!name) return c.html('<p>Укажи название зоны</p>');
+  if (!name) {
+    const zones = await fetchZonesForVenue(venueId);
+    return c.html(
+      `${renderZonesList(zones)}<div id="zone-form-error" class="error" hx-swap-oob="true">Укажи название зоны</div>`
+    );
+  }
 
-  const { rows } = await pool.query(
-    'INSERT INTO zones (venue_id, name) VALUES ($1, $2) RETURNING id, name',
-    [venueId, name]
+  const { rows: maxRows } = await pool.query(
+    'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM zones WHERE venue_id = $1',
+    [venueId]
   );
-  return c.html(renderZoneRow(rows[0], { oob: true }));
+  const nextOrder = Number(maxRows[0]?.next_order ?? 0);
+
+  await pool.query(
+    'INSERT INTO zones (venue_id, name, sort_order) VALUES ($1, $2, $3) RETURNING id, name, sort_order',
+    [venueId, name, nextOrder]
+  );
+  const zones = await fetchZonesForVenue(venueId);
+  return c.html(renderZonesList(zones));
+});
+
+tables.post('/zones/:id/move', async (c) => {
+  const id = Number(c.req.param('id'));
+  const body = await c.req.parseBody();
+  const dir = String(body.dir || '') === 'up' ? -1 : 1;
+
+  const { rows } = await pool.query('SELECT id, venue_id, sort_order FROM zones WHERE id = $1', [id]);
+  const zone = rows[0];
+  if (!zone) {
+    c.status(404);
+    return c.html('<p class="error">Зона не найдена</p>');
+  }
+
+  const zones = await fetchZonesForVenue(zone.venue_id);
+  const index = zones.findIndex((z) => z.id === zone.id);
+  const swapIndex = index + dir;
+  if (index < 0 || swapIndex < 0 || swapIndex >= zones.length) {
+    return c.html(renderZonesList(zones));
+  }
+
+  const other = zones[swapIndex];
+  await pool.query('UPDATE zones SET sort_order = $1 WHERE id = $2', [other.sort_order, zone.id]);
+  await pool.query('UPDATE zones SET sort_order = $1 WHERE id = $2', [zone.sort_order, other.id]);
+
+  // Плотные номера 0..n-1 после обмена
+  const refreshed = await fetchZonesForVenue(zone.venue_id);
+  for (let i = 0; i < refreshed.length; i += 1) {
+    if (refreshed[i].sort_order !== i) {
+      await pool.query('UPDATE zones SET sort_order = $1 WHERE id = $2', [i, refreshed[i].id]);
+      refreshed[i].sort_order = i;
+    }
+  }
+
+  return c.html(renderZonesList(refreshed));
 });
 
 tables.delete('/zones/:id', async (c) => {

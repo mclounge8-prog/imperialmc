@@ -1050,6 +1050,58 @@ input[type="radio"] {
   color: var(--text);
 }
 
+.zone-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.zone-order-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.zone-order-btn {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.zone-order-btn:hover:not(:disabled) {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+}
+
+.zone-order-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.zone-select-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.zone-select-btn:hover {
+  color: var(--accent-2);
+}
+
 .venue-select {
   background: var(--surface-2);
   border: 1px solid var(--border);

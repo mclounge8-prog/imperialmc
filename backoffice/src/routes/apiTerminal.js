@@ -26,7 +26,7 @@ apiTerminal.get('/tables', requireStaffToken, async (c) => {
   }
 
   const { rows: zones } = await pool.query(
-    'SELECT id, name FROM zones WHERE venue_id = $1 ORDER BY name',
+    'SELECT id, name FROM zones WHERE venue_id = $1 ORDER BY sort_order ASC, id ASC',
     [venueId]
   );
   const { rows: tableRows } = await pool.query(
