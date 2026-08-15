@@ -651,6 +651,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                 ]}
               >
                 {guest.total.toFixed(0)} ₽
+                {Number(guest.discountPercent) > 0 ? ` (−${guest.discountPercent}%)` : ''}
               </Text>
             </Pressable>
           ))}
