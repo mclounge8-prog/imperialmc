@@ -559,6 +559,9 @@ ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS precheck_printed_at TIMESTAMPT
 ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS precheck_printed_by INT REFERENCES staff(id) ON DELETE SET NULL;
 ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS precheck_printed_by_name VARCHAR(100);
 
+-- Скидка на конкретного гостя (до пречека/оплаты). 0 / 10 / 15 / 20 / 25 / 100.
+ALTER TABLE order_guests ADD COLUMN IF NOT EXISTS discount_percent INT NOT NULL DEFAULT 0;
+
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS cancel_comment TEXT;
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS precheck_was_printed BOOLEAN NOT NULL DEFAULT false;
 

@@ -96,7 +96,7 @@ async function fetchOrderDetail(orderId) {
   // Только открытые гости — оплаченный/закрытый гость пропадает из активного
   // списка на терминале, его чек уже рассчитан и к нему нечего добавлять
   const { rows: guestRows } = await pool.query(
-    `SELECT id, label, precheck_printed_at, precheck_printed_by_name
+    `SELECT id, label, precheck_printed_at, precheck_printed_by_name, discount_percent
      FROM order_guests
      WHERE order_id = $1 AND status = 'open'
      ORDER BY id`,
@@ -143,12 +143,20 @@ async function fetchOrderDetail(orderId) {
 
   const guests = guestRows.map((g) => {
     const guestItems = itemsById.filter((i) => i.guestId === g.id);
-    const guestTotal = guestItems.reduce((sum, i) => sum + i.lineTotal, 0);
+    const subtotal = roundMoney(guestItems.reduce((sum, i) => sum + i.lineTotal, 0));
+    const discountPercent = ALLOWED_DISCOUNT_PERCENTS.has(Number(g.discount_percent))
+      ? Number(g.discount_percent)
+      : 0;
+    const discountAmount = roundMoney((subtotal * discountPercent) / 100);
+    const total = roundMoney(subtotal - discountAmount);
     return {
       id: g.id,
       label: g.label,
       items: guestItems.map(({ guestId, ...rest }) => rest),
-      total: guestTotal,
+      subtotal,
+      discountPercent,
+      discountAmount,
+      total,
       precheckPrintedAt: g.precheck_printed_at
         ? new Date(g.precheck_printed_at).toISOString()
         : null,
@@ -300,7 +308,7 @@ const PAYMENT_METHODS = ['cash', 'card', 'other'];
 
 async function fetchGuestForSettlement(orderId, guestId, client) {
   const { rows } = await client.query(
-    `SELECT og.id, og.label, og.order_id, og.precheck_printed_at,
+    `SELECT og.id, og.label, og.order_id, og.precheck_printed_at, og.discount_percent,
             o.venue_id, o.table_id, o.opened_at, t.name AS table_name,
             COALESCE(v.precheck_enabled, false) AS precheck_enabled,
             v.name AS venue_name
@@ -468,14 +476,6 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
   const staff = c.get('staff');
   const body = await c.req.json().catch(() => null);
   const payments = body && Array.isArray(body.payments) ? body.payments : null;
-  const discountPercent = parseDiscountPercent(
-    body?.discount_percent ?? body?.discountPercent ?? 0
-  );
-
-  if (discountPercent == null) {
-    c.status(400);
-    return c.json({ error: 'Скидка должна быть одной из: 0, 10, 15, 20, 25, 100%' });
-  }
 
   const client = await pool.connect();
   let paidNotify = null;
@@ -488,6 +488,11 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       c.status(409);
       return c.json({ error: 'Гость не найден или уже закрыт' });
     }
+
+    // Скидка уже назначена на гостя (отдельное меню), не в момент оплаты.
+    const discountPercent = ALLOWED_DISCOUNT_PERCENTS.has(Number(guest.discount_percent))
+      ? Number(guest.discount_percent)
+      : 0;
 
     // В режиме пречека оплату разрешаем только после печати пречека (кроме 0 ₽).
     const items = await fetchGuestItemsSnapshot(guestId, client);
@@ -733,12 +738,18 @@ apiOrders.post('/orders/:orderId/guests/:guestId/precheck', requireStaffToken, a
     }
 
     const items = await fetchGuestItemsSnapshot(guestId, client);
-    const subtotal = items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
+    const subtotal = roundMoney(items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0));
     if (subtotal <= 0.009) {
       await client.query('ROLLBACK');
       c.status(400);
       return c.json({ error: 'Нельзя напечатать пречек на пустой чек' });
     }
+
+    const discountPercent = ALLOWED_DISCOUNT_PERCENTS.has(Number(guest.discount_percent))
+      ? Number(guest.discount_percent)
+      : 0;
+    const discountAmount = roundMoney((subtotal * discountPercent) / 100);
+    const payable = roundMoney(subtotal - discountAmount);
 
     await client.query(
       `UPDATE order_guests
@@ -752,7 +763,10 @@ apiOrders.post('/orders/:orderId/guests/:guestId/precheck', requireStaffToken, a
     jobId = await enqueuePrecheckFiscalJob(client, {
       venueId: guest.venue_id,
       items,
-      total: subtotal,
+      subtotal,
+      discountPercent,
+      discountAmount,
+      total: payable,
       tableName: guest.table_name,
       guestLabel: guest.label,
       operatorName: staff.name,
@@ -769,6 +783,56 @@ apiOrders.post('/orders/:orderId/guests/:guestId/precheck', requireStaffToken, a
 
   const order = await fetchOrderDetail(orderId);
   return c.json({ order, fiscalJobId: jobId });
+});
+
+// Назначить скидку конкретному гостю (до пречека / пока состав не зафиксирован).
+apiOrders.post('/orders/:orderId/guests/:guestId/discount', requireStaffToken, async (c) => {
+  const { orderId, guestId } = c.req.param();
+  const body = await c.req.json().catch(() => null);
+  const discountPercent = parseDiscountPercent(
+    body?.discount_percent ?? body?.discountPercent ?? null
+  );
+
+  if (discountPercent == null) {
+    c.status(400);
+    return c.json({ error: 'Скидка должна быть одной из: 0, 10, 15, 20, 25, 100%' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const guest = await fetchGuestForSettlement(orderId, guestId, client);
+    if (!guest) {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({ error: 'Гость не найден или уже закрыт' });
+    }
+
+    if (guest.precheck_printed_at) {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({
+        error: 'Пречек уже напечатан — скидку менять нельзя. Отмените чек или проведите оплату.',
+        code: 'PRECHECK_LOCKED',
+      });
+    }
+
+    await client.query('UPDATE order_guests SET discount_percent = $2 WHERE id = $1', [
+      guestId,
+      discountPercent,
+    ]);
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const order = await fetchOrderDetail(orderId);
+  return c.json({ order });
 });
 
 // ---------- Модификаторы позиции заказа: расчёт цены, ограничения групп,
