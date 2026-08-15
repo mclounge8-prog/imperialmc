@@ -18,7 +18,7 @@ import { fetchTables, fetchOpenOrders, fetchPaidReceipts } from '../api/client';
 import type { OpenOrderSummary, PaidReceiptSummary, Zone } from '../api/client';
 import PaidReceiptDetailModal from '../components/PaidReceiptDetailModal';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
-import { fitFloorPlan, normalizeTableSize } from '../utils/tableLayout';
+import { FLOOR_PLAN_HEIGHT, FLOOR_PLAN_WIDTH, layoutSizeForTable, normalizeTableSize, snapToGrid } from '../utils/tableLayout';
 import type { RootStackParamList } from '../../App';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -51,7 +51,6 @@ export default function TablesScreen() {
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [floorArea, setFloorArea] = useState({ width: 0, height: 0 });
   const hasLoadedRef = useRef(false);
 
   const load = useCallback(
@@ -70,10 +69,18 @@ export default function TablesScreen() {
         ]);
         const nextZones = tablesData.zones.map((zone) => ({
           ...zone,
-          tables: zone.tables.map((table) => ({
-            ...table,
-            size: normalizeTableSize(table.size),
-          })),
+          tables: zone.tables.map((table) => {
+            const size = normalizeTableSize(table.size);
+            const dims = layoutSizeForTable({ ...table, size });
+            return {
+              ...table,
+              size,
+              width: dims.width,
+              height: dims.height,
+              posX: snapToGrid(table.posX),
+              posY: snapToGrid(table.posY),
+            };
+          }),
         }));
         setZones(nextZones);
         setSelectedZoneId((prev) => {
@@ -183,10 +190,6 @@ export default function TablesScreen() {
   }
 
   const selectedZone = zones.find((z) => z.id === selectedZoneId) ?? zones[0];
-  const fitted =
-    selectedZone && selectedZone.tables.length > 0 && floorArea.width > 0 && floorArea.height > 0
-      ? fitFloorPlan(selectedZone.tables, floorArea.width, floorArea.height)
-      : null;
 
   return (
     <ScreenSwipeHost screen="Tables">
@@ -215,70 +218,52 @@ export default function TablesScreen() {
             <Text style={styles.emptyText}>Зоны пока не заведены в бэкофисе</Text>
           </View>
         ) : (
-          <View
-            style={styles.floorArea}
-            onLayout={(e) => {
-              const { width, height } = e.nativeEvent.layout;
-              setFloorArea((prev) =>
-                prev.width === width && prev.height === height ? prev : { width, height }
-              );
-            }}
-          >
+          <View style={styles.floorArea}>
             {!selectedZone || selectedZone.tables.length === 0 ? (
               <View style={styles.center}>
                 <Text style={styles.emptyText}>В этой зоне пока нет столов</Text>
               </View>
-            ) : fitted ? (
-              <View
-                style={[
-                  styles.floorPlan,
-                  { width: fitted.planWidth, height: fitted.planHeight },
-                ]}
+            ) : (
+              <ScrollView
+                horizontal
+                style={styles.floorScroll}
+                contentContainerStyle={styles.floorScrollContent}
               >
-                {fitted.tables.map((table) => {
-                  const fontScale = Math.max(0.7, Math.min(1.25, fitted.scale));
-                  return (
-                    <Pressable
-                      key={table.id}
-                      style={[
-                        styles.tableTile,
-                        {
-                          left: table.left,
-                          top: table.top,
-                          width: table.tileWidth,
-                          height: table.tileHeight,
-                          borderColor: STATUS_COLORS[table.status],
-                        },
-                      ]}
-                      onPress={() => handleTablePress(table.id, table.name)}
-                    >
-                      <Text
-                        style={[styles.tileName, { fontSize: Math.round(13 * fontScale) }]}
-                        numberOfLines={2}
-                      >
-                        {table.name}
-                      </Text>
-                      <Text
-                        style={[styles.tileCapacity, { fontSize: Math.round(11 * fontScale) }]}
-                      >
-                        {table.capacity} мест
-                      </Text>
-                      <Text
+                <ScrollView contentContainerStyle={styles.floorScrollContent}>
+                  <View
+                    style={[
+                      styles.floorPlan,
+                      { width: FLOOR_PLAN_WIDTH, height: FLOOR_PLAN_HEIGHT },
+                    ]}
+                  >
+                    {selectedZone.tables.map((table) => (
+                      <Pressable
+                        key={table.id}
                         style={[
-                          styles.tileStatus,
+                          styles.tableTile,
                           {
-                            color: STATUS_COLORS[table.status],
-                            fontSize: Math.round(11 * fontScale),
+                            left: table.posX,
+                            top: table.posY,
+                            width: table.width,
+                            height: table.height,
+                            borderColor: STATUS_COLORS[table.status],
                           },
                         ]}
+                        onPress={() => handleTablePress(table.id, table.name)}
                       >
-                        {STATUS_LABELS[table.status] || table.status}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
+                        <Text style={styles.tileName} numberOfLines={2}>
+                          {table.name}
+                        </Text>
+                        <Text style={styles.tileCapacity}>{table.capacity} мест</Text>
+                        <Text style={[styles.tileStatus, { color: STATUS_COLORS[table.status] }]}>
+                          {STATUS_LABELS[table.status] || table.status}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </ScrollView>
+              </ScrollView>
+            )}
           </View>
         )}
       </View>
@@ -392,6 +377,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     minHeight: 120,
   },
+  floorScroll: { flex: 1 },
+  floorScrollContent: { flexGrow: 1 },
   floorPlan: {
     position: 'relative',
     backgroundColor: colors.surface,

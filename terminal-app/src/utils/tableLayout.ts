@@ -1,9 +1,19 @@
 import type { TableInfo, TableSize } from '../api/client';
 
-export const TABLE_SIZE_PRESETS: Record<TableSize, { width: number; height: number }> = {
-  small: { width: 72, height: 56 },
-  medium: { width: 96, height: 72 },
-  large: { width: 128, height: 96 },
+/** Должно совпадать с backoffice/src/tableSizes.js */
+export const GRID_CELL = 40;
+export const GRID_COLS = 20;
+export const GRID_ROWS = 12;
+export const FLOOR_PLAN_WIDTH = GRID_CELL * GRID_COLS;
+export const FLOOR_PLAN_HEIGHT = GRID_CELL * GRID_ROWS;
+
+export const TABLE_SIZE_PRESETS: Record<
+  TableSize,
+  { cols: number; rows: number; width: number; height: number }
+> = {
+  small: { cols: 2, rows: 2, width: GRID_CELL * 2, height: GRID_CELL * 2 },
+  medium: { cols: 3, rows: 2, width: GRID_CELL * 3, height: GRID_CELL * 2 },
+  large: { cols: 4, rows: 3, width: GRID_CELL * 4, height: GRID_CELL * 3 },
 };
 
 export function normalizeTableSize(value: string | undefined | null): TableSize {
@@ -15,61 +25,10 @@ export function layoutSizeForTable(table: Pick<TableInfo, 'size' | 'width' | 'he
   width: number;
   height: number;
 } {
-  const size = normalizeTableSize(table.size);
-  return TABLE_SIZE_PRESETS[size];
+  return TABLE_SIZE_PRESETS[normalizeTableSize(table.size)];
 }
 
-export type FittedFloorPlan = {
-  scaleX: number;
-  scaleY: number;
-  /** Средний масштаб — для размера шрифта на плитке. */
-  scale: number;
-  planWidth: number;
-  planHeight: number;
-  tables: Array<TableInfo & { left: number; top: number; tileWidth: number; tileHeight: number }>;
-};
-
-/**
- * Растягивает схему на всю доступную ширину и высоту (scaleX/scaleY независимо),
- * без пустых полей сверху/снизу/по бокам.
- */
-export function fitFloorPlan(
-  tables: TableInfo[],
-  availWidth: number,
-  availHeight: number,
-  padding = 0
-): FittedFloorPlan {
-  const planWidth = Math.max(1, Math.floor(availWidth - padding * 2));
-  const planHeight = Math.max(1, Math.floor(availHeight - padding * 2));
-
-  const layoutTables = tables.map((table) => {
-    const dims = layoutSizeForTable(table);
-    return {
-      ...table,
-      size: normalizeTableSize(table.size),
-      layoutWidth: dims.width,
-      layoutHeight: dims.height,
-    };
-  });
-
-  const contentW = Math.max(...layoutTables.map((t) => t.posX + t.layoutWidth), 1);
-  const contentH = Math.max(...layoutTables.map((t) => t.posY + t.layoutHeight), 1);
-  const scaleX = planWidth / contentW;
-  const scaleY = planHeight / contentH;
-  const scale = Math.sqrt(scaleX * scaleY);
-
-  return {
-    scaleX,
-    scaleY,
-    scale,
-    planWidth,
-    planHeight,
-    tables: layoutTables.map((table) => ({
-      ...table,
-      left: Math.round(table.posX * scaleX),
-      top: Math.round(table.posY * scaleY),
-      tileWidth: Math.max(36, Math.round(table.layoutWidth * scaleX)),
-      tileHeight: Math.max(28, Math.round(table.layoutHeight * scaleY)),
-    })),
-  };
+export function snapToGrid(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.round(value / GRID_CELL) * GRID_CELL);
 }

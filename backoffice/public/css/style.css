@@ -592,13 +592,22 @@ input[type="radio"] {
 
 .floor-plan {
   position: relative;
-  width: 100%;
-  max-width: 840px;
+  width: 800px;
   height: 480px;
+  max-width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: auto;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.floor-plan-grid {
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: var(--grid-cell, 40px) var(--grid-cell, 40px);
 }
 
 .table-tile {

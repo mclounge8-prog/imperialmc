@@ -9,7 +9,9 @@ import {
   renderVenueZonesAndFloorPlan,
 } from '../views/tablesView.js';
 import {
+  clampTablePosition,
   dimensionsForSize,
+  GRID_CELL,
   normalizeTableSizeKey,
   TABLE_SIZE_VALUES,
   withTableDimensions,
@@ -105,8 +107,12 @@ tables.post('/zones/:zoneId/tables', async (c) => {
     return c.html('<p>Вместимость должна быть числом ≥ 1</p>');
   }
 
-  const posX = 20 + Math.floor(Math.random() * 300);
-  const posY = 20 + Math.floor(Math.random() * 200);
+  const { posX, posY } = clampTablePosition(
+    GRID_CELL + Math.floor(Math.random() * 8) * GRID_CELL,
+    GRID_CELL + Math.floor(Math.random() * 5) * GRID_CELL,
+    width,
+    height
+  );
 
   const { rows } = await pool.query(
     `INSERT INTO tables (zone_id, name, capacity, pos_x, pos_y, width, height, size, status)
@@ -164,9 +170,11 @@ tables.put('/:id', async (c) => {
     return c.html(renderTableEditTile({ ...current, name, capacity, status }, 'Некорректный размер'));
   }
 
+  const clamped = clampTablePosition(current.pos_x, current.pos_y, width, height);
+
   await pool.query(
-    'UPDATE tables SET name = $1, capacity = $2, status = $3, width = $4, height = $5, size = $6 WHERE id = $7',
-    [name, capacity, status, width, height, size, id]
+    'UPDATE tables SET name = $1, capacity = $2, status = $3, width = $4, height = $5, size = $6, pos_x = $7, pos_y = $8 WHERE id = $9',
+    [name, capacity, status, width, height, size, clamped.posX, clamped.posY, id]
   );
 
   const updated = await fetchTable(id);
@@ -177,14 +185,21 @@ tables.put('/:id', async (c) => {
 tables.put('/:id/position', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.parseBody();
-  const posX = Math.round(Number(body.pos_x));
-  const posY = Math.round(Number(body.pos_y));
+  const rawX = Math.round(Number(body.pos_x));
+  const rawY = Math.round(Number(body.pos_y));
 
-  if (Number.isNaN(posX) || Number.isNaN(posY)) {
+  if (Number.isNaN(rawX) || Number.isNaN(rawY)) {
     c.status(400);
     return c.body(null);
   }
 
+  const current = await fetchTable(id);
+  if (!current) {
+    c.status(404);
+    return c.body(null);
+  }
+
+  const { posX, posY } = clampTablePosition(rawX, rawY, current.width, current.height);
   await pool.query('UPDATE tables SET pos_x = $1, pos_y = $2 WHERE id = $3', [posX, posY, id]);
   return c.body(null);
 });

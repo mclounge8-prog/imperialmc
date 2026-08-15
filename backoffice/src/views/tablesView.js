@@ -1,5 +1,11 @@
 import { escapeHtml } from './escapeHtml.js';
-import { TABLE_SIZE_PRESETS, withTableDimensions } from '../tableSizes.js';
+import {
+  FLOOR_PLAN_HEIGHT,
+  FLOOR_PLAN_WIDTH,
+  GRID_CELL,
+  TABLE_SIZE_PRESETS,
+  withTableDimensions,
+} from '../tableSizes.js';
 
 const STATUS_LABELS = {
   free: 'Свободен',
@@ -40,23 +46,24 @@ export function renderZoneRow(zone, { oob = false } = {}) {
 }
 
 /**
- * Плитка стола на схеме зала. Перетаскивание — Alpine (локальное состояние + мышь),
- * сохранение позиции — htmx.ajax вызывается прямо из обработчика mouseup,
- * потому что координаты динамические и их нельзя зашить в статичный hx-vals.
+ * Плитка стола на схеме зала. Перетаскивание с привязкой к сетке.
  */
 export function renderTableTile(table, { oob = false, zoneId = null } = {}) {
   const t = withTableDimensions(table);
   const oobAttr = oob && zoneId ? ` hx-swap-oob="beforeend:#floor-plan-${zoneId}"` : '';
   const safeName = escapeHtml(t.name);
+  const cell = GRID_CELL;
+  const maxX = FLOOR_PLAN_WIDTH - t.width;
+  const maxY = FLOOR_PLAN_HEIGHT - t.height;
 
   return `
     <div
       class="table-tile status-${t.status} size-${t.size}"
       id="table-tile-${t.id}"
       style="left:${t.pos_x}px; top:${t.pos_y}px; width:${t.width}px; height:${t.height}px;"
-      x-data="{ dragging:false, sx:0, sy:0, ox:${t.pos_x}, oy:${t.pos_y} }"
+      x-data="{ dragging:false, sx:0, sy:0, ox:${t.pos_x}, oy:${t.pos_y}, cell:${cell}, maxX:${maxX}, maxY:${maxY}, snap(v){ return Math.max(0, Math.round(v/this.cell)*this.cell); } }"
       @mousedown="dragging=true; sx=$event.clientX; sy=$event.clientY; ox=parseInt($el.style.left); oy=parseInt($el.style.top);"
-      @mousemove.window="if(dragging){ $el.style.left = Math.max(0, ox + ($event.clientX - sx)) + 'px'; $el.style.top = Math.max(0, oy + ($event.clientY - sy)) + 'px'; }"
+      @mousemove.window="if(dragging){ const nx=Math.min(maxX, snap(ox + ($event.clientX - sx))); const ny=Math.min(maxY, snap(oy + ($event.clientY - sy))); $el.style.left = nx + 'px'; $el.style.top = ny + 'px'; }"
       @mouseup.window="if(dragging){ dragging=false; htmx.ajax('PUT', '/tables/${t.id}/position', { values: { pos_x: parseInt($el.style.left), pos_y: parseInt($el.style.top) }, swap: 'none' }); }"
       ${oobAttr}
     >
@@ -89,7 +96,7 @@ export function renderTableEditTile(table, errorMsg = null) {
     <form class="table-edit-panel" id="table-tile-${t.id}" style="left:${t.pos_x}px; top:${t.pos_y}px;">
       <input type="text" name="name" value="${escapeHtml(t.name)}" placeholder="Название" required>
       <input type="number" min="1" name="capacity" value="${t.capacity}" placeholder="Вместимость">
-      <select name="size" title="Размер плитки на схеме (не вместимость)">${sizeSelectHtml(t.size)}</select>
+      <select name="size" title="Размер на сетке">${sizeSelectHtml(t.size)}</select>
       <select name="status">${statusOptions}</select>
       ${errorHtml}
       <div class="edit-actions">
@@ -118,12 +125,16 @@ export function renderFloorPlan(zone, tableList) {
     >
       <input type="text" name="name" placeholder="Название стола" required>
       <input type="number" min="1" name="capacity" placeholder="Вместимость" value="4">
-      <select name="size" title="Размер плитки на схеме">${sizeSelectHtml('medium')}</select>
+      <select name="size" title="Размер на сетке">${sizeSelectHtml('medium')}</select>
       <button type="submit">Добавить стол</button>
       <div id="table-form-error" class="error"></div>
     </form>
-    <p class="hint">Перетаскивай столы мышью. Размер — маленький / средний / большой (на планшете схема подгоняется под экран сама).</p>
-    <div class="floor-plan" id="floor-plan-${zone.id}">${tiles}</div>
+    <p class="hint">Сетка ${GRID_CELL}×${GRID_CELL}px (${FLOOR_PLAN_WIDTH}×${FLOOR_PLAN_HEIGHT}). Столы двигаются только по клеткам — та же схема на терминале без масштабирования.</p>
+    <div
+      class="floor-plan floor-plan-grid"
+      id="floor-plan-${zone.id}"
+      style="width:${FLOOR_PLAN_WIDTH}px; height:${FLOOR_PLAN_HEIGHT}px; --grid-cell:${GRID_CELL}px;"
+    >${tiles}</div>
   `;
 }
 
