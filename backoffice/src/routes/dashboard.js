@@ -17,6 +17,8 @@ import { fetchAllVenues } from '../utils/venues.js';
 import { readSelectedVenueId, resolveSelectedVenue, writeLastSection } from '../utils/preferences.js';
 import { pool } from '../db.js';
 import { manifestForClient, publicBaseUrl, readManifest } from '../services/terminalUpdates.js';
+import { readTelegramSettings } from '../services/telegramNotify.js';
+import { renderTelegramSection } from '../views/telegramView.js';
 
 /**
  * Рендер HTML для конкретного раздела дэшборда по ключу.
@@ -157,6 +159,11 @@ export async function renderFragmentHtml(key, c) {
   if (key === 'updates') {
     const manifest = await readManifest();
     return renderUpdatesSection(manifest, manifestForClient(manifest, publicBaseUrl(c)));
+  }
+
+  if (key === 'telegram') {
+    const settings = await readTelegramSettings();
+    return renderTelegramSection(settings);
   }
 
   if (key === 'reports') {

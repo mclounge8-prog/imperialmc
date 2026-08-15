@@ -2,6 +2,14 @@ import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { enqueuePrecheckFiscalJob, enqueueReceiptFiscalJob } from '../services/fiscalQueue.js';
+import {
+  buildCashPaymentMessage,
+  buildItemDeleteMessage,
+  buildPrecheckCancelMessage,
+  buildZeroCloseMessage,
+  fetchVenueName,
+  notifyTelegramSafe,
+} from '../services/telegramNotify.js';
 
 const apiOrders = new Hono();
 
@@ -445,6 +453,7 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
   }
 
   const client = await pool.connect();
+  let paidNotify = null;
   try {
     await client.query('BEGIN');
 
@@ -481,6 +490,16 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
     await client.query("UPDATE order_guests SET status = 'paid' WHERE id = $1", [guestId]);
 
     await client.query('COMMIT');
+    paidNotify = {
+      venueName: guest.venue_name,
+      venueId: guest.venue_id,
+      tableName: guest.table_name,
+      guestLabel: guest.label,
+      cashier: staff.name,
+      cashAmount: payments
+        .filter((p) => p.method === 'cash')
+        .reduce((sum, p) => sum + Number(p.amount), 0),
+    };
   } catch (err) {
     await client.query('ROLLBACK');
     if (err && (err.code === 'SHIFT_REQUIRED' || err.code === 'PRECHECK_LOCKED')) {
@@ -490,6 +509,19 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
     throw err;
   } finally {
     client.release();
+  }
+
+  if (paidNotify && paidNotify.cashAmount > 0.009) {
+    const venueName = paidNotify.venueName || (await fetchVenueName(paidNotify.venueId));
+    notifyTelegramSafe(
+      buildCashPaymentMessage({
+        venueName,
+        amount: paidNotify.cashAmount,
+        cashier: paidNotify.cashier,
+        tableName: paidNotify.tableName,
+        guestLabel: paidNotify.guestLabel,
+      })
+    );
   }
 
   await maybeCloseOrderIfAllGuestsSettled(orderId);
@@ -509,6 +541,7 @@ apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, asy
   const cancelComment =
     body && typeof body.comment === 'string' ? body.comment.trim() : '';
 
+  let notifyPayload = null;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -530,6 +563,7 @@ apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, asy
     }
 
     const items = await fetchGuestItemsSnapshot(guestId, client);
+    const subtotal = items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
     await createReceipt(client, {
       guest,
       staff,
@@ -541,6 +575,17 @@ apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, asy
     await client.query("UPDATE order_guests SET status = 'cancelled' WHERE id = $1", [guestId]);
 
     await client.query('COMMIT');
+
+    notifyPayload = {
+      venueName: guest.venue_name,
+      venueId: guest.venue_id,
+      tableName: guest.table_name,
+      guestLabel: guest.label,
+      cashier: staff.name,
+      comment: cancelComment,
+      precheck: !!guest.precheck_printed_at,
+      subtotal,
+    };
   } catch (err) {
     await client.query('ROLLBACK');
     if (err && (err.code === 'SHIFT_REQUIRED' || err.code === 'PRECHECK_LOCKED')) {
@@ -550,6 +595,32 @@ apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, asy
     throw err;
   } finally {
     client.release();
+  }
+
+  if (notifyPayload) {
+    const venueName =
+      notifyPayload.venueName || (await fetchVenueName(notifyPayload.venueId));
+    if (notifyPayload.precheck) {
+      notifyTelegramSafe(
+        buildPrecheckCancelMessage({
+          venueName,
+          comment: notifyPayload.comment,
+          cashier: notifyPayload.cashier,
+          tableName: notifyPayload.tableName,
+          guestLabel: notifyPayload.guestLabel,
+          total: notifyPayload.subtotal,
+        })
+      );
+    } else if (notifyPayload.subtotal <= 0.009) {
+      notifyTelegramSafe(
+        buildZeroCloseMessage({
+          venueName,
+          cashier: notifyPayload.cashier,
+          tableName: notifyPayload.tableName,
+          guestLabel: notifyPayload.guestLabel,
+        })
+      );
+    }
   }
 
   await maybeCloseOrderIfAllGuestsSettled(orderId);
@@ -914,18 +985,25 @@ apiOrders.put('/orders/:orderId/items/:itemId/guest', requireStaffToken, async (
 // Убрать одну единицу позиции — возвращает списанное сырьё обратно на склад заведения
 apiOrders.delete('/orders/:orderId/items/:itemId', requireStaffToken, async (c) => {
   const { orderId, itemId } = c.req.param();
+  const staff = c.get('staff');
 
   const client = await pool.connect();
+  let deleteNotify = null;
   try {
     await client.query('BEGIN');
 
-    const { rows: orderRows } = await client.query('SELECT venue_id FROM orders WHERE id = $1', [
-      orderId,
-    ]);
+    const { rows: orderRows } = await client.query(
+      `SELECT o.venue_id, o.table_id, t.name AS table_name, v.name AS venue_name
+       FROM orders o
+       LEFT JOIN tables t ON t.id = o.table_id
+       LEFT JOIN venues v ON v.id = o.venue_id
+       WHERE o.id = $1`,
+      [orderId]
+    );
     const venueId = orderRows[0] ? orderRows[0].venue_id : null;
 
     const { rows: itemRows } = await client.query(
-      'SELECT id, menu_item_id, qty, guest_id FROM order_items WHERE id = $1 AND order_id = $2 FOR UPDATE',
+      'SELECT id, menu_item_id, name, price, qty, guest_id FROM order_items WHERE id = $1 AND order_id = $2 FOR UPDATE',
       [itemId, orderId]
     );
     const item = itemRows[0];
@@ -942,6 +1020,7 @@ apiOrders.delete('/orders/:orderId/items/:itemId', requireStaffToken, async (c) 
       await returnModifiersStock(client, venueId, modifierSnapshots, 1);
     }
 
+    const fullDelete = item.qty <= 1;
     if (item.qty > 1) {
       await client.query('UPDATE order_items SET qty = qty - 1 WHERE id = $1', [item.id]);
     } else {
@@ -949,6 +1028,16 @@ apiOrders.delete('/orders/:orderId/items/:itemId', requireStaffToken, async (c) 
     }
 
     await client.query('COMMIT');
+    deleteNotify = {
+      venueName: orderRows[0]?.venue_name,
+      venueId,
+      tableName: orderRows[0]?.table_name,
+      itemName: item.name,
+      price: Number(item.price),
+      qtyRemoved: fullDelete ? item.qty : 1,
+      fullDelete,
+      cashier: staff.name,
+    };
   } catch (err) {
     await client.query('ROLLBACK');
     if (err && err.code === 'PRECHECK_LOCKED') {
@@ -960,6 +1049,21 @@ apiOrders.delete('/orders/:orderId/items/:itemId', requireStaffToken, async (c) 
     client.release();
   }
 
+  if (deleteNotify) {
+    const venueName = deleteNotify.venueName || (await fetchVenueName(deleteNotify.venueId));
+    notifyTelegramSafe(
+      buildItemDeleteMessage({
+        venueName,
+        itemName: deleteNotify.itemName,
+        qtyRemoved: deleteNotify.qtyRemoved,
+        price: deleteNotify.price,
+        cashier: deleteNotify.cashier,
+        tableName: deleteNotify.tableName,
+        fullDelete: deleteNotify.fullDelete,
+      })
+    );
+  }
+
   const order = await fetchOrderDetail(orderId);
   return c.json({ order });
 });
@@ -968,18 +1072,25 @@ apiOrders.delete('/orders/:orderId/items/:itemId', requireStaffToken, async (c) 
 // весь списанный объём (qty × рецептура), а не одну порцию
 apiOrders.delete('/orders/:orderId/items/:itemId/full', requireStaffToken, async (c) => {
   const { orderId, itemId } = c.req.param();
+  const staff = c.get('staff');
 
   const client = await pool.connect();
+  let deleteNotify = null;
   try {
     await client.query('BEGIN');
 
-    const { rows: orderRows } = await client.query('SELECT venue_id FROM orders WHERE id = $1', [
-      orderId,
-    ]);
+    const { rows: orderRows } = await client.query(
+      `SELECT o.venue_id, o.table_id, t.name AS table_name, v.name AS venue_name
+       FROM orders o
+       LEFT JOIN tables t ON t.id = o.table_id
+       LEFT JOIN venues v ON v.id = o.venue_id
+       WHERE o.id = $1`,
+      [orderId]
+    );
     const venueId = orderRows[0] ? orderRows[0].venue_id : null;
 
     const { rows: itemRows } = await client.query(
-      'SELECT id, menu_item_id, qty, guest_id FROM order_items WHERE id = $1 AND order_id = $2 FOR UPDATE',
+      'SELECT id, menu_item_id, name, price, qty, guest_id FROM order_items WHERE id = $1 AND order_id = $2 FOR UPDATE',
       [itemId, orderId]
     );
     const item = itemRows[0];
@@ -999,6 +1110,16 @@ apiOrders.delete('/orders/:orderId/items/:itemId/full', requireStaffToken, async
     await client.query('DELETE FROM order_items WHERE id = $1', [item.id]);
 
     await client.query('COMMIT');
+    deleteNotify = {
+      venueName: orderRows[0]?.venue_name,
+      venueId,
+      tableName: orderRows[0]?.table_name,
+      itemName: item.name,
+      price: Number(item.price),
+      qtyRemoved: item.qty,
+      fullDelete: true,
+      cashier: staff.name,
+    };
   } catch (err) {
     await client.query('ROLLBACK');
     if (err && err.code === 'PRECHECK_LOCKED') {
@@ -1008,6 +1129,21 @@ apiOrders.delete('/orders/:orderId/items/:itemId/full', requireStaffToken, async
     throw err;
   } finally {
     client.release();
+  }
+
+  if (deleteNotify) {
+    const venueName = deleteNotify.venueName || (await fetchVenueName(deleteNotify.venueId));
+    notifyTelegramSafe(
+      buildItemDeleteMessage({
+        venueName,
+        itemName: deleteNotify.itemName,
+        qtyRemoved: deleteNotify.qtyRemoved,
+        price: deleteNotify.price,
+        cashier: deleteNotify.cashier,
+        tableName: deleteNotify.tableName,
+        fullDelete: true,
+      })
+    );
   }
 
   const order = await fetchOrderDetail(orderId);

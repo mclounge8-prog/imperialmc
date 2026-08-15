@@ -53,6 +53,12 @@ export const sections = {
     emptyText: 'Обновления ещё не опубликованы',
     actionText: 'Загрузить APK',
   },
+  telegram: {
+    title: 'Telegram',
+    hint: 'Уведомления о кассе и сменах в Telegram',
+    emptyText: 'Бот ещё не настроен',
+    actionText: 'Указать токен и chat id',
+  },
   reports: {
     title: 'Отчёты',
     hint: 'Чеки и статистика продаж',

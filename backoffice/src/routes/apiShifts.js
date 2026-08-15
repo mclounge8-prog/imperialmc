@@ -2,6 +2,14 @@ import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { enqueueCashFiscalJob, enqueueShiftFiscalJob } from '../services/fiscalQueue.js';
+import {
+  buildCashMovementMessage,
+  buildShiftCloseMessage,
+  buildShiftOpenMessage,
+  fetchPreviousShiftClosingCash,
+  fetchVenueName,
+  notifyTelegramSafe,
+} from '../services/telegramNotify.js';
 
 const apiShifts = new Hono();
 apiShifts.use('*', requireStaffToken);
@@ -178,6 +186,9 @@ apiShifts.post('/open', async (c) => {
     return c.json({ error: 'Смена уже открыта' });
   }
 
+  // Снимок до открытия: иначе после COMMIT легко перепутать с текущей сменой.
+  const previousClosingCash = await fetchPreviousShiftClosingCash(venueId);
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -209,6 +220,15 @@ apiShifts.post('/open', async (c) => {
 
     await client.query('COMMIT');
     const stats = await fetchShiftStats(shift);
+    const venueName = await fetchVenueName(venueId);
+    notifyTelegramSafe(
+      buildShiftOpenMessage({
+        venueName,
+        openingCash,
+        previousClosingCash,
+        cashier: staff.name,
+      })
+    );
     return c.json({ shift: serializeShift(shift, stats) });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -310,6 +330,21 @@ apiShifts.post('/close', async (c) => {
 
     await client.query('COMMIT');
     const closedStats = await fetchShiftStats(rows[0]);
+    const venueName = await fetchVenueName(venueId);
+    notifyTelegramSafe(
+      buildShiftCloseMessage({
+        venueName,
+        closingCash: countedCash,
+        expectedCash,
+        revenueTotal: stats.revenueTotal,
+        cashSales: stats.paymentBreakdown.cash,
+        cardSales: stats.paymentBreakdown.card + stats.paymentBreakdown.other,
+        receiptsCount: stats.receiptsCount,
+        deposits: stats.cash.deposits,
+        withdrawals: stats.cash.withdrawals,
+        cashier: staff.name,
+      })
+    );
     return c.json({
       shift: serializeShift(rows[0], closedStats),
       forcedClose: Boolean(mismatch && forcePin === FORCE_CLOSE_PIN),
@@ -371,6 +406,17 @@ apiShifts.post('/cash-movements', async (c) => {
     });
 
     await client.query('COMMIT');
+
+    const venueName = await fetchVenueName(venueId);
+    notifyTelegramSafe(
+      buildCashMovementMessage({
+        venueName,
+        type,
+        amount,
+        comment,
+        cashier: staff.name,
+      })
+    );
 
     const refreshed = await fetchOpenShift(venueId);
     const stats = await fetchShiftStats(refreshed);
