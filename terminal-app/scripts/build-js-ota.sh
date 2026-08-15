@@ -35,8 +35,9 @@ if [[ -n "$HERMESC" && -x "$HERMESC" ]]; then
   echo "==> Hermes compile ($HERMESC)…"
   "$HERMESC" -O -emit-binary -out "$BUNDLE_OUT" "$WORKDIR/index.android.bundle.js"
 else
-  echo "WARN: hermesc не найден — кладём plain JS (на Hermes-сборке OTA может не взлететь)"
-  mv "$WORKDIR/index.android.bundle.js" "$BUNDLE_OUT"
+  echo "ERROR: hermesc не найден — plain JS на Hermes-APK ломает OTA (цикл Установить)." >&2
+  echo "Ожидался node_modules/hermes-compiler/hermesc/linux64-bin/hermesc" >&2
+  exit 1
 fi
 
 ZIP_DIR="$ROOT/dist"

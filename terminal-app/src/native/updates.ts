@@ -14,6 +14,7 @@ type UpdateNativeModule = {
   downloadFile(url: string, fileName: string): Promise<string>;
   installApk(apkPath: string): Promise<void>;
   applyJsBundleZip(zipPath: string, jsVersion: number): Promise<string>;
+  applyJsBundleZipAndRestart?(zipPath: string, jsVersion: number): Promise<void>;
   clearJsOta(): Promise<void>;
   restartApp(): Promise<void>;
 };
@@ -54,6 +55,25 @@ export async function installApk(apkPath: string): Promise<void> {
 export async function applyJsBundleZip(zipPath: string, jsVersion: number): Promise<string> {
   if (!UpdateModule) throw new Error('UpdateModule недоступен');
   return UpdateModule.applyJsBundleZip(zipPath, jsVersion);
+}
+
+/** Предпочтительно: commit + рестарт на native, без гонки со старым JS. */
+export async function applyJsBundleZipAndRestart(
+  zipPath: string,
+  jsVersion: number
+): Promise<void> {
+  if (!UpdateModule) throw new Error('UpdateModule недоступен');
+  if (typeof UpdateModule.applyJsBundleZipAndRestart === 'function') {
+    await UpdateModule.applyJsBundleZipAndRestart(zipPath, jsVersion);
+    return;
+  }
+  await UpdateModule.applyJsBundleZip(zipPath, jsVersion);
+  await new Promise((r) => setTimeout(r, 300));
+  const local = await UpdateModule.getAppVersion();
+  if (Number(local.jsOtaVersion) < Number(jsVersion)) {
+    throw new Error('OTA не сохранилась на устройстве — поставьте APK обновление');
+  }
+  await UpdateModule.restartApp();
 }
 
 export async function clearJsOta(): Promise<void> {

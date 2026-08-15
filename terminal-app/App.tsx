@@ -47,14 +47,14 @@ const screenOptions = {
 };
 
 function RootNavigator() {
-  const { session } = useSession();
+  const { session, hydrating } = useSession();
   const { deviceToken, status, loading: deviceLoading } = useDevice();
 
   // Разбор очереди фискальных заданий (касса АТОЛ) — работает на фоне, пока
   // есть сессия и заведение, независимо от текущего экрана.
   useFiscalSync(status?.venue?.id ?? null, session?.token ?? null);
 
-  if (deviceLoading) {
+  if (deviceLoading || hydrating) {
     return (
       <View
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}

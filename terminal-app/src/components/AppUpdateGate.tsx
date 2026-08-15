@@ -112,7 +112,10 @@ export default function AppUpdateGate({ autoCheck = true }: Props) {
     plan.kind === 'apk'
       ? `${plan.localVersionName} (${plan.localVersionCode}) → ${plan.remote.versionName} (${plan.remote.versionCode})`
       : `JS ${plan.localJsVersion} → ${plan.remote.version}`;
-  const notes = plan.remote.notes?.trim();
+  const notes =
+    plan.kind === 'apk'
+      ? `${plan.remote.notes?.trim() || ''}\nПосле установки откройте приложение снова.`.trim()
+      : `${plan.remote.notes?.trim() || ''}\nУстановка перезапустит приложение (сессия сотрудника сохранится).`.trim();
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => canSkip && setDismissed(true)}>
