@@ -667,8 +667,8 @@ export async function fetchFiscalJobs(
   venueId: number,
   token: string,
   limit = 30
-): Promise<{ jobs: FiscalJobListItem[]; errorCount: number }> {
-  return authorizedRequest<{ jobs: FiscalJobListItem[]; errorCount: number }>(
+): Promise<{ jobs: FiscalJobListItem[]; errorCount: number; pendingCount: number }> {
+  return authorizedRequest<{ jobs: FiscalJobListItem[]; errorCount: number; pendingCount: number }>(
     `/api/fiscal/jobs?venueId=${venueId}&limit=${limit}`,
     token
   );
@@ -679,4 +679,19 @@ export async function retryFiscalJob(jobId: number, venueId: number, token: stri
     method: 'POST',
     body: {},
   });
+}
+
+export async function retryAllFiscalJobs(
+  venueId: number,
+  token: string,
+  options?: { includeStuck?: boolean }
+): Promise<{ retried: number }> {
+  return authorizedRequest<{ ok: boolean; retried: number }>(
+    `/api/fiscal/jobs/retry-all?venueId=${venueId}`,
+    token,
+    {
+      method: 'POST',
+      body: { includeStuck: Boolean(options?.includeStuck) },
+    }
+  );
 }

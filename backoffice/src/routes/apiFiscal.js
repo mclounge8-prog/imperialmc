@@ -119,9 +119,14 @@ apiFiscal.get('/jobs', async (c) => {
     `SELECT COUNT(*)::int AS count FROM fiscal_jobs WHERE venue_id = $1 AND status = 'error'`,
     [venueId]
   );
+  const { rows: pendingCountRows } = await pool.query(
+    `SELECT COUNT(*)::int AS count FROM fiscal_jobs WHERE venue_id = $1 AND status IN ('pending', 'in_progress')`,
+    [venueId]
+  );
 
   return c.json({
     errorCount: errorCountRows[0]?.count || 0,
+    pendingCount: pendingCountRows[0]?.count || 0,
     jobs: rows.map((job) => ({
       id: job.id,
       type: job.type,
@@ -139,7 +144,35 @@ apiFiscal.get('/jobs', async (c) => {
   });
 });
 
-// Вернуть упавшее задание в очередь — терминал подхватит при следующем опросе.
+// Повторить все ошибочные (и опционально зависшие in_progress) задания заведения.
+apiFiscal.post('/jobs/retry-all', async (c) => {
+  const venueId = c.req.query('venueId');
+  if (!venueId) {
+    c.status(400);
+    return c.json({ error: 'Не указано заведение' });
+  }
+  const body = await c.req.json().catch(() => ({}));
+  const includeStuck = Boolean(body?.includeStuck);
+
+  const { rowCount } = await pool.query(
+    `UPDATE fiscal_jobs
+     SET status = 'pending', last_error = NULL, updated_at = now()
+     WHERE venue_id = $1
+       AND (
+         status = 'error'
+         OR (
+           $2::boolean
+           AND status = 'in_progress'
+           AND updated_at < now() - interval '2 minutes'
+         )
+       )`,
+    [venueId, includeStuck]
+  );
+
+  return c.json({ ok: true, retried: rowCount || 0 });
+});
+
+// Вернуть упавшее / зависшее задание в очередь — терминал подхватит при следующем опросе.
 apiFiscal.post('/jobs/:id/retry', async (c) => {
   const jobId = c.req.param('id');
   const venueId = c.req.query('venueId');
@@ -151,12 +184,12 @@ apiFiscal.post('/jobs/:id/retry', async (c) => {
   const { rowCount } = await pool.query(
     `UPDATE fiscal_jobs
      SET status = 'pending', last_error = NULL, updated_at = now()
-     WHERE id = $1 AND venue_id = $2 AND status = 'error'`,
+     WHERE id = $1 AND venue_id = $2 AND status IN ('error', 'in_progress')`,
     [jobId, venueId]
   );
   if (!rowCount) {
     c.status(404);
-    return c.json({ error: 'Задание не найдено или уже не в статусе error' });
+    return c.json({ error: 'Задание не найдено или его нельзя повторить' });
   }
   return c.json({ ok: true });
 });

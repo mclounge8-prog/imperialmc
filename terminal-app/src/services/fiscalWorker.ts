@@ -103,6 +103,7 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
             `Касса ответила без fiscalDocumentNumber/fiscalDocumentSign: ${JSON.stringify(response)}`;
           console.warn(`[ATOL] задание #${job.id} — ${message}`);
           notifyFiscalError({
+            kind: 'atol',
             jobId: job.id,
             title: `${jobTypeLabel(job.type)} #${job.id}`,
             message,
@@ -121,6 +122,7 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
         const message = err instanceof Error ? err.message : String(err);
         console.warn(`[ATOL] задание #${job.id} — ошибка:`, message);
         notifyFiscalError({
+          kind: 'atol',
           jobId: job.id,
           title: `${jobTypeLabel(job.type)} #${job.id}`,
           message,
@@ -131,6 +133,7 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
   } catch (err) {
     console.warn('[ATOL] не удалось получить настройки/связаться с backend:', err);
     notifyFiscalError({
+      kind: 'server',
       title: 'Связь с сервером',
       message: err instanceof Error ? err.message : String(err),
     });
