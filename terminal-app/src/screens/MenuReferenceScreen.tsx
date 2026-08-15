@@ -5,6 +5,7 @@ import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
 import MenuBrowser from '../components/MenuBrowser';
 import CompositionModal from '../components/CompositionModal';
+import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import type { CompositionTarget } from '../components/CompositionModal';
 import { fetchMenu } from '../api/client';
 import type { MenuResponse } from '../api/client';
@@ -39,34 +40,44 @@ export default function MenuReferenceScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent2} size="large" />
-      </View>
+      <ScreenSwipeHost screen="MenuReference">
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.accent2} size="large" />
+        </View>
+      </ScreenSwipeHost>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.retryButton} onPress={load}>
-          <Text style={styles.retryText}>Повторить</Text>
-        </Pressable>
-      </View>
+      <ScreenSwipeHost screen="MenuReference">
+        <View style={styles.center}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable style={styles.retryButton} onPress={load}>
+            <Text style={styles.retryText}>Повторить</Text>
+          </Pressable>
+        </View>
+      </ScreenSwipeHost>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.hintBar}>
-        <Text style={styles.hintText}>Справочник меню — тап по позиции показывает состав</Text>
+    <ScreenSwipeHost screen="MenuReference">
+      <View style={styles.container}>
+        <View style={styles.hintBar}>
+          <Text style={styles.hintText}>
+            Справочник меню — тап по позиции показывает состав · свайп влево/вправо — Столы / Настройки
+          </Text>
+        </View>
+        <MenuBrowser
+          menu={menu}
+          onItemPress={(item) =>
+            setCompositionTarget({ name: item.name, modifierGroups: item.modifierGroups })
+          }
+        />
+        <CompositionModal target={compositionTarget} onClose={() => setCompositionTarget(null)} />
       </View>
-      <MenuBrowser
-        menu={menu}
-        onItemPress={(item) => setCompositionTarget({ name: item.name, modifierGroups: item.modifierGroups })}
-      />
-      <CompositionModal target={compositionTarget} onClose={() => setCompositionTarget(null)} />
-    </View>
+    </ScreenSwipeHost>
   );
 }
 
