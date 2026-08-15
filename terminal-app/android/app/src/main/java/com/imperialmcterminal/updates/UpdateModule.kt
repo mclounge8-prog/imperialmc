@@ -207,7 +207,7 @@ class UpdateModule(reactContext: ReactApplicationContext) :
           }
 
         val saved = reactApplicationContext
-          .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+          .getSharedPreferences(PREFS, MODE)
           .edit()
           .putString(KEY_JS_BUNDLE, bundle.absolutePath)
           .putInt(KEY_JS_VERSION, jsVersion)
