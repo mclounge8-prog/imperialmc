@@ -206,13 +206,20 @@ class UpdateModule(reactContext: ReactApplicationContext) :
             return@thread
           }
 
-        reactApplicationContext
-          .getSharedPreferences(PREFS, MODE)
+        val saved = reactApplicationContext
+          .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
           .edit()
           .putString(KEY_JS_BUNDLE, bundle.absolutePath)
           .putInt(KEY_JS_VERSION, jsVersion)
           .putInt(KEY_JS_FOR_APK, BuildConfig.VERSION_CODE)
-          .apply()
+          // commit(), не apply(): иначе Runtime.exit при рестарте убивает процесс
+          // до записи prefs — и планшет снова видит JS 0 → N в цикле.
+          .commit()
+
+        if (!saved) {
+          promise.reject("JS_OTA_PREFS", "Не удалось сохранить версию OTA")
+          return@thread
+        }
 
         promise.resolve(bundle.absolutePath)
       } catch (e: Exception) {
