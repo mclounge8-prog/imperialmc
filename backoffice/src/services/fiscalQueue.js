@@ -109,6 +109,9 @@ function buildCashOutPayload({ amount, operatorName }) {
 export function buildPrecheckPayload({
   items,
   total,
+  subtotal,
+  discountPercent = 0,
+  discountAmount = 0,
   tableName,
   guestLabel,
   operatorName,
@@ -147,6 +150,18 @@ export function buildPrecheckPayload({
   }
 
   lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
+  if (discountPercent > 0) {
+    lines.push({
+      type: 'text',
+      text: `Сумма: ${Number(subtotal).toFixed(2)} руб.`,
+      alignment: 'right',
+    });
+    lines.push({
+      type: 'text',
+      text: `Скидка ${discountPercent}%: −${Number(discountAmount).toFixed(2)} руб.`,
+      alignment: 'right',
+    });
+  }
   lines.push({
     type: 'text',
     text: `ИТОГО: ${Number(total).toFixed(2)} руб.`,
@@ -163,7 +178,18 @@ export function buildPrecheckPayload({
 
 export async function enqueuePrecheckFiscalJob(
   client,
-  { venueId, items, total, tableName, guestLabel, operatorName, venueName }
+  {
+    venueId,
+    items,
+    total,
+    subtotal,
+    discountPercent,
+    discountAmount,
+    tableName,
+    guestLabel,
+    operatorName,
+    venueName,
+  }
 ) {
   if (!venueId) return null;
   const enabled = await isAtolEnabledForVenue(client, venueId);
@@ -176,6 +202,9 @@ export async function enqueuePrecheckFiscalJob(
   const payload = buildPrecheckPayload({
     items,
     total,
+    subtotal,
+    discountPercent,
+    discountAmount,
     tableName,
     guestLabel,
     operatorName,

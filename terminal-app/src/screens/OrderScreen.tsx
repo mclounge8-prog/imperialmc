@@ -32,6 +32,7 @@ import {
   moveOrderItem,
   transferOrderTable,
   payGuest,
+  setGuestDiscount,
   cancelGuest,
   printGuestPrecheck,
   fetchCurrentShift,
@@ -102,7 +103,9 @@ export default function OrderScreen({ route, navigation }: Props) {
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [cashEntryMode, setCashEntryMode] = useState(false);
   const [cashReceivedText, setCashReceivedText] = useState('');
-  const [discountPercent, setDiscountPercent] = useState<DiscountPercent>(0);
+  const [discountGuest, setDiscountGuest] = useState<OrderGuest | null>(null);
+  const [discountDraft, setDiscountDraft] = useState<DiscountPercent>(0);
+  const [discountBusy, setDiscountBusy] = useState(false);
   const [compositionTarget, setCompositionTarget] = useState<CompositionTarget>(null);
   const [customizeTarget, setCustomizeTarget] = useState<MenuItem | null>(null);
   const [cancelCommentGuest, setCancelCommentGuest] = useState<OrderGuest | null>(null);
@@ -338,7 +341,42 @@ export default function OrderScreen({ route, navigation }: Props) {
     setPaymentTarget(null);
     setCashEntryMode(false);
     setCashReceivedText('');
-    setDiscountPercent(0);
+  };
+
+  const openDiscountModal = () => {
+    if (!order) return;
+    const guest = order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
+    if (!guest) return;
+    if (guest.precheckPrintedAt) {
+      showAlert('Пречек напечатан', 'После пречека скидку менять нельзя.');
+      return;
+    }
+    const guestSubtotal = guest.subtotal ?? guest.total;
+    if (guestSubtotal <= 0) {
+      showAlert('Пустой чек', 'Сначала добавьте позиции гостю');
+      return;
+    }
+    setDiscountDraft((guest.discountPercent as DiscountPercent) || 0);
+    setDiscountGuest(guest);
+  };
+
+  const confirmGuestDiscount = async () => {
+    if (!session || !order || !discountGuest) return;
+    setDiscountBusy(true);
+    try {
+      const updated = await setGuestDiscount(
+        order.id,
+        discountGuest.id,
+        discountDraft,
+        session.token
+      );
+      setOrder(updated);
+      setDiscountGuest(null);
+    } catch (e) {
+      showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось сохранить скидку');
+    } finally {
+      setDiscountBusy(false);
+    }
   };
 
   const handleCashKeyPress = (key: string) => {
@@ -383,7 +421,8 @@ export default function OrderScreen({ route, navigation }: Props) {
     if (!order) return;
     const guest = order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
     if (!guest) return;
-    if (order.precheckEnabled && guest.total > 0 && !guest.precheckPrintedAt) {
+    const guestSubtotal = guest.subtotal ?? guest.total;
+    if (order.precheckEnabled && guestSubtotal > 0 && !guest.precheckPrintedAt) {
       showAlert('Нужен пречек', 'Сначала напечатайте пречек, затем проводите оплату.');
       return;
     }
@@ -395,7 +434,8 @@ export default function OrderScreen({ route, navigation }: Props) {
     if (!session || !order) return;
     const guest = order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
     if (!guest) return;
-    if (guest.total <= 0) {
+    const guestSubtotal = guest.subtotal ?? guest.total;
+    if (guestSubtotal <= 0) {
       showAlert('Пустой чек', 'Добавьте позиции перед печатью пречека');
       return;
     }
@@ -408,7 +448,13 @@ export default function OrderScreen({ route, navigation }: Props) {
       const updated = await printGuestPrecheck(order.id, guest.id, session.token);
       setOrder(updated);
       if (venue) runPendingFiscalJobs(venue.id, session.token);
-      showAlert('Пречек', 'Состав зафиксирован. Печать ушла на кассу (если АТОЛ включён).');
+      const pct = guest.discountPercent || 0;
+      showAlert(
+        'Пречек',
+        pct > 0
+          ? `Состав зафиксирован со скидкой ${pct}%. Печать ушла на кассу (если АТОЛ включён).`
+          : 'Состав зафиксирован. Печать ушла на кассу (если АТОЛ включён).'
+      );
     } catch (e) {
       showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось напечатать пречек');
     } finally {
@@ -416,10 +462,16 @@ export default function OrderScreen({ route, navigation }: Props) {
     }
   };
 
-  const payableAmount = paymentTarget
-    ? roundMoney(paymentTarget.total * (1 - discountPercent / 100))
+  const payableAmount = paymentTarget ? roundMoney(paymentTarget.total) : 0;
+  const paymentSubtotal = paymentTarget
+    ? roundMoney(paymentTarget.subtotal ?? paymentTarget.total)
     : 0;
-  const discountAmount = paymentTarget ? roundMoney(paymentTarget.total - payableAmount) : 0;
+  const paymentDiscountPct = paymentTarget?.discountPercent
+    ? Number(paymentTarget.discountPercent)
+    : 0;
+  const paymentDiscountAmount = paymentTarget
+    ? roundMoney(paymentTarget.discountAmount ?? paymentSubtotal - payableAmount)
+    : 0;
   const cashReceivedAmount = parseFloat(cashReceivedText.replace(',', '.')) || 0;
   const changeAmount = cashReceivedAmount - payableAmount;
   const canConfirmCash = paymentTarget != null && cashReceivedAmount >= payableAmount - 0.001;
@@ -431,20 +483,10 @@ export default function OrderScreen({ route, navigation }: Props) {
       return;
     }
     const guest = paymentTarget;
-    const pct = discountPercent;
     setPaymentBusy(true);
     try {
-      const updated = await payGuest(
-        order.id,
-        guest.id,
-        method,
-        payableAmount,
-        session.token,
-        pct
-      );
+      const updated = await payGuest(order.id, guest.id, method, payableAmount, session.token);
       closePaymentModal();
-      // Не ждём фискализацию — она не должна задерживать закрытие модалки
-      // оплаты, при сбое чек останется в очереди и разберётся фоном.
       if (venue && payableAmount > 0.009) runPendingFiscalJobs(venue.id, session.token);
       if (updated.guests.length === 0) {
         navigation.goBack();
@@ -461,7 +503,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   };
 
   const confirmComplimentary = async () => {
-    if (!session || !order || !paymentTarget || discountPercent !== 100) return;
+    if (!session || !order || !paymentTarget || paymentDiscountPct !== 100) return;
     if (!(await ensureShiftOpen(0))) {
       closePaymentModal();
       return;
@@ -469,7 +511,7 @@ export default function OrderScreen({ route, navigation }: Props) {
     const guest = paymentTarget;
     setPaymentBusy(true);
     try {
-      const updated = await payGuest(order.id, guest.id, 'cash', 0, session.token, 100);
+      const updated = await payGuest(order.id, guest.id, 'cash', 0, session.token);
       closePaymentModal();
       if (updated.guests.length === 0) {
         navigation.goBack();
@@ -609,6 +651,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                 ]}
               >
                 {guest.total.toFixed(0)} ₽
+                {Number(guest.discountPercent) > 0 ? ` (−${guest.discountPercent}%)` : ''}
               </Text>
             </Pressable>
           ))}
@@ -680,7 +723,15 @@ export default function OrderScreen({ route, navigation }: Props) {
         )}
 
         <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Итого — {selectedGuest?.label ?? 'чек'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.totalLabel}>Итого — {selectedGuest?.label ?? 'чек'}</Text>
+            {selectedGuest && Number(selectedGuest.discountPercent) > 0 ? (
+              <Text style={styles.discountInline}>
+                скидка {selectedGuest.discountPercent}% · было{' '}
+                {(selectedGuest.subtotal ?? selectedGuest.total).toFixed(2)} ₽
+              </Text>
+            ) : null}
+          </View>
           <Text style={styles.totalValue}>{(selectedGuest?.total ?? 0).toFixed(2)} ₽</Text>
         </View>
 
@@ -690,10 +741,31 @@ export default function OrderScreen({ route, navigation }: Props) {
               <Text style={styles.transferButtonText}>🔀 Пересадить</Text>
             </Pressable>
           )}
+          <Pressable
+            style={[styles.actionButton, styles.discountButton]}
+            disabled={
+              busy ||
+              !selectedGuest ||
+              (selectedGuest.subtotal ?? selectedGuest.total) <= 0 ||
+              precheckLocked
+            }
+            onPress={openDiscountModal}
+          >
+            <Text style={styles.discountButtonText}>
+              Скидка
+              {selectedGuest && Number(selectedGuest.discountPercent) > 0
+                ? ` ${selectedGuest.discountPercent}%`
+                : ''}
+            </Text>
+          </Pressable>
           {precheckMode && !precheckLocked ? (
             <Pressable
               style={[styles.actionButton, styles.precheckButton]}
-              disabled={busy || !selectedGuest || selectedGuest.total === 0}
+              disabled={
+                busy ||
+                !selectedGuest ||
+                (selectedGuest.subtotal ?? selectedGuest.total) <= 0
+              }
               onPress={() => void handlePrecheck()}
             >
               <Text style={styles.precheckButtonText}>Пречек</Text>
@@ -704,7 +776,7 @@ export default function OrderScreen({ route, navigation }: Props) {
             disabled={
               busy ||
               !selectedGuest ||
-              selectedGuest.total === 0 ||
+              (selectedGuest.subtotal ?? selectedGuest.total) <= 0 ||
               (precheckMode && !precheckLocked)
             }
             onPress={handlePay}
@@ -717,7 +789,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                 styles.actionButton,
                 (busy ||
                   !selectedGuest ||
-                  selectedGuest.total === 0 ||
+                  (selectedGuest.subtotal ?? selectedGuest.total) <= 0 ||
                   (precheckMode && !precheckLocked)) &&
                   styles.actionButtonDisabled,
               ]}
@@ -840,14 +912,12 @@ export default function OrderScreen({ route, navigation }: Props) {
           <Pressable style={styles.paymentModalBox} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.modalTitle}>Оплата — {paymentTarget?.label}</Text>
             <Text style={styles.paymentAmount}>{payableAmount.toFixed(2)} ₽</Text>
-            {discountPercent > 0 ? (
+            {paymentDiscountPct > 0 ? (
               <Text style={styles.discountHint}>
-                было {paymentTarget?.total.toFixed(2)} ₽ · скидка {discountPercent}% (−
-                {discountAmount.toFixed(2)} ₽)
+                было {paymentSubtotal.toFixed(2)} ₽ · скидка {paymentDiscountPct}% (−
+                {paymentDiscountAmount.toFixed(2)} ₽)
               </Text>
-            ) : (
-              <Text style={styles.discountHint}>без скидки</Text>
-            )}
+            ) : null}
 
             {paymentBusy ? (
               <ActivityIndicator color={colors.accent2} style={{ marginVertical: 24 }} />
@@ -891,23 +961,92 @@ export default function OrderScreen({ route, navigation }: Props) {
                   <Text style={styles.modalCancelText}>← Назад к способу оплаты</Text>
                 </Pressable>
               </>
+            ) : paymentDiscountPct === 100 ? (
+              <>
+                <Text style={styles.modalSubtitle}>Чек будет закрыт как комплимент (0 ₽)</Text>
+                <Pressable
+                  style={[styles.paymentMethodButton, styles.paymentMethodComp]}
+                  onPress={confirmComplimentary}
+                >
+                  <Text style={styles.paymentMethodLabel}>Закрыть со скидкой 100%</Text>
+                </Pressable>
+                <Pressable style={styles.modalCancel} onPress={closePaymentModal}>
+                  <Text style={styles.modalCancelText}>Отмена</Text>
+                </Pressable>
+              </>
             ) : (
               <>
-                <Text style={styles.modalSubtitle}>Скидка</Text>
+                <Text style={styles.modalSubtitle}>Выбери способ оплаты</Text>
+                <Pressable
+                  style={[styles.paymentMethodButton, styles.paymentMethodCash]}
+                  onPress={() => setCashEntryMode(true)}
+                >
+                  <Text style={styles.paymentMethodIcon}>💵</Text>
+                  <Text style={styles.paymentMethodLabel}>Наличные</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.paymentMethodButton, styles.paymentMethodCard]}
+                  onPress={() => confirmPayment('card')}
+                >
+                  <Text style={styles.paymentMethodIcon}>💳</Text>
+                  <Text style={styles.paymentMethodLabel}>Безналичный</Text>
+                </Pressable>
+                <Pressable style={styles.modalCancel} onPress={closePaymentModal}>
+                  <Text style={styles.modalCancelText}>Отмена</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Скидка на выбранного гостя — до пречека, не на весь стол */}
+      <Modal
+        visible={discountGuest !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !discountBusy && setDiscountGuest(null)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => !discountBusy && setDiscountGuest(null)}
+        >
+          <Pressable style={styles.paymentModalBox} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>Скидка — {discountGuest?.label}</Text>
+            {(() => {
+              const sub = discountGuest
+                ? roundMoney(discountGuest.subtotal ?? discountGuest.total)
+                : 0;
+              const payable = roundMoney(sub * (1 - discountDraft / 100));
+              return (
+                <>
+                  <Text style={styles.paymentAmount}>{payable.toFixed(2)} ₽</Text>
+                  <Text style={styles.discountHint}>
+                    сумма гостя {sub.toFixed(2)} ₽
+                    {discountDraft > 0 ? ` · −${discountDraft}%` : ' · без скидки'}
+                  </Text>
+                </>
+              );
+            })()}
+            {discountBusy ? (
+              <ActivityIndicator color={colors.accent2} style={{ marginVertical: 24 }} />
+            ) : (
+              <>
+                <Text style={styles.modalSubtitle}>Процент для этого гостя</Text>
                 <View style={styles.discountRow}>
                   {DISCOUNT_OPTIONS.map((pct) => (
                     <Pressable
                       key={pct}
                       style={[
                         styles.discountChip,
-                        discountPercent === pct && styles.discountChipActive,
+                        discountDraft === pct && styles.discountChipActive,
                       ]}
-                      onPress={() => setDiscountPercent(pct)}
+                      onPress={() => setDiscountDraft(pct)}
                     >
                       <Text
                         style={[
                           styles.discountChipText,
-                          discountPercent === pct && styles.discountChipTextActive,
+                          discountDraft === pct && styles.discountChipTextActive,
                         ]}
                       >
                         {pct === 0 ? '0%' : `${pct}%`}
@@ -915,37 +1054,13 @@ export default function OrderScreen({ route, navigation }: Props) {
                     </Pressable>
                   ))}
                 </View>
-
-                {discountPercent === 100 ? (
-                  <>
-                    <Text style={styles.modalSubtitle}>Чек будет закрыт как комплимент (0 ₽)</Text>
-                    <Pressable
-                      style={[styles.paymentMethodButton, styles.paymentMethodComp]}
-                      onPress={confirmComplimentary}
-                    >
-                      <Text style={styles.paymentMethodLabel}>Закрыть со скидкой 100%</Text>
-                    </Pressable>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.modalSubtitle}>Выбери способ оплаты</Text>
-                    <Pressable
-                      style={[styles.paymentMethodButton, styles.paymentMethodCash]}
-                      onPress={() => setCashEntryMode(true)}
-                    >
-                      <Text style={styles.paymentMethodIcon}>💵</Text>
-                      <Text style={styles.paymentMethodLabel}>Наличные</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.paymentMethodButton, styles.paymentMethodCard]}
-                      onPress={() => confirmPayment('card')}
-                    >
-                      <Text style={styles.paymentMethodIcon}>💳</Text>
-                      <Text style={styles.paymentMethodLabel}>Безналичный</Text>
-                    </Pressable>
-                  </>
-                )}
-                <Pressable style={styles.modalCancel} onPress={closePaymentModal}>
+                <Pressable
+                  style={[styles.confirmCashButton, { marginTop: 16 }]}
+                  onPress={() => void confirmGuestDiscount()}
+                >
+                  <Text style={styles.paymentMethodLabel}>Сохранить</Text>
+                </Pressable>
+                <Pressable style={styles.modalCancel} onPress={() => setDiscountGuest(null)}>
                   <Text style={styles.modalCancelText}>Отмена</Text>
                 </Pressable>
               </>
@@ -1207,6 +1322,17 @@ const styles = StyleSheet.create({
     borderColor: colors.accent2,
   },
   precheckButtonText: { color: colors.accent2, fontSize: 16, fontWeight: '700' },
+  discountButton: {
+    backgroundColor: 'rgba(230, 160, 63, 0.1)',
+    borderWidth: 1,
+    borderColor: '#e6a03f',
+  },
+  discountButtonText: { color: '#e6a03f', fontSize: 16, fontWeight: '700' },
+  discountInline: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
 
   modalBackdrop: {
     flex: 1,

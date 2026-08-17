@@ -203,10 +203,17 @@ export type OrderItem = {
   modifiers: OrderItemModifier[];
 };
 
+export type DiscountPercent = 0 | 10 | 15 | 20 | 25 | 100;
+
 export type OrderGuest = {
   id: number;
   label: string;
   items: OrderItem[];
+  /** Сумма позиций без скидки */
+  subtotal?: number;
+  discountPercent?: DiscountPercent | number;
+  discountAmount?: number;
+  /** К оплате с учётом скидки гостя */
   total: number;
   precheckPrintedAt?: string | null;
   precheckPrintedByName?: string | null;
@@ -356,29 +363,36 @@ export async function removeOrderItem(
 
 export type PaymentMethod = 'cash' | 'card';
 
-export type DiscountPercent = 0 | 10 | 15 | 20 | 25 | 100;
-
 export async function payGuest(
   orderId: number,
   guestId: number,
   method: PaymentMethod,
   amount: number,
-  token: string,
-  discountPercent: DiscountPercent = 0
+  token: string
 ): Promise<Order> {
   const body: {
     payments: { method: PaymentMethod; amount: number }[];
-    discount_percent?: DiscountPercent;
   } = {
     payments: amount > 0.009 ? [{ method, amount }] : [],
   };
-  if (discountPercent > 0) {
-    body.discount_percent = discountPercent;
-  }
   const { order } = await authorizedRequest<OrderEnvelope>(
     `/api/orders/${orderId}/guests/${guestId}/pay`,
     token,
     { method: 'POST', body }
+  );
+  return order;
+}
+
+export async function setGuestDiscount(
+  orderId: number,
+  guestId: number,
+  discountPercent: DiscountPercent,
+  token: string
+): Promise<Order> {
+  const { order } = await authorizedRequest<OrderEnvelope>(
+    `/api/orders/${orderId}/guests/${guestId}/discount`,
+    token,
+    { method: 'POST', body: { discount_percent: discountPercent } }
   );
   return order;
 }
