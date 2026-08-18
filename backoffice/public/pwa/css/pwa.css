@@ -34,9 +34,28 @@ html, body {
   overscroll-behavior-y: contain;
 }
 
+/*
+ * Важно: наш `.app-screen { display: flex }` перекрывал бы браузерный стиль
+ * атрибута [hidden] (одинаковая специфичность, побеждает авторский CSS) —
+ * из-за этого экран «Показатели» оставался в потоке документа под формой
+ * входа и его было видно, если пролистать вниз.
+ */
+[hidden] {
+  display: none !important;
+}
+
+body.is-login {
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
+}
+
 /* ---------- Экран входа (визуально идентичен бэкофису) ---------- */
 
 .login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -45,6 +64,9 @@ html, body {
   justify-content: center;
   gap: 32px;
   padding: 24px;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  background: var(--bg);
+  overflow: auto;
 }
 
 .brand-mark {
@@ -109,6 +131,11 @@ html, body {
   margin: 0 0 24px;
   font-size: 13px;
   color: var(--text-muted);
+}
+
+.login-hint strong {
+  color: var(--text);
+  font-weight: 600;
 }
 
 form label {

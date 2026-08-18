@@ -17,7 +17,7 @@
   var updatedHint = document.getElementById('updatedHint');
 
   var state = {
-    date: null, // YYYY-MM-DD, синхронизировано с dateInput
+    date: null,
     venueId: '',
   };
 
@@ -62,18 +62,26 @@
   function showLogin(message) {
     appScreen.hidden = true;
     loginScreen.hidden = false;
+    document.body.classList.add('is-login');
     loginError.textContent = message || '';
   }
 
   function showApp() {
     loginScreen.hidden = true;
     appScreen.hidden = false;
+    document.body.classList.remove('is-login');
+  }
+
+  function apiFetch(url, options) {
+    var opts = options || {};
+    opts.credentials = 'include';
+    return fetch(url, opts);
   }
 
   // ---------- Авторизация ----------
 
   function checkSession() {
-    return fetch('/api/auth/me', { credentials: 'same-origin' })
+    return apiFetch('/api/auth/me')
       .then(function (res) {
         if (!res.ok) throw new Error('unauth');
         return res.json();
@@ -95,35 +103,51 @@
     var username = document.getElementById('username').value.trim();
     var password = document.getElementById('password').value;
 
-    fetch('/api/auth/login-json', {
+    apiFetch('/api/auth/login-json', {
       method: 'POST',
-      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: username, password: password }),
     })
       .then(function (res) {
         return res.json().then(function (data) {
-          return { ok: res.ok, data: data };
+          return { ok: res.ok, status: res.status, data: data };
         });
       })
       .then(function (result) {
-        loginSubmit.disabled = false;
         if (!result.ok) {
+          loginSubmit.disabled = false;
           loginError.textContent = result.data.error || 'Не удалось войти';
-          return;
+          return null;
         }
+        // Cookie мог не сохраниться (особенно в standalone PWA на iOS) —
+        // не открываем «Показатели», пока /me не подтвердит сессию.
+        return apiFetch('/api/auth/me').then(function (res) {
+          if (!res.ok) {
+            throw new Error('session');
+          }
+          return res.json();
+        });
+      })
+      .then(function (me) {
+        loginSubmit.disabled = false;
+        if (!me) return;
         loginForm.reset();
         showApp();
-        init();
+        return init();
       })
-      .catch(function () {
+      .catch(function (err) {
         loginSubmit.disabled = false;
+        if (err && err.message === 'session') {
+          loginError.textContent =
+            'Вход принят, но браузер не сохранил сессию. Откройте https://imperial-mc.online/pwa/ в Safari (не из ярлыка), войдите, затем снова «На экран Домой».';
+          return;
+        }
         loginError.textContent = 'Сервер недоступен, попробуйте ещё раз';
       });
   });
 
   logoutBtn.addEventListener('click', function () {
-    fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).finally(function () {
+    apiFetch('/api/auth/logout', { method: 'POST' }).finally(function () {
       showLogin();
     });
   });
@@ -158,7 +182,7 @@
   // ---------- Загрузка данных ----------
 
   function loadVenues() {
-    return fetch('/api/pwa/venues', { credentials: 'same-origin' })
+    return apiFetch('/api/pwa/venues')
       .then(function (res) {
         if (!res.ok) throw new Error('venues');
         return res.json();
@@ -181,10 +205,10 @@
     if (state.date) params.set('date', state.date);
     if (state.venueId) params.set('venueId', state.venueId);
 
-    return fetch('/api/pwa/stats?' + params.toString(), { credentials: 'same-origin' })
+    return apiFetch('/api/pwa/stats?' + params.toString())
       .then(function (res) {
         if (res.status === 401) {
-          showLogin();
+          showLogin('Сессия истекла, войдите снова');
           throw new Error('unauth');
         }
         if (!res.ok) throw new Error('stats');
@@ -286,5 +310,9 @@
     });
   }
 
+  // Стартуем с экрана входа — иначе до ответа /me на долю секунды
+  // мелькает «Показатели» (и раньше из-за бага с [hidden] он вообще всегда
+  // оставался внизу страницы).
+  showLogin();
   checkSession();
 })();
