@@ -174,7 +174,7 @@
   logoutBtn.addEventListener('click', function () {
     apiFetch('/api/auth/logout', { method: 'POST' }).finally(function () {
       showLogin('');
-      document.getElementById('username').value = 'mc-imperial';
+      document.getElementById('username').value = '';
       document.getElementById('password').value = '';
     });
   });

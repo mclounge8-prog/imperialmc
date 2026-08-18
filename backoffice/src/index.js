@@ -37,6 +37,12 @@ import { ensureTelegramSettingsRow } from './services/telegramNotify.js';
 
 const app = new Hono();
 
+// Поисковым ботам: не индексировать. Браузеры, терминал и API это игнорируют.
+app.use('*', async (c, next) => {
+  await next();
+  c.header('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+});
+
 app.route('/api/auth', authRoutes);
 app.route('/', dashboardRoutes); // отдаёт /fragments/:section (защищено)
 app.route('/staff', staffRoutes); // CRUD сотрудников
