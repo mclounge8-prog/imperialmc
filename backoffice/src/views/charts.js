@@ -6,11 +6,14 @@ import { escapeHtml } from './escapeHtml.js';
 export const CHART_COLORS = {
   accent: '#2647c7',
   accent2: '#3f63e6',
-  accent2Fill: 'rgba(63, 99, 230, 0.16)',
+  accent2Fill: 'rgba(63, 99, 230, 0.22)',
   muted: '#98979f',
   mutedFill: 'rgba(152, 151, 159, 0.12)',
   grid: '#34343c',
   text: '#98979f',
+  bg: '#1b1b1f',
+  // Сегменты donut — оттенки брендового синего + нейтрали
+  donut: ['#3f63e6', '#2647c7', '#5b7cf0', '#7a93f5', '#98979f'],
 };
 
 export function formatMoney(value, { decimals = 0 } = {}) {
@@ -194,6 +197,10 @@ export function renderTopItemsList(items) {
 
   return `
     <div class="top-items-list">
+      <div class="top-items-head">
+        <span>Блюдо</span>
+        <span>Выручка, ₽</span>
+      </div>
       ${items
         .map((item, idx) => {
           const revenue = Number(item.revenue);
@@ -213,6 +220,84 @@ export function renderTopItemsList(items) {
           `;
         })
         .join('')}
+    </div>
+  `;
+}
+
+/**
+ * Donut для топ-блюд. В центре — лидер и его доля.
+ */
+export function renderDonutChart(items) {
+  if (!items.length) {
+    return `<p class="empty-hint">За этот период продаж нет</p>`;
+  }
+
+  const total = items.reduce((s, i) => s + Number(i.revenue), 0) || 1;
+  const size = 220;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 78;
+  const stroke = 28;
+  const circumference = 2 * Math.PI * r;
+
+  let offset = 0;
+  const segments = items
+    .map((item, idx) => {
+      const value = Number(item.revenue);
+      const share = value / total;
+      const dash = share * circumference;
+      const gap = circumference - dash;
+      const color = CHART_COLORS.donut[idx % CHART_COLORS.donut.length];
+      const el = `
+        <circle
+          cx="${cx}" cy="${cy}" r="${r}"
+          fill="none"
+          stroke="${color}"
+          stroke-width="${stroke}"
+          stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
+          stroke-dashoffset="${(-offset).toFixed(2)}"
+          transform="rotate(-90 ${cx} ${cy})"
+        >
+          <title>${escapeHtml(item.name)}: ${formatMoney(value)} (${(share * 100).toFixed(0)}%)</title>
+        </circle>
+      `;
+      offset += dash;
+      return el;
+    })
+    .join('');
+
+  const leader = items[0];
+  const leaderShare = ((Number(leader.revenue) / total) * 100).toFixed(0);
+
+  const legend = items
+    .map((item, idx) => {
+      const value = Number(item.revenue);
+      const share = ((value / total) * 100).toFixed(0);
+      const color = CHART_COLORS.donut[idx % CHART_COLORS.donut.length];
+      return `
+        <div class="donut-legend-row">
+          <span class="donut-swatch" style="background:${color}"></span>
+          <span class="donut-legend-pct">${share}%</span>
+          <span class="donut-legend-name">${escapeHtml(item.name)}</span>
+          <span class="donut-legend-val">${formatMoney(value)}</span>
+        </div>
+      `;
+    })
+    .join('');
+
+  return `
+    <div class="donut-layout">
+      <div class="donut-chart-wrap">
+        <svg viewBox="0 0 ${size} ${size}" class="donut-svg" role="img" aria-label="Топ блюд">
+          <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${CHART_COLORS.grid}" stroke-width="${stroke}" />
+          ${segments}
+        </svg>
+        <div class="donut-center">
+          <div class="donut-center-pct">${leaderShare}%</div>
+          <div class="donut-center-name">${escapeHtml(leader.name)}</div>
+        </div>
+      </div>
+      <div class="donut-legend">${legend}</div>
     </div>
   `;
 }

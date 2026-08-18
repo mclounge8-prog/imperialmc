@@ -5,7 +5,7 @@ import {
   renderDashboardSection,
   renderRevenueWidgetBody,
   renderTopItemsWidgetBody,
-  renderReceiptsCountWidgetBody,
+  renderTopItemsDonutBody,
 } from '../views/statsView.js';
 
 const stats = new Hono();
@@ -151,18 +151,52 @@ async function fetchTopItems(period, venueId, limit = 5) {
 async function fetchTodayStats(venueId) {
   const now = new Date();
   const todayStart = startOfUTCDay(now);
-  const rows = await fetchPaidReceiptsInRange(todayStart, new Date(todayStart.getTime() + 86400000), venueId);
-  const receiptCount = rows.length;
-  const revenue = rows.reduce((sum, r) => sum + Number(r.total), 0);
-  // Каждый чек (receipts) — это уже расчёт одного гостя (см. схему БД:
-  // receipts создаётся на конкретного order_guest), так что кол-во чеков
-  // и кол-во обслуженных гостей за период совпадают по построению.
+  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+  const tomorrowStart = new Date(todayStart.getTime() + 86400000);
+
+  const [todayRows, yesterdayRows] = await Promise.all([
+    fetchPaidReceiptsInRange(todayStart, tomorrowStart, venueId),
+    fetchPaidReceiptsInRange(yesterdayStart, todayStart, venueId),
+  ]);
+
+  const receiptCount = todayRows.length;
+  const revenue = todayRows.reduce((sum, r) => sum + Number(r.total), 0);
+  const yesterdayRevenue = yesterdayRows.reduce((sum, r) => sum + Number(r.total), 0);
+
   return {
     revenue,
     receiptCount,
     guestCount: receiptCount,
     avgCheck: receiptCount > 0 ? revenue / receiptCount : 0,
+    yesterdayRevenue,
   };
+}
+
+/** Итоги: сегодня / неделя / месяц / квартал — для подвала виджета «Выручка». */
+async function fetchPeriodTotals(venueId) {
+  const now = new Date();
+  const todayStart = startOfUTCDay(now);
+  const weekStart = mondayOfWeek(todayStart);
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const quarterMonth = Math.floor(now.getUTCMonth() / 3) * 3;
+  const quarterStart = new Date(Date.UTC(now.getUTCFullYear(), quarterMonth, 1));
+
+  const rows = await fetchPaidReceiptsInRange(quarterStart, now, venueId);
+
+  let day = 0;
+  let week = 0;
+  let month = 0;
+  let quarter = 0;
+  for (const r of rows) {
+    const closedAt = new Date(r.closed_at);
+    const amount = Number(r.total);
+    quarter += amount;
+    if (closedAt >= monthStart) month += amount;
+    if (closedAt >= weekStart) week += amount;
+    if (closedAt >= todayStart) day += amount;
+  }
+
+  return { day, week, month, quarter };
 }
 
 async function fetchHourlyComparison(venueId) {
@@ -196,15 +230,15 @@ async function fetchHourlyComparison(venueId) {
 async function buildDashboardData(venueId) {
   const { rows: venues } = await pool.query('SELECT id, name FROM venues ORDER BY name');
 
-  const [today, hourly, revenueTrend, topItems, receiptsTrend] = await Promise.all([
+  const [today, hourly, revenueTrend, topItems, periodTotals] = await Promise.all([
     fetchTodayStats(venueId),
     fetchHourlyComparison(venueId),
-    fetchTrend('day', venueId),
-    fetchTopItems('day', venueId),
-    fetchTrend('day', venueId),
+    fetchTrend('week', venueId),
+    fetchTopItems('day', venueId, 5),
+    fetchPeriodTotals(venueId),
   ]);
 
-  return { venues, venueId, today, hourly, revenueTrend, topItems, receiptsTrend };
+  return { venues, venueId, today, hourly, revenueTrend, topItems, periodTotals };
 }
 
 export async function renderDashboardFragment(venueId) {
@@ -220,22 +254,25 @@ stats.get('/', async (c) => {
 stats.get('/revenue', async (c) => {
   const venueId = c.req.query('venueId') || null;
   const period = normalizePeriod(c.req.query('period'));
-  const trend = await fetchTrend(period, venueId);
-  return c.html(renderRevenueWidgetBody(trend));
+  const [trend, periodTotals] = await Promise.all([
+    fetchTrend(period, venueId),
+    fetchPeriodTotals(venueId),
+  ]);
+  return c.html(renderRevenueWidgetBody(trend, periodTotals, period));
 });
 
 stats.get('/top-items', async (c) => {
   const venueId = c.req.query('venueId') || null;
   const period = normalizePeriod(c.req.query('period'));
-  const items = await fetchTopItems(period, venueId);
+  const items = await fetchTopItems(period, venueId, 5);
   return c.html(renderTopItemsWidgetBody(items));
 });
 
-stats.get('/receipts-count', async (c) => {
+stats.get('/top-items-donut', async (c) => {
   const venueId = c.req.query('venueId') || null;
   const period = normalizePeriod(c.req.query('period'));
-  const trend = await fetchTrend(period, venueId);
-  return c.html(renderReceiptsCountWidgetBody(trend));
+  const items = await fetchTopItems(period, venueId, 5);
+  return c.html(renderTopItemsDonutBody(items));
 });
 
 export default stats;

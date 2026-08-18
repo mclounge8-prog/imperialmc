@@ -1337,45 +1337,49 @@ input[type="radio"] {
   cursor: default;
 }
 
-/* ---------- Главная / статистика продаж ---------- */
+/* ---------- Главная / статистика продаж (рабочий стол) ---------- */
 
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-}
-
-.kpi-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px 20px;
-}
-
-.kpi-label {
-  font-size: 13px;
-  color: var(--text-muted);
+.dashboard-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
   margin-bottom: 8px;
 }
 
-.kpi-value {
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 600;
-  color: var(--text);
+.dashboard-header h1 {
+  margin-bottom: 4px;
 }
 
-.stats-grid-2 {
+.dashboard-header p {
+  margin: 0;
+}
+
+.dashboard-venue-select {
+  min-width: 200px;
+}
+
+.board-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.board-row-2 {
+  grid-template-columns: 1.35fr 1fr;
+}
+
+.board-row-3 {
+  grid-template-columns: 1fr 1fr 1.15fr;
 }
 
 .stat-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px 22px;
+  border-radius: 14px;
+  padding: 18px 20px;
+  min-width: 0;
 }
 
 .widget-header {
@@ -1397,34 +1401,38 @@ input[type="radio"] {
 
 .widget-header .hint {
   margin: 0;
+  font-size: 12px;
 }
 
 .widget-tabs {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
 }
 
 .widget-tab {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: none;
   color: var(--text-muted);
   font-family: var(--font-body);
   font-size: 12px;
+  font-weight: 600;
   padding: 6px 12px;
-  border-radius: 999px;
+  border-radius: 8px;
   cursor: pointer;
 }
 
 .widget-tab:hover {
   color: var(--text);
-  border-color: var(--accent-2);
 }
 
 .widget-tab-active {
   color: var(--text);
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-2);
 }
 
 .stat-card-summary {
@@ -1433,7 +1441,7 @@ input[type="radio"] {
 
 .stat-card-value {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--text);
 }
@@ -1442,6 +1450,83 @@ input[type="radio"] {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 2px;
+}
+
+.period-totals {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.period-total-cell {
+  min-width: 0;
+}
+
+.period-total-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.period-total-value {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.today-hero {
+  margin-bottom: 16px;
+}
+
+.today-hero-value {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.today-hero-compare {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.today-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.today-metric {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.today-metric-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.today-metric-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .delta-badge {
@@ -1526,6 +1611,16 @@ input[type="radio"] {
   gap: 10px;
 }
 
+.top-items-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 0 4px 34px;
+}
+
 .top-item-row {
   display: flex;
   align-items: center;
@@ -1593,11 +1688,107 @@ input[type="radio"] {
   color: var(--text-muted);
 }
 
-@media (max-width: 960px) {
-  .kpi-grid {
+.donut-layout {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.donut-chart-wrap {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  flex-shrink: 0;
+}
+
+.donut-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 28px;
+  pointer-events: none;
+}
+
+.donut-center-pct {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.donut-center-name {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+  max-width: 90px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.donut-legend {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.donut-legend-row {
+  display: grid;
+  grid-template-columns: 10px 36px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.donut-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.donut-legend-pct {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.donut-legend-name {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.donut-legend-val {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .board-row-2,
+  .board-row-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .period-totals {
     grid-template-columns: repeat(2, 1fr);
   }
-  .stats-grid-2 {
-    grid-template-columns: 1fr;
+  .today-hero-value {
+    font-size: 26px;
   }
 }
