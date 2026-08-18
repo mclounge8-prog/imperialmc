@@ -9,8 +9,13 @@ const auth = new Hono();
 const SESSION_TTL_SECONDS = 60 * 60 * 12; // 12 часов — примерно одна смена
 
 async function findAndCheckUser(username, password) {
+  // Логин сравниваем без учёта регистра: на телефоне часто уходит
+  // «Mc-Imperial» / «MC-IMPERIAL» из автозаполнения или Shift, а в БД лежит
+  // канонический «mc-imperial» — иначе bcrypt даже не вызывается и PWA
+  // показывает «Неверный логин или пароль», хотя в бэкофисе те же данные
+  // уже сохранены браузером в правильном регистре и проходят.
   const { rows } = await pool.query(
-    'SELECT id, username, password_hash, role FROM admin_users WHERE username = $1',
+    'SELECT id, username, password_hash, role FROM admin_users WHERE lower(username) = lower($1)',
     [username]
   );
   const user = rows[0];

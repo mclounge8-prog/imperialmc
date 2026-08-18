@@ -1,7 +1,7 @@
 // Service worker PWA «Показатели». Версия в имени кэша — единственный способ
 // заставить браузер подтянуть новый app-shell после деплоя (иначе activate
 // увидит старый CACHE_NAME и ничего не тронет).
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `imperial-mc-pwa-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -36,18 +36,11 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // Данные статистики/логина — всегда сеть, кэш только как офлайн-подстраховка
-  // (устаревшие цифры хуже, чем короткое ожидание сети).
+  // API всегда только из сети. POST/логин кэшировать нельзя: иначе после
+  // одного неверного ввода SW мог бы отдать сохранённый 401 даже при верном
+  // пароле, а устаревшая статистика хуже короткого ожидания сети.
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
+    event.respondWith(fetch(event.request));
     return;
   }
 
