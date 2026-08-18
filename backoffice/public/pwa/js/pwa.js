@@ -21,6 +21,11 @@
     venueId: '',
   };
 
+  // Поколение экрана авторизации: поздний ответ старого checkSession() не должен
+  // вернуть форму входа поверх уже открытой статистики (типичная гонка на iPhone).
+  var authEpoch = 0;
+  var isAuthenticated = false;
+
   var MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
   function todayISO() {
@@ -60,16 +65,26 @@
   }
 
   function showLogin(message) {
-    appScreen.hidden = true;
-    loginScreen.hidden = false;
+    isAuthenticated = false;
+    authEpoch += 1;
+    loginScreen.classList.remove('screen-hidden');
+    appScreen.classList.add('screen-hidden');
+    appScreen.setAttribute('aria-hidden', 'true');
     document.body.classList.add('is-login');
-    loginError.textContent = message || '';
+    window.scrollTo(0, 0);
+    if (message !== undefined) {
+      loginError.textContent = message || '';
+    }
   }
 
   function showApp() {
-    loginScreen.hidden = true;
-    appScreen.hidden = false;
+    isAuthenticated = true;
+    authEpoch += 1;
+    loginScreen.classList.add('screen-hidden');
+    appScreen.classList.remove('screen-hidden');
+    appScreen.setAttribute('aria-hidden', 'false');
     document.body.classList.remove('is-login');
+    window.scrollTo(0, 0);
   }
 
   function apiFetch(url, options) {
@@ -81,16 +96,20 @@
   // ---------- Авторизация ----------
 
   function checkSession() {
+    var epoch = authEpoch;
     return apiFetch('/api/auth/me')
       .then(function (res) {
         if (!res.ok) throw new Error('unauth');
         return res.json();
       })
       .then(function () {
+        if (epoch !== authEpoch) return null;
         showApp();
         return init();
       })
       .catch(function () {
+        // Не трогаем UI, если пользователь уже успел войти, пока летел /me
+        if (epoch !== authEpoch || isAuthenticated) return;
         showLogin();
       });
   }
@@ -102,6 +121,9 @@
 
     var username = document.getElementById('username').value.trim();
     var password = document.getElementById('password').value;
+    // Инвалидируем любой незавершённый checkSession с загрузки страницы
+    authEpoch += 1;
+    var epoch = authEpoch;
 
     apiFetch('/api/auth/login-json', {
       method: 'POST',
@@ -114,6 +136,7 @@
         });
       })
       .then(function (result) {
+        if (epoch !== authEpoch) return null;
         if (!result.ok) {
           loginSubmit.disabled = false;
           loginError.textContent = result.data.error || 'Не удалось войти';
@@ -129,13 +152,15 @@
         });
       })
       .then(function (me) {
+        if (epoch !== authEpoch) return;
         loginSubmit.disabled = false;
         if (!me) return;
-        loginForm.reset();
+        document.getElementById('password').value = '';
         showApp();
         return init();
       })
       .catch(function (err) {
+        if (epoch !== authEpoch) return;
         loginSubmit.disabled = false;
         if (err && err.message === 'session') {
           loginError.textContent =
@@ -148,7 +173,9 @@
 
   logoutBtn.addEventListener('click', function () {
     apiFetch('/api/auth/logout', { method: 'POST' }).finally(function () {
-      showLogin();
+      showLogin('');
+      document.getElementById('username').value = 'mc-imperial';
+      document.getElementById('password').value = '';
     });
   });
 
