@@ -5,8 +5,10 @@ import { renderStaffSection } from '../views/staffView.js';
 import { renderWarehouseSection } from '../views/warehouseView.js';
 import { renderMenuSection } from '../views/menuView.js';
 import { renderTablesSection } from '../views/tablesView.js';
+import { withTableDimensions } from '../tableSizes.js';
 import { renderVenuesSection } from '../views/venuesView.js';
 import { renderDevicesSection } from '../views/devicesView.js';
+import { renderUpdatesSection } from '../views/updatesView.js';
 import { renderReceiptsSection } from '../views/reportsView.js';
 import { fetchReceiptsPage, defaultDateRange, PAGE_SIZE } from './reports.js';
 import { renderDashboardFragment } from './stats.js';
@@ -14,6 +16,9 @@ import { renderModifiersFragment } from './modifiers.js';
 import { fetchAllVenues } from '../utils/venues.js';
 import { readSelectedVenueId, resolveSelectedVenue, writeLastSection } from '../utils/preferences.js';
 import { pool } from '../db.js';
+import { manifestForClient, publicBaseUrl, readManifest } from '../services/terminalUpdates.js';
+import { readTelegramSettings } from '../services/telegramNotify.js';
+import { renderTelegramSection } from '../views/telegramView.js';
 
 /**
  * Рендер HTML для конкретного раздела дэшборда по ключу.
@@ -33,7 +38,7 @@ export async function renderFragmentHtml(key, c) {
 
   if (key === 'venues') {
     const { rows: venueRows } = await pool.query(
-      'SELECT id, name, address FROM venues ORDER BY name'
+      'SELECT id, name, address, COALESCE(precheck_enabled, false) AS precheck_enabled FROM venues ORDER BY name'
     );
     const venueCards = [];
     for (const venue of venueRows) {
@@ -88,7 +93,7 @@ export async function renderFragmentHtml(key, c) {
     const venueRows = await fetchAllVenues();
     const selectedVenue = resolveSelectedVenue(venueRows, readSelectedVenueId(c));
     const { rows: categories } = await pool.query(
-      'SELECT id, name, icon FROM menu_categories ORDER BY sort_order, name'
+      'SELECT id, name, icon, parent_id, sort_order FROM menu_categories ORDER BY sort_order, name'
     );
     const { rows: items } = await pool.query(
       `SELECT mi.id, mi.name, mi.category_id, mi.price, mi.image_url, mi.is_active,
@@ -120,17 +125,18 @@ export async function renderFragmentHtml(key, c) {
     let selectedZone = null;
     let tableRows = [];
     if (selectedVenue) {
-      const { rows } = await pool.query('SELECT id, name FROM zones WHERE venue_id = $1 ORDER BY name', [
-        selectedVenue.id,
-      ]);
+      const { rows } = await pool.query(
+        'SELECT id, name, sort_order FROM zones WHERE venue_id = $1 ORDER BY sort_order ASC, id ASC',
+        [selectedVenue.id]
+      );
       zones = rows;
       selectedZone = zones[0] || null;
       if (selectedZone) {
         const { rows: tRows } = await pool.query(
-          'SELECT id, zone_id, name, capacity, pos_x, pos_y, status FROM tables WHERE zone_id = $1 ORDER BY id',
+          'SELECT id, zone_id, name, capacity, pos_x, pos_y, width, height, size, status FROM tables WHERE zone_id = $1 ORDER BY id',
           [selectedZone.id]
         );
-        tableRows = tRows;
+        tableRows = tRows.map(withTableDimensions);
       }
     }
     return renderTablesSection(
@@ -148,6 +154,16 @@ export async function renderFragmentHtml(key, c) {
     );
     const { rows: venueRows } = await pool.query('SELECT id, name FROM venues ORDER BY name');
     return renderDevicesSection(deviceRows, venueRows);
+  }
+
+  if (key === 'updates') {
+    const manifest = await readManifest();
+    return renderUpdatesSection(manifest, manifestForClient(manifest, publicBaseUrl(c)));
+  }
+
+  if (key === 'telegram') {
+    const settings = await readTelegramSettings();
+    return renderTelegramSection(settings);
   }
 
   if (key === 'reports') {
