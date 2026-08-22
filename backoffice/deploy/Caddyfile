@@ -7,6 +7,9 @@ imperial-mc.online {
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "SAMEORIGIN"
+		# Весь домен — закрытый бэкофис/терминал/PWA, в выдачу поисковиков
+		# не должен попадать. На работу приложений и API не влияет.
+		X-Robots-Tag "noindex, nofollow, noarchive, nosnippet"
 	}
 
 	log {
