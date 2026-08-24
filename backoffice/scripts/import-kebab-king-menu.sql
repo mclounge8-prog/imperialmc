@@ -97,6 +97,9 @@ DECLARE
   c_juice int;
   c_water int;
   c_tea_bot int;
+  c_dip int;
+  c_extras int;
+  c_delivery int;
 BEGIN
   c_burgers  := pg_temp.kk_ensure_category('Бургеры и сэндвичи', NULL, '🍔', 20, 'Бургеры и сэндвичи');
   c_rolls    := pg_temp.kk_ensure_category('Роллы и хот-доги', NULL, '🌭', 21, 'Роллы и хот-доги');
@@ -112,6 +115,10 @@ BEGIN
   c_juice      := pg_temp.kk_ensure_category('Соки', c_drinks, NULL, 5, 'Напитки КК → Соки');
   c_water      := pg_temp.kk_ensure_category('Вода', c_drinks, NULL, 6, 'Напитки КК → Вода');
   c_tea_bot    := pg_temp.kk_ensure_category('Чай бутилированный', c_drinks, NULL, 7, 'Напитки КК → Чай бутилированный');
+
+  c_dip      := pg_temp.kk_ensure_category('Дип-Пот', NULL, '🥣', 26, 'Дип-Пот');
+  c_extras   := pg_temp.kk_ensure_category('Дополнения', NULL, '➕', 27, 'Дополнения');
+  c_delivery := pg_temp.kk_ensure_category('Доставка', NULL, '🛵', 28, 'Доставка');
 
   -- Бургеры
   PERFORM pg_temp.kk_upsert_item(c_burgers, 'Гамбургер', 310, true);
@@ -208,6 +215,30 @@ BEGIN
   -- Чай бутилированный
   PERFORM pg_temp.kk_upsert_item(c_tea_bot, 'Липтон зеленый 0.5', 150, true);
   PERFORM pg_temp.kk_upsert_item(c_tea_bot, 'Липтон черный 0.5', 150, true);
+
+  -- Дип-Пот
+  PERFORM pg_temp.kk_upsert_item(c_dip, 'Дип пот Сырный', 50, true);
+  PERFORM pg_temp.kk_upsert_item(c_dip, 'Дип пот Кетчуп', 50, true);
+  PERFORM pg_temp.kk_upsert_item(c_dip, 'Дип пот Барбекю', 50, true);
+  PERFORM pg_temp.kk_upsert_item(c_dip, 'Дип пот Сливочно-чесночный', 50, true);
+
+  -- Дополнения
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Бекон жареный (доп)', 80, true);
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Жаренный лук (доп)', 35, true);
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Картофель фри (доп)', 50, true);
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Лук (доп)', 20, true);
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Морковь по корейски (доп)', 50, true);
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Мясо Курицы (доп)', 140, true);
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Мясо Свинины (доп)', 140, true);
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Пеперони (доп)', 140, false);
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Сыр чеддр (доп)', 70, true);
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Халапенье (доп)', 50, true);
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Горчица (доп)', 40, true);
+  -- В выгрузке без «Расположение» — рядом с дополнениями
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Стаканчик с крышкой под чай', 15, true);
+
+  -- Доставка
+  PERFORM pg_temp.kk_upsert_item(c_delivery, 'Доставка по городу', 200, true);
 END $$;
 
 -- Скрыть все KK-категории (корни + подкатегории) у заведений, кроме KK.
