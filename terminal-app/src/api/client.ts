@@ -1,3 +1,5 @@
+import { emitStaffUnauthorized } from '../services/authSession';
+
 // Домен реального сервера. Вынести в конфиг окружения, когда появится
 // отдельный dev/staging контур — пока прод один, хардкодим осознанно.
 export const API_BASE_URL = 'https://imperial-mc.online';
@@ -252,6 +254,20 @@ async function authorizedRequest<T>(
   if (!response.ok) {
     const body = data as ApiErrorBody;
     const message = body.error || 'Ошибка запроса';
+    if (response.status === 401) {
+      emitStaffUnauthorized(message);
+      throw new ApiRequestError(
+        message === 'Не авторизован'
+          ? 'Сессия истекла — войдите по PIN снова'
+          : message,
+        {
+          status: response.status,
+          code: body.code || 'UNAUTHORIZED',
+          expectedCash: body.expectedCash,
+          countedCash: body.countedCash,
+        }
+      );
+    }
     throw new ApiRequestError(message, {
       status: response.status,
       code: body.code,
