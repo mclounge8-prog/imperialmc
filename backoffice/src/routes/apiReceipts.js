@@ -2,6 +2,11 @@ import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { enqueueReceiptReturnFiscalJob } from '../services/fiscalQueue.js';
+import {
+  buildReceiptRefundMessage,
+  fetchVenueName,
+  notifyTelegramSafe,
+} from '../services/telegramNotify.js';
 
 const apiReceipts = new Hono();
 apiReceipts.use('*', requireStaffToken);
@@ -186,12 +191,13 @@ apiReceipts.post('/:id/refund', async (c) => {
   const id = c.req.param('id');
   const staff = c.get('staff');
 
+  let refundNotify = null;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const { rows: receiptRows } = await client.query(
-      `SELECT id, venue_id, shift_id, status, total, staff_name
+      `SELECT id, venue_id, shift_id, status, total, staff_name, table_name, guest_label
        FROM receipts WHERE id = $1 FOR UPDATE`,
       [id]
     );
@@ -301,6 +307,15 @@ apiReceipts.post('/:id/refund', async (c) => {
     });
 
     await client.query('COMMIT');
+    refundNotify = {
+      venueId: receipt.venue_id,
+      receiptId: Number(id),
+      total: Number(receipt.total),
+      payments,
+      cashier: staff.name,
+      tableName: receipt.table_name,
+      guestLabel: receipt.guest_label,
+    };
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[receipts/refund]', err);
@@ -308,6 +323,21 @@ apiReceipts.post('/:id/refund', async (c) => {
     return c.json({ error: err.message || 'Не удалось оформить возврат' });
   } finally {
     client.release();
+  }
+
+  if (refundNotify) {
+    notifyTelegramSafe(async () => {
+      const venueName = await fetchVenueName(refundNotify.venueId);
+      return buildReceiptRefundMessage({
+        venueName,
+        receiptId: refundNotify.receiptId,
+        total: refundNotify.total,
+        payments: refundNotify.payments,
+        cashier: refundNotify.cashier,
+        tableName: refundNotify.tableName,
+        guestLabel: refundNotify.guestLabel,
+      });
+    });
   }
 
   const detail = await loadReceiptDetail(id);
