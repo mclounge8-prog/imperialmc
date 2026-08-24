@@ -573,6 +573,13 @@ ALTER TABLE receipts ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS refunded_by INT REFERENCES staff(id) ON DELETE SET NULL;
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS refunded_by_name VARCHAR(100);
 
+-- Снапшот списания на чеке: возврат склада идёт по этим полям, а не по
+-- текущему каталогу modifiers (там qty часто 0, расход — в qty_override блюда).
+ALTER TABLE receipt_item_modifiers
+  ADD COLUMN IF NOT EXISTS warehouse_item_id INT REFERENCES warehouse_items(id) ON DELETE SET NULL;
+ALTER TABLE receipt_item_modifiers
+  ADD COLUMN IF NOT EXISTS qty NUMERIC(10,3) NOT NULL DEFAULT 0;
+
 -- Тип задания receipt_return длиннее 20 символов не нужен; расширяем запас.
 ALTER TABLE fiscal_jobs ALTER COLUMN type TYPE VARCHAR(32);
 

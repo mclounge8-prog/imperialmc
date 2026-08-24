@@ -121,21 +121,62 @@ async function applyStockDelta(client, venueId, warehouseItemId, deltaQty) {
   );
 }
 
-/** Возврат склада по текущим привязкам модификаторов каталога (best-effort). */
+/** Возврат склада по снапшоту чека (то, что реально списывалось при добавлении). */
 async function returnReceiptStock(client, venueId, items) {
   for (const item of items) {
-    const qty = Number(item.qty) || 1;
+    const itemQty = Number(item.qty) || 1;
     for (const mod of item.modifiers || []) {
-      if (!mod.modifierId) continue;
+      const warehouseItemId = mod.warehouse_item_id ?? mod.warehouseItemId ?? null;
+      const perUnitQty = Number(mod.qty) || 0;
+      if (!warehouseItemId || perUnitQty <= 0) continue;
       // eslint-disable-next-line no-await-in-loop
-      const { rows } = await client.query(
-        `SELECT warehouse_item_id, qty FROM modifiers WHERE id = $1`,
-        [mod.modifierId]
-      );
-      const row = rows[0];
-      if (!row?.warehouse_item_id || Number(row.qty) <= 0) continue;
-      // eslint-disable-next-line no-await-in-loop
-      await applyStockDelta(client, venueId, row.warehouse_item_id, Number(row.qty) * qty);
+      await applyStockDelta(client, venueId, warehouseItemId, perUnitQty * itemQty);
+    }
+  }
+}
+
+/**
+ * Для старых чеков без warehouse/qty в receipt_item_modifiers —
+ * подтягиваем расход из привязки блюда (qty_override) или каталога.
+ */
+async function enrichReceiptModifiersWithStockSnapshot(client, items) {
+  for (const item of items) {
+    for (const mod of item.modifiers || []) {
+      if (mod.warehouse_item_id && Number(mod.qty) > 0) continue;
+      if (!mod.modifier_id && !mod.modifierId) continue;
+      const modifierId = mod.modifier_id ?? mod.modifierId;
+      let warehouseItemId = mod.warehouse_item_id ?? null;
+      let qty = Number(mod.qty) || 0;
+
+      if (item.menu_item_id || item.menuItemId) {
+        // eslint-disable-next-line no-await-in-loop
+        const { rows } = await client.query(
+          `SELECT m.warehouse_item_id,
+                  COALESCE(mim.qty_override, m.qty) AS qty
+           FROM modifiers m
+           LEFT JOIN menu_item_modifiers mim
+             ON mim.modifier_id = m.id AND mim.menu_item_id = $2
+           WHERE m.id = $1`,
+          [modifierId, item.menu_item_id ?? item.menuItemId]
+        );
+        if (rows[0]) {
+          warehouseItemId = warehouseItemId || rows[0].warehouse_item_id;
+          if (qty <= 0) qty = Number(rows[0].qty) || 0;
+        }
+      } else {
+        // eslint-disable-next-line no-await-in-loop
+        const { rows } = await client.query(
+          `SELECT warehouse_item_id, qty FROM modifiers WHERE id = $1`,
+          [modifierId]
+        );
+        if (rows[0]) {
+          warehouseItemId = warehouseItemId || rows[0].warehouse_item_id;
+          if (qty <= 0) qty = Number(rows[0].qty) || 0;
+        }
+      }
+
+      mod.warehouse_item_id = warehouseItemId;
+      mod.qty = qty;
     }
   }
 }
@@ -249,7 +290,8 @@ apiReceipts.post('/:id/refund', async (c) => {
     for (const item of itemRows) {
       // eslint-disable-next-line no-await-in-loop
       const { rows: modRows } = await client.query(
-        'SELECT modifier_id, name, price FROM receipt_item_modifiers WHERE receipt_item_id = $1 ORDER BY id',
+        `SELECT modifier_id, name, price, warehouse_item_id, qty
+         FROM receipt_item_modifiers WHERE receipt_item_id = $1 ORDER BY id`,
         [item.id]
       );
       items.push({
@@ -259,11 +301,16 @@ apiReceipts.post('/:id/refund', async (c) => {
         qty: Number(item.qty),
         modifiers: modRows.map((m) => ({
           modifierId: m.modifier_id,
+          modifier_id: m.modifier_id,
           name: m.name,
           price: Number(m.price),
+          warehouse_item_id: m.warehouse_item_id,
+          qty: Number(m.qty) || 0,
         })),
       });
     }
+
+    await enrichReceiptModifiersWithStockSnapshot(client, items);
 
     await client.query(
       `UPDATE receipts
