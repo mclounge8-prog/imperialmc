@@ -20,16 +20,44 @@ async function fetchCategories() {
   return rows;
 }
 
-// Каталог + остаток конкретного заведения одним запросом (LEFT JOIN — если строки
-// остатка ещё нет, COALESCE отдаёт 0, а не падает)
+/**
+ * Позиции склада, которые реально используются в меню выбранного заведения:
+ * модификатор → позиция меню → категория меню не скрыта для этого venue
+ * (как venue_hidden_menu_categories). Иначе на складе видны чужие сырьё
+ * (например мясо KK при работе со складом lounge).
+ */
 async function fetchItemsForVenue(venueId) {
+  if (!venueId) return [];
   const { rows } = await pool.query(
     `SELECT wi.id, wi.name, wi.category_id, wi.unit, wc.name AS category_name,
             COALESCE(vws.stock_qty, 0) AS stock_qty,
             COALESCE(vws.min_stock_qty, 0) AS min_stock_qty
      FROM warehouse_items wi
      LEFT JOIN warehouse_categories wc ON wc.id = wi.category_id
-     LEFT JOIN venue_warehouse_stock vws ON vws.warehouse_item_id = wi.id AND vws.venue_id = $1
+     LEFT JOIN venue_warehouse_stock vws
+       ON vws.warehouse_item_id = wi.id AND vws.venue_id = $1
+     WHERE EXISTS (
+       SELECT 1
+       FROM modifiers m
+       JOIN menu_item_modifiers mim ON mim.modifier_id = m.id
+       JOIN menu_items mi ON mi.id = mim.menu_item_id
+       LEFT JOIN menu_categories mc ON mc.id = mi.category_id
+       WHERE m.warehouse_item_id = wi.id
+         AND (
+           mc.id IS NULL
+           OR NOT EXISTS (
+             SELECT 1 FROM venue_hidden_menu_categories h
+             WHERE h.venue_id = $1 AND h.category_id = mc.id
+           )
+         )
+         AND (
+           mc.parent_id IS NULL
+           OR NOT EXISTS (
+             SELECT 1 FROM venue_hidden_menu_categories h
+             WHERE h.venue_id = $1 AND h.category_id = mc.parent_id
+           )
+         )
+     )
      ORDER BY wi.name`,
     [venueId]
   );

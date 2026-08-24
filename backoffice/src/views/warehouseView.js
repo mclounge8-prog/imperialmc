@@ -179,12 +179,19 @@ export function renderUncategorizedAccordionSection(venueId, items, { oob = fals
 
 export function renderStockAccordion(venueId, categories, items) {
   const categorySections = categories
-    .map((cat) => renderCategoryAccordionSection(venueId, cat, items.filter((i) => i.category_id === cat.id)))
+    .map((cat) => {
+      const catItems = items.filter((i) => i.category_id === cat.id);
+      if (catItems.length === 0) return '';
+      return renderCategoryAccordionSection(venueId, cat, catItems);
+    })
     .join('');
-  const uncategorizedSection = renderUncategorizedAccordionSection(
-    venueId,
-    items.filter((i) => !i.category_id)
-  );
+  const uncategorized = items.filter((i) => !i.category_id);
+  const uncategorizedSection =
+    uncategorized.length > 0 ? renderUncategorizedAccordionSection(venueId, uncategorized) : '';
+
+  if (!categorySections && !uncategorizedSection) {
+    return `<div id="stock-accordion"><p class="empty-hint">Для этого заведения пока нет складских позиций, привязанных к видимому меню (через модификаторы). Скрытые категории меню сюда не попадают.</p></div>`;
+  }
 
   return `<div id="stock-accordion">${categorySections}${uncategorizedSection}</div>`;
 }
@@ -281,9 +288,10 @@ export function renderWarehouseSection(venues, selectedVenueId, categories, item
         </div>
       </div>
       <p class="hint">
-        Каталог (названия, категории, единицы измерения) один общий на все заведения.
-        Меняется по заведениям только количество — колонки «Остаток» и «Мин.» ниже
-        относятся именно к выбранному в шапке заведению.
+        Остатки ниже — только сырьё, которое используется в <strong>видимом</strong> меню
+        выбранного заведения (через модификаторы позиций). Скрытые категории меню
+        на склад этой точки не попадают. Каталог названий/единиц общий; колонки
+        «Остаток» и «Мин.» относятся к заведению из шапки.
       </p>
       <input
         type="search"
