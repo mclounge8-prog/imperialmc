@@ -249,4 +249,12 @@ CROSS JOIN kk_cat_map m
 WHERE v.name NOT IN ('Kebab King Октябрьская', 'Kebab King Карла')
 ON CONFLICT DO NOTHING;
 
+-- MC Lounge Puff: скрыть вообще все категории меню.
+INSERT INTO venue_hidden_menu_categories (venue_id, category_id)
+SELECT v.id, c.id
+FROM venues v
+CROSS JOIN menu_categories c
+WHERE v.name = 'MC Lounge Puff'
+ON CONFLICT DO NOTHING;
+
 COMMIT;
