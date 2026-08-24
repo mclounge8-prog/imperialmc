@@ -177,23 +177,41 @@ export function renderUncategorizedAccordionSection(venueId, items, { oob = fals
   `;
 }
 
-export function renderStockAccordion(venueId, categories, items) {
+export function renderStockAccordion(
+  venueId,
+  categories,
+  items,
+  { oob = false, forceOpenCategoryId = undefined } = {}
+) {
+  const oobAttr = oob ? ' hx-swap-oob="true"' : '';
+  const openUncategorized = forceOpenCategoryId === null;
+  const openCatId =
+    forceOpenCategoryId === null || forceOpenCategoryId === undefined || forceOpenCategoryId === ''
+      ? null
+      : Number(forceOpenCategoryId);
+
   const categorySections = categories
     .map((cat) => {
-      const catItems = items.filter((i) => i.category_id === cat.id);
+      const catItems = items.filter((i) => Number(i.category_id) === Number(cat.id));
       if (catItems.length === 0) return '';
-      return renderCategoryAccordionSection(venueId, cat, catItems);
+      return renderCategoryAccordionSection(venueId, cat, catItems, {
+        forceOpen: openCatId !== null && Number(cat.id) === openCatId,
+      });
     })
     .join('');
   const uncategorized = items.filter((i) => !i.category_id);
   const uncategorizedSection =
-    uncategorized.length > 0 ? renderUncategorizedAccordionSection(venueId, uncategorized) : '';
+    uncategorized.length > 0
+      ? renderUncategorizedAccordionSection(venueId, uncategorized, {
+          forceOpen: openUncategorized,
+        })
+      : '';
 
   if (!categorySections && !uncategorizedSection) {
-    return `<div id="stock-accordion"><p class="empty-hint">Для этого заведения пока нет складских позиций, привязанных к видимому меню (через модификаторы). Скрытые категории меню сюда не попадают.</p></div>`;
+    return `<div id="stock-accordion"${oobAttr}><p class="empty-hint">Для этого заведения пока нет складских позиций из видимого меню и нет заведённых остатков. «+ Позиция» создаст строку с нулём на этой точке.</p></div>`;
   }
 
-  return `<div id="stock-accordion">${categorySections}${uncategorizedSection}</div>`;
+  return `<div id="stock-accordion"${oobAttr}>${categorySections}${uncategorizedSection}</div>`;
 }
 
 /* ---------- Модалки добавления (Alpine — открытие/закрытие без сервера) ---------- */
@@ -288,10 +306,10 @@ export function renderWarehouseSection(venues, selectedVenueId, categories, item
         </div>
       </div>
       <p class="hint">
-        Остатки ниже — только сырьё, которое используется в <strong>видимом</strong> меню
-        выбранного заведения (через модификаторы позиций). Скрытые категории меню
-        на склад этой точки не попадают. Каталог названий/единиц общий; колонки
-        «Остаток» и «Мин.» относятся к заведению из шапки.
+        Остатки ниже — сырьё из <strong>видимого</strong> меню выбранного заведения
+        (через модификаторы) плюс позиции, для которых уже заведён остаток на этой
+        точке. Скрытые категории меню чужих точек сюда не попадают. «+ Позиция»
+        сразу появляется здесь с нулём, чтобы можно было внести количество.
       </p>
       <input
         type="search"

@@ -3,7 +3,6 @@ import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
 import {
   renderCategoryAccordionSection,
-  renderUncategorizedAccordionSection,
   renderStockRow,
   renderCatalogEditRow,
   renderStockAccordion,
@@ -21,10 +20,10 @@ async function fetchCategories() {
 }
 
 /**
- * Позиции склада, которые реально используются в меню выбранного заведения:
- * модификатор → позиция меню → категория меню не скрыта для этого venue
- * (как venue_hidden_menu_categories). Иначе на складе видны чужие сырьё
- * (например мясо KK при работе со складом lounge).
+ * Позиции склада для выбранного заведения:
+ * 1) сырьё из видимого меню точки (модификаторы → блюда → категория не скрыта),
+ * 2) либо уже заведённый остаток на этой точке (в т.ч. только что добавленная
+ *    позиция с нулём — иначе «+ Позиция» сразу пропадала бы из списка).
  */
 async function fetchItemsForVenue(venueId) {
   if (!venueId) return [];
@@ -36,28 +35,29 @@ async function fetchItemsForVenue(venueId) {
      LEFT JOIN warehouse_categories wc ON wc.id = wi.category_id
      LEFT JOIN venue_warehouse_stock vws
        ON vws.warehouse_item_id = wi.id AND vws.venue_id = $1
-     WHERE EXISTS (
-       SELECT 1
-       FROM modifiers m
-       JOIN menu_item_modifiers mim ON mim.modifier_id = m.id
-       JOIN menu_items mi ON mi.id = mim.menu_item_id
-       LEFT JOIN menu_categories mc ON mc.id = mi.category_id
-       WHERE m.warehouse_item_id = wi.id
-         AND (
-           mc.id IS NULL
-           OR NOT EXISTS (
-             SELECT 1 FROM venue_hidden_menu_categories h
-             WHERE h.venue_id = $1 AND h.category_id = mc.id
-           )
-         )
-         AND (
-           mc.parent_id IS NULL
-           OR NOT EXISTS (
-             SELECT 1 FROM venue_hidden_menu_categories h
-             WHERE h.venue_id = $1 AND h.category_id = mc.parent_id
-           )
-         )
-     )
+     WHERE vws.venue_id IS NOT NULL
+        OR EXISTS (
+          SELECT 1
+          FROM modifiers m
+          JOIN menu_item_modifiers mim ON mim.modifier_id = m.id
+          JOIN menu_items mi ON mi.id = mim.menu_item_id
+          LEFT JOIN menu_categories mc ON mc.id = mi.category_id
+          WHERE m.warehouse_item_id = wi.id
+            AND (
+              mc.id IS NULL
+              OR NOT EXISTS (
+                SELECT 1 FROM venue_hidden_menu_categories h
+                WHERE h.venue_id = $1 AND h.category_id = mc.id
+              )
+            )
+            AND (
+              mc.parent_id IS NULL
+              OR NOT EXISTS (
+                SELECT 1 FROM venue_hidden_menu_categories h
+                WHERE h.venue_id = $1 AND h.category_id = mc.parent_id
+              )
+            )
+        )
      ORDER BY wi.name`,
     [venueId]
   );
@@ -71,11 +71,22 @@ async function fetchItemForVenue(venueId, itemId) {
             COALESCE(vws.min_stock_qty, 0) AS min_stock_qty
      FROM warehouse_items wi
      LEFT JOIN warehouse_categories wc ON wc.id = wi.category_id
-     LEFT JOIN venue_warehouse_stock vws ON vws.warehouse_item_id = wi.id AND vws.venue_id = $1
+     LEFT JOIN venue_warehouse_stock vws
+       ON vws.warehouse_item_id = wi.id AND vws.venue_id = $1
      WHERE wi.id = $2`,
     [venueId, itemId]
   );
   return rows[0] || null;
+}
+
+async function ensureVenueStockRow(venueId, itemId) {
+  if (!venueId || !itemId) return;
+  await pool.query(
+    `INSERT INTO venue_warehouse_stock (venue_id, warehouse_item_id, stock_qty, min_stock_qty)
+     VALUES ($1, $2, 0, 0)
+     ON CONFLICT (venue_id, warehouse_item_id) DO NOTHING`,
+    [venueId, itemId]
+  );
 }
 
 // ---------- Переключение заведения ----------
@@ -139,33 +150,28 @@ warehouse.post('/items', async (c) => {
   if (!name) return c.html('<p>Укажи наименование</p>');
   if (!UNIT_VALUES.includes(unit)) return c.html('<p>Выбери единицу измерения</p>');
 
-  await pool.query('INSERT INTO warehouse_items (category_id, name, unit) VALUES ($1, $2, $3)', [
-    categoryId,
-    name,
-    unit,
-  ]);
+  const { rows: insertedRows } = await pool.query(
+    'INSERT INTO warehouse_items (category_id, name, unit) VALUES ($1, $2, $3) RETURNING id',
+    [categoryId, name, unit]
+  );
+  const newItemId = insertedRows[0].id;
 
-  // Целиком перерисовываем затронутую секцию (а не вставляем строку в конец) —
-  // так позиции внутри неё сразу отсортированы как при обычной загрузке
-  // (по имени), а соседние категории не сворачиваются/не теряют состояние.
-  const items = await fetchItemsForVenue(venueId);
-  if (categoryId) {
-    const { rows: catRows } = await pool.query('SELECT id, name FROM warehouse_categories WHERE id = $1', [
-      categoryId,
-    ]);
-    const categoryItems = items.filter((i) => i.category_id === categoryId);
-    return c.html(
-      renderCategoryAccordionSection(venueId, catRows[0], categoryItems, {
-        oob: true,
-        oobMode: 'replace',
-        forceOpen: true,
-      })
-    );
+  // Чтобы новая позиция сразу появилась на складе текущей точки (ещё до
+  // привязки к меню/модификаторам) — заводим нулевой остаток по venue.
+  if (venueId) {
+    await ensureVenueStockRow(venueId, newItemId);
   }
 
-  const uncategorizedItems = items.filter((i) => !i.category_id);
+  // Полная перерисовка аккордеона: пустой hint, отсутствующая секция категории
+  // и «Без категории» иначе не появляются в DOM (oob replace/append по кускам
+  // ломается, когда секции ещё нет).
+  const categories = await fetchCategories();
+  const items = await fetchItemsForVenue(venueId);
   return c.html(
-    renderUncategorizedAccordionSection(venueId, uncategorizedItems, { oob: true, forceOpen: true })
+    renderStockAccordion(venueId, categories, items, {
+      oob: true,
+      forceOpenCategoryId: categoryId,
+    })
   );
 });
 
