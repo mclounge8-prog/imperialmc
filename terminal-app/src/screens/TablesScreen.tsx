@@ -347,9 +347,19 @@ export default function TablesScreen() {
                     {r.tableName ?? 'Быстрый заказ'}
                     {r.guestLabel ? ` · ${r.guestLabel}` : ''}
                   </Text>
-                  <Text style={styles.paidReceiptTime}>{formatReceiptTime(r.closedAt)}</Text>
+                  <Text style={styles.paidReceiptTime}>
+                    {formatReceiptTime(r.closedAt)}
+                    {r.status === 'refunded' ? ' · возврат' : ''}
+                  </Text>
                 </View>
-                <Text style={styles.openOrderTotal}>{r.total.toFixed(0)} ₽</Text>
+                <Text
+                  style={[
+                    styles.openOrderTotal,
+                    r.status === 'refunded' && styles.paidReceiptRefunded,
+                  ]}
+                >
+                  {r.total.toFixed(0)} ₽
+                </Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -359,7 +369,11 @@ export default function TablesScreen() {
       <PaidReceiptDetailModal
         receiptId={selectedReceiptId}
         token={session?.token ?? ''}
+        venueId={venue?.id}
         onClose={() => setSelectedReceiptId(null)}
+        onRefunded={() => {
+          void load();
+        }}
       />
     </View>
     </ScreenSwipeHost>
@@ -476,6 +490,7 @@ const styles = StyleSheet.create({
   },
   paidReceiptInfo: { flex: 1 },
   paidReceiptTime: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  paidReceiptRefunded: { color: colors.textMuted, textDecorationLine: 'line-through' },
   openOrderRow: {
     backgroundColor: colors.surface,
     borderWidth: 1,

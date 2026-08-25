@@ -207,6 +207,39 @@ export function buildDiscountPaymentMessage({
     .join('\n');
 }
 
+export function buildReceiptRefundMessage({
+  venueName,
+  receiptId,
+  total,
+  payments,
+  cashier,
+  tableName,
+  guestLabel,
+  when,
+}) {
+  const where = [tableName ? `стол ${tableName}` : 'быстрый заказ', guestLabel].filter(Boolean).join(' · ');
+  const methodLabels = { cash: 'наличные', card: 'безнал', other: 'прочее' };
+  const payLines = (payments || [])
+    .filter((p) => Number(p.amount) > 0.009)
+    .map(
+      (p) =>
+        `${methodLabels[p.method] || p.method}: ${escapeHtml(formatMoney(p.amount))}`
+    );
+  const hasCard = (payments || []).some((p) => p.method === 'card' && Number(p.amount) > 0.009);
+  return [
+    header('↩️ Возврат чека', venueName, when),
+    '',
+    `Чек №${escapeHtml(String(receiptId))}`,
+    `Сумма возврата: <b>${escapeHtml(formatMoney(total))}</b>`,
+    payLines.length ? `Способ: ${payLines.join(', ')}` : null,
+    where ? `Где: ${escapeHtml(where)}` : null,
+    `Кассир: ${escapeHtml(cashier || '—')}`,
+    hasCard ? '⚠️ Безнал: возврат на банковском терминале сделайте отдельно' : null,
+  ]
+    .filter((x) => x != null)
+    .join('\n');
+}
+
 export function buildShiftOpenMessage({
   venueName,
   openingCash,

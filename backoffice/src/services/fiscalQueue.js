@@ -19,10 +19,10 @@ async function isAtolEnabledForVenue(client, venueId) {
   return !!(rows[0] && rows[0].enabled);
 }
 
-function buildSellTaskPayload({ items, payments, total, operatorName }) {
+function buildFiscalReceiptPayload(type, { items, payments, total, operatorName }) {
   const fiscalItems = applyDiscountToFiscalItems(items, total);
   return {
-    type: 'sell',
+    type,
     ...(operatorName ? { operator: { name: operatorName } } : {}),
     items: fiscalItems.map((item) => ({
       type: 'position',
@@ -40,6 +40,14 @@ function buildSellTaskPayload({ items, payments, total, operatorName }) {
     })),
     total: Number(total),
   };
+}
+
+function buildSellTaskPayload(args) {
+  return buildFiscalReceiptPayload('sell', args);
+}
+
+function buildSellReturnTaskPayload(args) {
+  return buildFiscalReceiptPayload('sellReturn', args);
 }
 
 /** Пропорционально снижает цены позиций, чтобы sum(price*qty) == targetTotal (АТОЛ сверяет). */
@@ -233,6 +241,27 @@ export async function enqueueReceiptFiscalJob(
   const payload = buildSellTaskPayload({ items, payments, total, operatorName });
   await client.query(
     `INSERT INTO fiscal_jobs (venue_id, type, receipt_id, payload) VALUES ($1, 'receipt', $2, $3)`,
+    [venueId, receiptId, JSON.stringify(payload)]
+  );
+  await client.query("UPDATE receipts SET fiscal_status = 'pending' WHERE id = $1", [receiptId]);
+}
+
+/** Фискальный чек возврата (sellReturn) — нал и безнал по исходным оплатам. */
+export async function enqueueReceiptReturnFiscalJob(
+  client,
+  { venueId, receiptId, items, payments, total, operatorName }
+) {
+  if (!venueId) return;
+  if (Number(total) <= 0.009) {
+    await client.query("UPDATE receipts SET fiscal_status = NULL WHERE id = $1", [receiptId]);
+    return;
+  }
+  const enabled = await isAtolEnabledForVenue(client, venueId);
+  if (!enabled) return;
+
+  const payload = buildSellReturnTaskPayload({ items, payments, total, operatorName });
+  await client.query(
+    `INSERT INTO fiscal_jobs (venue_id, type, receipt_id, payload) VALUES ($1, 'receipt_return', $2, $3)`,
     [venueId, receiptId, JSON.stringify(payload)]
   );
   await client.query("UPDATE receipts SET fiscal_status = 'pending' WHERE id = $1", [receiptId]);

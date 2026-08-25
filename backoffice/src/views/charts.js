@@ -6,11 +6,14 @@ import { escapeHtml } from './escapeHtml.js';
 export const CHART_COLORS = {
   accent: '#2647c7',
   accent2: '#3f63e6',
-  accent2Fill: 'rgba(63, 99, 230, 0.16)',
+  accent2Fill: 'rgba(63, 99, 230, 0.22)',
   muted: '#98979f',
   mutedFill: 'rgba(152, 151, 159, 0.12)',
   grid: '#34343c',
   text: '#98979f',
+  bg: '#1b1b1f',
+  // Сегменты donut — оттенки брендового синего + нейтрали
+  donut: ['#3f63e6', '#2647c7', '#5b7cf0', '#7a93f5', '#98979f'],
 };
 
 export function formatMoney(value, { decimals = 0 } = {}) {
@@ -72,6 +75,77 @@ function labelsRow(labels) {
 }
 
 /**
+ * Компактная запись числа для подписей оси Y (4K, 3.5K, 250 и т. д.) —
+ * полные суммы с ₽ и разделителями разрядов туда просто не влезают.
+ */
+function formatCompactAxis(value) {
+  const num = Number(value) || 0;
+  const abs = Math.abs(num);
+  const trim = (v) => (Math.round(v * 10) / 10).toString().replace('.', ',');
+  if (abs >= 1_000_000) return `${trim(num / 1_000_000)}M`;
+  if (abs >= 1000) return `${trim(num / 1000)}K`;
+  return `${Math.round(num)}`;
+}
+
+/**
+ * Подписи оси Y слева от графика — те же горизонтальные отметки, что рисует
+ * gridLinesSvg, но вынесены в обычный HTML (а не текст внутри SVG), потому что
+ * SVG растягивается через preserveAspectRatio="none" и текст внутри него плыл
+ * бы по горизонтали вместе с линиями.
+ */
+function yAxisColumn(maxValue, height, padTop) {
+  const fractions = [0, 0.25, 0.5, 0.75, 1];
+  const ticks = fractions
+    .map((f) => {
+      const y = height - f * (height - padTop);
+      const translate = f === 1 ? '0' : f === 0 ? '-100%' : '-50%';
+      return `<span class="chart-y-axis-tick" style="top:${y.toFixed(1)}px; transform:translateY(${translate})">${escapeHtml(
+        formatCompactAxis(f * maxValue)
+      )}</span>`;
+    })
+    .join('');
+  return `<div class="chart-y-axis" style="height:${height}px">${ticks}</div>`;
+}
+
+/**
+ * Слой наведения: невидимая область поверх графика, которая по mousemove
+ * находит ближайшую точку (через Alpine, см. window.chartTooltip в app.js) и
+ * показывает вертикальную линию-«прицел» + всплывающую подсказку с числами.
+ * Раньше подсказки жили в <title> у SVG-точек — это нативный тултип браузера
+ * с большой задержкой и крошечной областью наведения (только сам кружок
+ * радиусом 3px), из-за чего казалось, что при наведении вообще ничего не
+ * происходит.
+ */
+function hoverLayer(points, height, svg) {
+  const pointsAttr = escapeHtml(JSON.stringify(points));
+  return `
+    <div
+      class="chart-plot"
+      style="height:${height}px"
+      x-data="chartTooltip(${pointsAttr})"
+      @mousemove="onMove($event)"
+      @mouseleave="hide()"
+    >
+      ${svg}
+      <div class="chart-crosshair" x-show="active" x-cloak :style="'left:' + (active ? active.xPct : 0) + '%'"></div>
+      <template x-for="row in (active ? active.rows : [])" :key="row.name || row.color">
+        <div class="chart-hover-dot" :style="'left:' + active.xPct + '%; top:' + row.yPct + '%; background:' + row.color"></div>
+      </template>
+      <div class="chart-tooltip" x-show="active" x-cloak :style="tooltipStyle">
+        <div class="chart-tooltip-label" x-text="active ? active.label : ''"></div>
+        <template x-for="row in (active ? active.rows : [])" :key="row.name || row.color">
+          <div class="chart-tooltip-row">
+            <span class="chart-tooltip-dot" :style="'background:' + row.color"></span>
+            <span class="chart-tooltip-name" x-text="row.name"></span>
+            <span class="chart-tooltip-value" x-text="row.value"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Линия + залитая область под ней — для трендов (выручка, кол-во чеков во
  * времени). Один ряд значений.
  */
@@ -87,18 +161,38 @@ export function renderLineAreaChart({ labels, values, formatValue = (v) => Strin
     .map((v, i) => {
       const x = i * stepX;
       const y = scaleY(v, maxValue, height, padTop);
-      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${CHART_COLORS.accent2}" stroke="${CHART_COLORS.bg || '#121214'}" stroke-width="1.5"><title>${escapeHtml(labels[i] || '')}: ${escapeHtml(formatValue(v))}</title></circle>`;
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${CHART_COLORS.accent2}" stroke="${CHART_COLORS.bg || '#121214'}" stroke-width="1.5" />`;
     })
     .join('');
 
+  const svg = `
+    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="chart-svg" role="img" aria-label="График">
+      ${gridLinesSvg(width, height, padTop)}
+      <path d="${areaPath}" fill="${CHART_COLORS.accent2Fill}" stroke="none" />
+      <path d="${linePath}" fill="none" stroke="${CHART_COLORS.accent2}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+      ${dots}
+    </svg>
+  `;
+
+  const points = values.map((v, i) => ({
+    xPct: stepX ? (i / (values.length - 1)) * 100 : 50,
+    label: labels[i] || '',
+    rows: [
+      {
+        name: '',
+        value: formatValue(v),
+        color: CHART_COLORS.accent2,
+        yPct: (scaleY(v, maxValue, height, padTop) / height) * 100,
+      },
+    ],
+  }));
+
   return `
     <div class="chart-wrap">
-      <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="chart-svg" role="img" aria-label="График">
-        ${gridLinesSvg(width, height, padTop)}
-        <path d="${areaPath}" fill="${CHART_COLORS.accent2Fill}" stroke="none" />
-        <path d="${linePath}" fill="none" stroke="${CHART_COLORS.accent2}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
-        ${dots}
-      </svg>
+      <div class="chart-with-axis">
+        ${yAxisColumn(maxValue, height, padTop)}
+        ${hoverLayer(points, height, svg)}
+      </div>
       ${labelsRow(labels)}
     </div>
   `;
@@ -160,18 +254,44 @@ export function renderDualLineChart({
     .map((v, i) => {
       const x = i * stepX;
       const y = scaleY(v, maxValue, height, padTop);
-      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${CHART_COLORS.accent2}"><title>${escapeHtml(labels[i] || '')} · ${escapeHtml(labelA)}: ${escapeHtml(formatValue(v))}</title></circle>`;
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${CHART_COLORS.accent2}" />`;
     })
     .join('');
 
+  const svg = `
+    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="chart-svg" role="img" aria-label="График">
+      ${gridLinesSvg(width, height, padTop)}
+      <path d="${pathB}" fill="none" stroke="${CHART_COLORS.muted}" stroke-width="2" stroke-dasharray="6 5" stroke-linejoin="round" stroke-linecap="round" />
+      <path d="${pathA}" fill="none" stroke="${CHART_COLORS.accent2}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+      ${dotsA}
+    </svg>
+  `;
+
+  const points = seriesA.map((v, i) => ({
+    xPct: stepX ? (i / (seriesA.length - 1)) * 100 : 50,
+    label: labels[i] || '',
+    rows: [
+      {
+        name: labelA,
+        value: formatValue(v),
+        color: CHART_COLORS.accent2,
+        yPct: (scaleY(v, maxValue, height, padTop) / height) * 100,
+      },
+      {
+        name: labelB,
+        value: formatValue(seriesB[i] ?? 0),
+        color: CHART_COLORS.muted,
+        yPct: (scaleY(seriesB[i] ?? 0, maxValue, height, padTop) / height) * 100,
+      },
+    ],
+  }));
+
   return `
     <div class="chart-wrap">
-      <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="chart-svg" role="img" aria-label="График">
-        ${gridLinesSvg(width, height, padTop)}
-        <path d="${pathB}" fill="none" stroke="${CHART_COLORS.muted}" stroke-width="2" stroke-dasharray="6 5" stroke-linejoin="round" stroke-linecap="round" />
-        <path d="${pathA}" fill="none" stroke="${CHART_COLORS.accent2}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
-        ${dotsA}
-      </svg>
+      <div class="chart-with-axis">
+        ${yAxisColumn(maxValue, height, padTop)}
+        ${hoverLayer(points, height, svg)}
+      </div>
       ${labelsRow(labels)}
       <div class="chart-legend">
         <span class="chart-legend-item"><span class="chart-legend-dot" style="background:${CHART_COLORS.accent2}"></span>${escapeHtml(labelA)}</span>
@@ -194,6 +314,10 @@ export function renderTopItemsList(items) {
 
   return `
     <div class="top-items-list">
+      <div class="top-items-head">
+        <span>Блюдо</span>
+        <span>Выручка, ₽</span>
+      </div>
       ${items
         .map((item, idx) => {
           const revenue = Number(item.revenue);
@@ -213,6 +337,84 @@ export function renderTopItemsList(items) {
           `;
         })
         .join('')}
+    </div>
+  `;
+}
+
+/**
+ * Donut для топ-блюд. В центре — лидер и его доля.
+ */
+export function renderDonutChart(items) {
+  if (!items.length) {
+    return `<p class="empty-hint">За этот период продаж нет</p>`;
+  }
+
+  const total = items.reduce((s, i) => s + Number(i.revenue), 0) || 1;
+  const size = 220;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 78;
+  const stroke = 28;
+  const circumference = 2 * Math.PI * r;
+
+  let offset = 0;
+  const segments = items
+    .map((item, idx) => {
+      const value = Number(item.revenue);
+      const share = value / total;
+      const dash = share * circumference;
+      const gap = circumference - dash;
+      const color = CHART_COLORS.donut[idx % CHART_COLORS.donut.length];
+      const el = `
+        <circle
+          cx="${cx}" cy="${cy}" r="${r}"
+          fill="none"
+          stroke="${color}"
+          stroke-width="${stroke}"
+          stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
+          stroke-dashoffset="${(-offset).toFixed(2)}"
+          transform="rotate(-90 ${cx} ${cy})"
+        >
+          <title>${escapeHtml(item.name)}: ${formatMoney(value)} (${(share * 100).toFixed(0)}%)</title>
+        </circle>
+      `;
+      offset += dash;
+      return el;
+    })
+    .join('');
+
+  const leader = items[0];
+  const leaderShare = ((Number(leader.revenue) / total) * 100).toFixed(0);
+
+  const legend = items
+    .map((item, idx) => {
+      const value = Number(item.revenue);
+      const share = ((value / total) * 100).toFixed(0);
+      const color = CHART_COLORS.donut[idx % CHART_COLORS.donut.length];
+      return `
+        <div class="donut-legend-row">
+          <span class="donut-swatch" style="background:${color}"></span>
+          <span class="donut-legend-pct">${share}%</span>
+          <span class="donut-legend-name">${escapeHtml(item.name)}</span>
+          <span class="donut-legend-val">${formatMoney(value)}</span>
+        </div>
+      `;
+    })
+    .join('');
+
+  return `
+    <div class="donut-layout">
+      <div class="donut-chart-wrap">
+        <svg viewBox="0 0 ${size} ${size}" class="donut-svg" role="img" aria-label="Топ блюд">
+          <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${CHART_COLORS.grid}" stroke-width="${stroke}" />
+          ${segments}
+        </svg>
+        <div class="donut-center">
+          <div class="donut-center-pct">${leaderShare}%</div>
+          <div class="donut-center-name">${escapeHtml(leader.name)}</div>
+        </div>
+      </div>
+      <div class="donut-legend">${legend}</div>
     </div>
   `;
 }
