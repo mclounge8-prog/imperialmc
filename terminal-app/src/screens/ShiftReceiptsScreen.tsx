@@ -7,7 +7,11 @@ import { fetchShiftReceipts } from '../api/client';
 import type { ShiftReceipt } from '../api/client';
 
 const METHOD_LABELS: Record<string, string> = { cash: 'Наличные', card: 'Карта', other: 'Другое' };
-const STATUS_LABELS: Record<string, string> = { paid: 'Оплачен', cancelled: 'Отменён' };
+const STATUS_LABELS: Record<string, string> = {
+  paid: 'Оплачен',
+  cancelled: 'Отменён',
+  refunded: 'Возврат',
+};
 
 function formatMoney(value: number): string {
   return `${Math.round(value).toLocaleString('ru-RU')} ₽`;
@@ -19,6 +23,7 @@ function formatTime(value: string): string {
 
 function ReceiptRow({ receipt }: { receipt: ShiftReceipt }) {
   const isPaid = receipt.status === 'paid';
+  const isRefunded = receipt.status === 'refunded';
   return (
     <View style={[styles.row, styles.rowBorder]}>
       <View style={styles.rowLeft}>
@@ -34,10 +39,10 @@ function ReceiptRow({ receipt }: { receipt: ShiftReceipt }) {
         </Text>
       </View>
       <View style={styles.rowRight}>
-        <Text style={[styles.rowTotal, !isPaid && styles.rowTotalCancelled]}>
+        <Text style={[styles.rowTotal, (!isPaid || isRefunded) && styles.rowTotalCancelled]}>
           {formatMoney(receipt.total)}
         </Text>
-        {!isPaid && <Text style={styles.statusLabel}>{STATUS_LABELS[receipt.status]}</Text>}
+        {!isPaid && <Text style={styles.statusLabel}>{STATUS_LABELS[receipt.status] || receipt.status}</Text>}
       </View>
     </View>
   );

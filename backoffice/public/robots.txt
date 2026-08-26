@@ -1,0 +1,15 @@
+# Закрытый рабочий контур Imperial MC (бэкофис, терминал, PWA).
+# Индексация поисковиками не нужна — Disallow на весь сайт не влияет
+# на работу браузеров, планшетов и API, только на краулеров.
+User-agent: *
+Disallow: /
+
+# На всякий случай явно:
+User-agent: Googlebot
+Disallow: /
+
+User-agent: Bingbot
+Disallow: /
+
+User-agent: Yandex
+Disallow: /

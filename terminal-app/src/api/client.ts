@@ -458,6 +458,7 @@ export type PaidReceiptSummary = {
   staffName: string | null;
   total: number;
   closedAt: string;
+  status?: 'paid' | 'refunded' | string;
 };
 
 export type ReceiptDetailItemModifier = {
@@ -480,6 +481,11 @@ export type ReceiptDetailItem = {
   added: string[];
 };
 
+export type ReceiptPayment = {
+  method: 'cash' | 'card' | 'other' | string;
+  amount: number;
+};
+
 export type PaidReceiptDetail = {
   id: number;
   tableName: string | null;
@@ -488,6 +494,10 @@ export type PaidReceiptDetail = {
   total: number;
   closedAt: string;
   status: string;
+  refundedAt?: string | null;
+  refundedByName?: string | null;
+  fiscalStatus?: string | null;
+  payments: ReceiptPayment[];
   items: ReceiptDetailItem[];
 };
 
@@ -501,6 +511,15 @@ export async function fetchPaidReceipts(venueId: number, token: string): Promise
 
 export async function fetchPaidReceiptDetail(id: number, token: string): Promise<PaidReceiptDetail> {
   const { receipt } = await authorizedRequest<{ receipt: PaidReceiptDetail }>(`/api/receipts/${id}`, token);
+  return receipt;
+}
+
+export async function refundPaidReceipt(id: number, token: string): Promise<PaidReceiptDetail> {
+  const { receipt } = await authorizedRequest<{ receipt: PaidReceiptDetail }>(
+    `/api/receipts/${id}/refund`,
+    token,
+    { method: 'POST' }
+  );
   return receipt;
 }
 
