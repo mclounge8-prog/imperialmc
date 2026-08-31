@@ -44,13 +44,19 @@ export default function CompositionModal({ target, onClose }: Props) {
 
   return (
     <Modal visible={target !== null} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable style={styles.modalBox} onPress={(e) => e.stopPropagation()}>
+      <View style={styles.modalBackdrop}>
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+        <View style={styles.modalBox}>
           <Text style={styles.modalTitle}>Состав: {target?.name}</Text>
           {groups.length === 0 ? (
             <Text style={styles.emptyText}>Состав не задан</Text>
           ) : (
-            <ScrollView style={styles.compositionList}>
+            <ScrollView
+              style={styles.compositionList}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
               {groups.map((group) => (
                 <View key={group.id ?? 'ungrouped'} style={styles.groupBlock}>
                   <Text style={styles.groupTitle}>{group.name}</Text>
@@ -70,8 +76,8 @@ export default function CompositionModal({ target, onClose }: Props) {
           <Pressable style={styles.modalCancel} onPress={onClose}>
             <Text style={styles.modalCancelText}>Закрыть</Text>
           </Pressable>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -92,6 +98,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 14,
     padding: 20,
+    zIndex: 1,
+    elevation: 4,
   },
   modalTitle: { color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
   emptyText: { color: colors.textMuted, fontSize: 13, marginTop: 12, marginBottom: 4 },

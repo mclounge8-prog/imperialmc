@@ -101,7 +101,9 @@ export async function fetchDeviceStatus(token: string): Promise<DeviceStatus> {
 
   if (!response.ok) {
     const message = (data as ApiErrorBody).error || 'Не удалось получить статус устройства';
-    throw new Error(message);
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
 
   return data as DeviceStatus;
