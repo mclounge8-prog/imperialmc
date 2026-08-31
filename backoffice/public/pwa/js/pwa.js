@@ -146,7 +146,9 @@
             return { ok: res.ok, status: res.status, data: data };
           })
           .catch(function () {
-            throw new Error(res.status === 404 ? 'missing-endpoint' : 'bad-response');
+            if (res.status === 404) throw new Error('missing-endpoint');
+            if (res.status >= 500) throw new Error('server-error');
+            throw new Error('bad-response');
           });
       })
       .then(function (result) {
@@ -183,6 +185,10 @@
         }
         if (err && err.message === 'missing-endpoint') {
           loginError.textContent = 'Сервер устарел: нет /login-json. Обновите бэкофис и повторите вход.';
+          return;
+        }
+        if (err && err.message === 'server-error') {
+          loginError.textContent = 'Ошибка сервера при входе. Попробуйте ещё раз через минуту.';
           return;
         }
         loginError.textContent = 'Сервер недоступен, попробуйте ещё раз';

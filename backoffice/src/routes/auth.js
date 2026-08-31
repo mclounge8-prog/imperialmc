@@ -6,9 +6,10 @@ import { pool } from '../db.js';
 
 const auth = new Hono();
 
-// Долгая сессия для бэкофиса и PWA «Показатели»: не просим логин каждые 12 часов.
-// На практике живёт, пока не разлогинятся / не удалят PWA / не очистят данные сайта.
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 365 * 10; // ~10 лет
+// Долгая сессия для бэкофиса и PWA «Показатели».
+// Браузеры (и cookie-хелпер Hono) запрещают Max-Age > 400 дней —
+// раньше TTL ~10 лет давал 500 Internal Server Error при успешном логине.
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 400; // максимум Chrome/Hono
 const JWT_ALG = 'HS256';
 
 function sessionCookieOptions() {
@@ -43,6 +44,18 @@ async function issueSessionCookie(c, user) {
   const token = await sign(payload, process.env.JWT_SECRET);
   setCookie(c, 'session', token, sessionCookieOptions());
   return { token, payload };
+}
+
+async function renewSessionCookie(c, payload) {
+  const next = {
+    sub: payload.sub,
+    username: payload.username,
+    role: payload.role,
+    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
+  };
+  const token = await sign(next, process.env.JWT_SECRET);
+  setCookie(c, 'session', token, sessionCookieOptions());
+  return next;
 }
 
 // HTML-форма бэкофиса (htmx)
@@ -86,7 +99,8 @@ auth.post('/login-json', async (c) => {
   return c.json({ ok: true, username: user.username, role: user.role });
 });
 
-// Проверка сессии для PWA при старте и сразу после логина
+// Проверка сессии для PWA при старте и сразу после логина.
+// При каждом успешном /me продлеваем cookie (скользящее окно до 400 дней).
 auth.get('/me', async (c) => {
   const token = getCookie(c, 'session');
   if (!token) {
@@ -95,6 +109,7 @@ auth.get('/me', async (c) => {
   }
   try {
     const payload = await verify(token, process.env.JWT_SECRET, JWT_ALG);
+    await renewSessionCookie(c, payload);
     return c.json({
       ok: true,
       username: payload.username,
