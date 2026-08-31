@@ -88,7 +88,15 @@ function buildMetric(buckets, selector) {
   const compareValue = compareIdx >= 0 ? trend[compareIdx] || 0 : 0;
   const deltaAbs = value - compareValue;
   const deltaPct = compareValue === 0 ? (value === 0 ? 0 : 100) : (deltaAbs / compareValue) * 100;
-  return { value, compareValue, deltaAbs, deltaPct, trend };
+  return {
+    value,
+    compareValue,
+    deltaAbs,
+    deltaPct,
+    trend,
+    selectedIndex: lastIdx,
+    compareIndex: compareIdx >= 0 ? compareIdx : null,
+  };
 }
 
 apiPwa.get('/venues', async (c) => {
@@ -123,6 +131,8 @@ apiPwa.get('/stats', async (c) => {
   return c.json({
     date: fmtDate(selectedDay),
     compareDate: fmtDate(compareDay),
+    dates: buckets.map((b) => b.date),
+    compareOffsetDays: COMPARE_OFFSET_DAYS,
     venueId: venueId || null,
     metrics: {
       cash: buildMetric(buckets, (b) => b.cash),

@@ -86,6 +86,26 @@
     <p class="updated-hint" id="updatedHint"></p>
   </div>
 
+  <!-- Детальный график по тапу на карточку -->
+  <div class="chart-sheet screen-hidden" id="chartSheet" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="chartSheetTitle">
+    <button type="button" class="chart-sheet-backdrop" id="chartSheetClose" aria-label="Закрыть"></button>
+    <div class="chart-sheet-panel">
+      <div class="chart-sheet-handle" aria-hidden="true"></div>
+      <div class="chart-sheet-header">
+        <h2 id="chartSheetTitle">—</h2>
+        <button type="button" class="icon-btn chart-sheet-x" id="chartSheetX" aria-label="Закрыть">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="chart-sheet-compare" id="chartSheetCompare"></div>
+      <div class="chart-sheet-plot" id="chartSheetPlot"></div>
+      <div class="chart-sheet-legend">
+        <span class="chart-legend-item"><span class="chart-legend-dot chart-legend-dot-selected"></span>Выбранный день</span>
+        <span class="chart-legend-item"><span class="chart-legend-dot chart-legend-dot-compare"></span>Тот же день неделю назад</span>
+      </div>
+    </div>
+  </div>
+
   <script src="/pwa/js/pwa.js"></script>
 </body>
 </html>

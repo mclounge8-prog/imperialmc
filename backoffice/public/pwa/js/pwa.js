@@ -15,10 +15,19 @@
   var venueLabel = document.getElementById('venueLabel');
   var cardsEl = document.getElementById('cards');
   var updatedHint = document.getElementById('updatedHint');
+  var chartSheet = document.getElementById('chartSheet');
+  var chartSheetTitle = document.getElementById('chartSheetTitle');
+  var chartSheetCompare = document.getElementById('chartSheetCompare');
+  var chartSheetPlot = document.getElementById('chartSheetPlot');
+  var chartSheetClose = document.getElementById('chartSheetClose');
+  var chartSheetX = document.getElementById('chartSheetX');
 
   var state = {
     date: null,
     venueId: '',
+    compareDate: null,
+    dates: [],
+    metrics: null,
   };
 
   // Поколение экрана авторизации: поздний ответ старого checkSession() не должен
@@ -252,6 +261,9 @@
       })
       .then(function (data) {
         state.date = data.date;
+        state.compareDate = data.compareDate || null;
+        state.dates = data.dates || [];
+        state.metrics = data.metrics || null;
         dateInput.value = data.date;
         updateDateLabels(data.compareDate);
         renderCards(data.metrics);
@@ -276,17 +288,76 @@
     { key: 'guestCount', label: 'Гости', formatter: formatInt, deltaFormatter: formatSignedInt },
   ];
 
-  function sparklinePath(values, width, height) {
-    if (!values || values.length === 0) return '';
+  var COMPARE_OFFSET_FALLBACK = 7;
+
+  function sparkScale(values, width, height) {
     var max = Math.max.apply(null, values.concat([1]));
     var min = Math.min.apply(null, values.concat([0]));
     var range = max - min || 1;
     var stepX = values.length > 1 ? width / (values.length - 1) : 0;
+    return {
+      max: max,
+      min: min,
+      range: range,
+      stepX: stepX,
+      point: function (v, i) {
+        return {
+          x: i * stepX,
+          y: height - ((v - min) / range) * height,
+        };
+      },
+    };
+  }
+
+  function sparklinePath(values, width, height) {
+    if (!values || values.length === 0) return '';
+    var scale = sparkScale(values, width, height);
     return values.map(function (v, i) {
-      var x = i * stepX;
-      var y = height - ((v - min) / range) * height;
-      return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+      var p = scale.point(v, i);
+      return (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1);
     }).join(' ');
+  }
+
+  function markerSvg(values, width, height, selectedIndex, compareIndex, lineColor) {
+    if (!values || values.length === 0) return '';
+    var scale = sparkScale(values, width, height);
+    var parts = [];
+
+    if (compareIndex != null && compareIndex >= 0 && compareIndex < values.length) {
+      var cp = scale.point(values[compareIndex], compareIndex);
+      parts.push(
+        '<line class="spark-guide spark-guide-compare" x1="' + cp.x.toFixed(1) + '" y1="0" x2="' +
+          cp.x.toFixed(1) + '" y2="' + height + '" />'
+      );
+      parts.push(
+        '<circle class="spark-dot spark-dot-compare" cx="' + cp.x.toFixed(1) + '" cy="' +
+          cp.y.toFixed(1) + '" r="3.2" />'
+      );
+    }
+
+    if (selectedIndex != null && selectedIndex >= 0 && selectedIndex < values.length) {
+      var sp = scale.point(values[selectedIndex], selectedIndex);
+      parts.push(
+        '<line class="spark-guide spark-guide-selected" x1="' + sp.x.toFixed(1) + '" y1="0" x2="' +
+          sp.x.toFixed(1) + '" y2="' + height + '" stroke="' + lineColor + '" />'
+      );
+      parts.push(
+        '<circle class="spark-dot spark-dot-selected" cx="' + sp.x.toFixed(1) + '" cy="' +
+          sp.y.toFixed(1) + '" r="3.8" fill="' + lineColor + '" stroke="' + lineColor + '" />'
+      );
+    }
+
+    return parts.join('');
+  }
+
+  function resolveIndices(m) {
+    var len = (m.trend && m.trend.length) || 0;
+    var selectedIndex = m.selectedIndex != null ? m.selectedIndex : (len ? len - 1 : null);
+    var compareIndex = m.compareIndex != null
+      ? m.compareIndex
+      : (selectedIndex != null ? selectedIndex - COMPARE_OFFSET_FALLBACK : null);
+    if (compareIndex != null && (compareIndex < 0 || compareIndex >= len)) compareIndex = null;
+    return { selectedIndex: selectedIndex, compareIndex: compareIndex };
   }
 
   function renderCards(metrics) {
@@ -295,10 +366,13 @@
       var trendClass = m.deltaPct > 0.5 ? 'up' : m.deltaPct < -0.5 ? 'down' : 'flat';
       var arrow = trendClass === 'up' ? '\u25B2' : trendClass === 'down' ? '\u25BC' : '\u25CF';
       var lineColor = trendClass === 'up' ? 'var(--success)' : trendClass === 'down' ? 'var(--danger)' : 'var(--text-muted)';
+      var idxs = resolveIndices(m);
       var path = sparklinePath(m.trend, 110, 44);
+      var markers = markerSvg(m.trend, 110, 44, idxs.selectedIndex, idxs.compareIndex, lineColor);
 
       return (
-        '<div class="stat-card">' +
+        '<button type="button" class="stat-card" data-metric="' + def.key + '" aria-label="' +
+          escapeHtml(def.label) + ': открыть график">' +
           '<div class="stat-card-info">' +
             '<div class="stat-card-label">' + escapeHtml(def.label) + '</div>' +
             '<div class="stat-card-value">' + def.formatter(m.value) + '</div>' +
@@ -310,12 +384,132 @@
           '<div class="sparkline-wrap">' +
             '<svg class="sparkline" viewBox="0 0 110 44" preserveAspectRatio="none">' +
               '<path d="' + path + '" fill="none" stroke="' + lineColor + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />' +
+              markers +
             '</svg>' +
           '</div>' +
-        '</div>'
+        '</button>'
       );
     }).join('');
   }
+
+  function buildDetailChart(m, formatter) {
+    var width = 320;
+    var height = 160;
+    var padTop = 12;
+    var padBottom = 8;
+    var plotH = height - padTop - padBottom;
+    var values = m.trend || [];
+    if (!values.length) {
+      return '<p class="empty-state">Нет данных за период</p>';
+    }
+
+    var idxs = resolveIndices(m);
+    var max = Math.max.apply(null, values.concat([1]));
+    var min = Math.min.apply(null, values.concat([0]));
+    var range = max - min || 1;
+    var stepX = values.length > 1 ? width / (values.length - 1) : 0;
+
+    function xy(v, i) {
+      return {
+        x: i * stepX,
+        y: padTop + (plotH - ((v - min) / range) * plotH),
+      };
+    }
+
+    var path = values.map(function (v, i) {
+      var p = xy(v, i);
+      return (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1);
+    }).join(' ');
+
+    var guides = '';
+    var dots = '';
+
+    if (idxs.compareIndex != null) {
+      var cp = xy(values[idxs.compareIndex], idxs.compareIndex);
+      guides +=
+        '<line class="detail-guide detail-guide-compare" x1="' + cp.x.toFixed(1) + '" y1="' + padTop +
+        '" x2="' + cp.x.toFixed(1) + '" y2="' + (height - padBottom) + '" />';
+      dots +=
+        '<circle class="detail-dot detail-dot-compare" cx="' + cp.x.toFixed(1) + '" cy="' +
+        cp.y.toFixed(1) + '" r="5" />';
+    }
+
+    if (idxs.selectedIndex != null) {
+      var sp = xy(values[idxs.selectedIndex], idxs.selectedIndex);
+      guides +=
+        '<line class="detail-guide detail-guide-selected" x1="' + sp.x.toFixed(1) + '" y1="' + padTop +
+        '" x2="' + sp.x.toFixed(1) + '" y2="' + (height - padBottom) + '" />';
+      dots +=
+        '<circle class="detail-dot detail-dot-selected" cx="' + sp.x.toFixed(1) + '" cy="' +
+        sp.y.toFixed(1) + '" r="6" />';
+    }
+
+    var dateLabels = '';
+    if (state.dates && state.dates.length) {
+      var first = formatDateLabel(state.dates[0]);
+      var last = formatDateLabel(state.dates[state.dates.length - 1]);
+      dateLabels =
+        '<div class="chart-sheet-xlabels">' +
+          '<span>' + escapeHtml(first) + '</span>' +
+          '<span>' + escapeHtml(last) + '</span>' +
+        '</div>';
+    }
+
+    return (
+      '<svg class="detail-chart" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none" role="img">' +
+        guides +
+        '<path d="' + path + '" fill="none" stroke="var(--accent-2)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />' +
+        dots +
+      '</svg>' +
+      dateLabels +
+      '<div class="chart-sheet-values">' +
+        '<div class="chart-sheet-value-row">' +
+          '<span class="chart-legend-dot chart-legend-dot-selected"></span>' +
+          '<span>' + escapeHtml(formatDateLabel(state.date)) + '</span>' +
+          '<strong>' + formatter(m.value) + '</strong>' +
+        '</div>' +
+        '<div class="chart-sheet-value-row">' +
+          '<span class="chart-legend-dot chart-legend-dot-compare"></span>' +
+          '<span>' + escapeHtml(formatDateLabel(state.compareDate)) + '</span>' +
+          '<strong>' + formatter(m.compareValue) + '</strong>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function openChartSheet(metricKey) {
+    var def = CARD_DEFS.find(function (d) { return d.key === metricKey; });
+    if (!def || !state.metrics || !state.metrics[metricKey]) return;
+    var m = state.metrics[metricKey];
+    chartSheetTitle.textContent = def.label;
+    chartSheetCompare.textContent =
+      'Сравнение с ' + formatDateLabel(state.compareDate) + ' (тот же день неделю назад)';
+    chartSheetPlot.innerHTML = buildDetailChart(m, def.formatter);
+    chartSheet.classList.remove('screen-hidden');
+    chartSheet.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('chart-open');
+  }
+
+  function closeChartSheet() {
+    chartSheet.classList.add('screen-hidden');
+    chartSheet.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('chart-open');
+    chartSheetPlot.innerHTML = '';
+  }
+
+  cardsEl.addEventListener('click', function (event) {
+    var card = event.target.closest('.stat-card');
+    if (!card || !cardsEl.contains(card)) return;
+    openChartSheet(card.getAttribute('data-metric'));
+  });
+
+  chartSheetClose.addEventListener('click', closeChartSheet);
+  chartSheetX.addEventListener('click', closeChartSheet);
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && !chartSheet.classList.contains('screen-hidden')) {
+      closeChartSheet();
+    }
+  });
 
   function escapeHtml(value) {
     return String(value)
