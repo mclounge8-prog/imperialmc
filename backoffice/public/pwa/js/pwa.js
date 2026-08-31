@@ -131,9 +131,14 @@
       body: JSON.stringify({ username: username, password: password }),
     })
       .then(function (res) {
-        return res.json().then(function (data) {
-          return { ok: res.ok, status: res.status, data: data };
-        });
+        return res
+          .json()
+          .then(function (data) {
+            return { ok: res.ok, status: res.status, data: data };
+          })
+          .catch(function () {
+            throw new Error(res.status === 404 ? 'missing-endpoint' : 'bad-response');
+          });
       })
       .then(function (result) {
         if (epoch !== authEpoch) return null;
@@ -165,6 +170,10 @@
         if (err && err.message === 'session') {
           loginError.textContent =
             'Вход принят, но браузер не сохранил сессию. Откройте https://imperial-mc.online/pwa/ в Safari (не из ярлыка), войдите, затем снова «На экран Домой».';
+          return;
+        }
+        if (err && err.message === 'missing-endpoint') {
+          loginError.textContent = 'Сервер устарел: нет /login-json. Обновите бэкофис и повторите вход.';
           return;
         }
         loginError.textContent = 'Сервер недоступен, попробуйте ещё раз';

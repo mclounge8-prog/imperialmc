@@ -1,7 +1,7 @@
 // Service worker PWA «Показатели». Версия в имени кэша — единственный способ
 // заставить браузер подтянуть новый app-shell после деплоя (иначе activate
 // увидит старый CACHE_NAME и ничего не тронет).
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const CACHE_NAME = `imperial-mc-pwa-${CACHE_VERSION}`;
 
 const APP_SHELL = [
