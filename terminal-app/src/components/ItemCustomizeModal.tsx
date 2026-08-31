@@ -141,7 +141,10 @@ export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) 
   const canConfirm = groups.every((g) => {
     if (!g.id) return true;
     const count = countInGroup(g, selected);
-    return count >= g.minSelect && (g.maxSelect == null || count <= g.maxSelect);
+    const optionCount = g.options.length;
+    const minSelect = Math.min(g.minSelect, optionCount);
+    const maxSelect = g.maxSelect == null ? null : Math.min(g.maxSelect, optionCount);
+    return count >= minSelect && (maxSelect == null || count <= maxSelect);
   });
 
   return (

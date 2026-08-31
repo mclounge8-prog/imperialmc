@@ -995,22 +995,28 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
       countsByGroup.set(groupId, (countsByGroup.get(groupId) || 0) + 1);
     }
     const groupsInvolved = new Map();
+    const optionsPerGroup = new Map();
     for (const a of attachments) {
-      if (a.group_id && !groupsInvolved.has(a.group_id)) {
+      if (!a.group_id) continue;
+      optionsPerGroup.set(a.group_id, (optionsPerGroup.get(a.group_id) || 0) + 1);
+      if (!groupsInvolved.has(a.group_id)) {
         groupsInvolved.set(a.group_id, { name: a.group_name, min: a.min_select, max: a.max_select });
       }
     }
     for (const [groupId, info] of groupsInvolved) {
       const count = countsByGroup.get(groupId) || 0;
-      if (info.max != null && count > info.max) {
+      const optionCount = optionsPerGroup.get(groupId) || 0;
+      const effectiveMax = info.max == null ? null : Math.min(info.max, optionCount);
+      const effectiveMin = Math.min(Math.max(info.min, 0), optionCount);
+      if (effectiveMax != null && count > effectiveMax) {
         await client.query('ROLLBACK');
         c.status(400);
-        return c.json({ error: `В группе «${info.name}» можно выбрать не больше ${info.max}` });
+        return c.json({ error: `В группе «${info.name}» можно выбрать не больше ${effectiveMax}` });
       }
-      if (info.min > 0 && count < info.min) {
+      if (effectiveMin > 0 && count < effectiveMin) {
         await client.query('ROLLBACK');
         c.status(400);
-        return c.json({ error: `В группе «${info.name}» нужно выбрать хотя бы ${info.min}` });
+        return c.json({ error: `В группе «${info.name}» нужно выбрать хотя бы ${effectiveMin}` });
       }
     }
 

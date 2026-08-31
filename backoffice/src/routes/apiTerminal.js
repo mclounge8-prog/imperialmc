@@ -130,7 +130,18 @@ apiTerminal.get('/menu', requireStaffToken, async (c) => {
         unit: row.warehouse_unit || null,
       });
     }
-    return [...groups.values()];
+    // Лимиты группы глобальные, а опций на конкретной позиции может быть
+    // меньше (Puff: 2 из «Кальянная номенклатура» при min=3) — иначе
+    // терминал требует выбрать больше, чем есть в списке.
+    return [...groups.values()].map((group) => {
+      const optionCount = group.options.length;
+      const minSelect = Math.min(Number(group.minSelect) || 0, optionCount);
+      let maxSelect = group.maxSelect;
+      if (maxSelect != null) {
+        maxSelect = Math.min(Number(maxSelect), optionCount);
+      }
+      return { ...group, minSelect, maxSelect };
+    });
   }
 
   const mapItem = (item) => ({
