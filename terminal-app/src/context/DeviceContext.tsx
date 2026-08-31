@@ -13,9 +13,19 @@ type DeviceContextValue = {
   error: string | null;
   register: (code: string) => Promise<void>;
   refresh: () => Promise<void>;
+  /** Сбросить локальную привязку и снова показать экран ввода кода */
+  clearRegistration: () => Promise<void>;
 };
 
 const DeviceContext = createContext<DeviceContextValue | undefined>(undefined);
+
+function isDeviceGoneError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const status = (error as Error & { status?: number }).status;
+  if (status === 401) return true;
+  const msg = error.message.toLowerCase();
+  return msg.includes('удален') || msg.includes('не найден');
+}
 
 export function DeviceProvider({ children }: { children: ReactNode }) {
   const [deviceToken, setDeviceToken] = useState<string | null>(null);
@@ -23,15 +33,31 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const checkStatus = useCallback(async (token: string) => {
+  const clearRegistration = useCallback(async () => {
+    await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+    setDeviceToken(null);
+    setStatus(null);
     setError(null);
-    try {
-      const data = await fetchDeviceStatus(token);
-      setStatus(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось проверить статус устройства');
-    }
   }, []);
+
+  const checkStatus = useCallback(
+    async (token: string) => {
+      setError(null);
+      try {
+        const data = await fetchDeviceStatus(token);
+        setStatus(data);
+      } catch (e) {
+        if (isDeviceGoneError(e)) {
+          // Удалили в бэкофисе (или токен битый) — сбрасываем локально,
+          // иначе планшет навсегда зависает на «устройство не найдено».
+          await clearRegistration();
+          return;
+        }
+        setError(e instanceof Error ? e.message : 'Не удалось проверить статус устройства');
+      }
+    },
+    [clearRegistration]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -59,6 +85,7 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
     async (code: string) => {
       const { token } = await apiRegisterDevice(code);
       await AsyncStorage.setItem(STORAGE_KEY, token);
+      setError(null);
       setDeviceToken(token);
       await checkStatus(token);
     },
@@ -71,7 +98,17 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
   }, [deviceToken, checkStatus]);
 
   return (
-    <DeviceContext.Provider value={{ deviceToken, status, loading, error, register, refresh }}>
+    <DeviceContext.Provider
+      value={{
+        deviceToken,
+        status,
+        loading,
+        error,
+        register,
+        refresh,
+        clearRegistration,
+      }}
+    >
       {children}
     </DeviceContext.Provider>
   );
