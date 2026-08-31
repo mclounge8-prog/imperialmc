@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
-import type { MenuItem, ModifierGroup } from '../api/client';
+import type { MenuItem, ModifierGroup, ModifierOption } from '../api/client';
 
 function formatMoney(value: number): string {
   return `${value.toFixed(0)} ₽`;
@@ -13,7 +13,12 @@ const UNIT_LABELS: Record<string, string> = {
   pcs: 'шт',
 };
 
-function formatOptionMeta(opt: { price: number; qty: number; unit: string | null; isDefault: boolean }): string {
+function formatOptionMeta(opt: {
+  price: number;
+  qty: number;
+  unit: string | null;
+  isDefault: boolean;
+}): string {
   const parts: string[] = [];
   if (opt.qty > 0 && opt.unit) {
     parts.push(`${opt.qty} ${UNIT_LABELS[opt.unit] || opt.unit}`);
@@ -24,6 +29,44 @@ function formatOptionMeta(opt: { price: number; qty: number; unit: string | null
   if (parts.length > 0) return parts.join(' · ');
   return opt.isDefault ? '' : 'беспл.';
 }
+
+type OptionRowProps = {
+  opt: ModifierOption;
+  isSelected: boolean;
+  isRadio: boolean;
+  onToggle: (modifierId: number) => void;
+};
+
+// Отдельный memo-ряд: при выборе одного модификатора не перерисовываем весь список —
+// на планшете это давало микролаги и «проглатывание» следующего свайпа.
+const OptionRow = React.memo(function OptionRow({
+  opt,
+  isSelected,
+  isRadio,
+  onToggle,
+}: OptionRowProps) {
+  return (
+    <Pressable
+      style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+      onPress={() => onToggle(opt.modifierId)}
+      // Даём ScrollView шанс забрать вертикальный жест раньше, чем Pressable
+      // решит, что это тап (типичный Android-глюк «свайп иногда не едет»).
+      delayPressIn={50}
+    >
+      <View
+        style={[
+          styles.checkbox,
+          isRadio && styles.checkboxRadio,
+          isSelected && styles.checkboxChecked,
+        ]}
+      >
+        {isSelected ? <View style={isRadio ? styles.radioDot : styles.checkboxTick} /> : null}
+      </View>
+      <Text style={styles.optionName}>{opt.name}</Text>
+      <Text style={styles.optionPrice}>{formatOptionMeta(opt)}</Text>
+    </Pressable>
+  );
+});
 
 type Props = {
   item: MenuItem | null;
@@ -50,94 +93,121 @@ export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) 
     setSelected(defaults);
   }, [item]);
 
-  if (!item) return null;
+  const groups = item?.modifierGroups ?? [];
 
-  const countInGroup = (group: ModifierGroup): number =>
-    group.options.filter((o) => selected.has(o.modifierId)).length;
+  const countInGroup = useCallback(
+    (group: ModifierGroup, selectedSet: Set<number>): number =>
+      group.options.filter((o) => selectedSet.has(o.modifierId)).length,
+    []
+  );
 
-  const toggle = (group: ModifierGroup, modifierId: number) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(modifierId)) {
-        next.delete(modifierId);
-        return next;
-      }
-      if (group.maxSelect === 1) {
-        for (const opt of group.options) next.delete(opt.modifierId);
+  const toggleInGroup = useCallback(
+    (group: ModifierGroup, modifierId: number) => {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(modifierId)) {
+          next.delete(modifierId);
+          return next;
+        }
+        if (group.maxSelect === 1) {
+          for (const opt of group.options) next.delete(opt.modifierId);
+          next.add(modifierId);
+          return next;
+        }
+        if (group.maxSelect != null && countInGroup(group, next) >= group.maxSelect) {
+          return prev;
+        }
         next.add(modifierId);
         return next;
-      }
-      if (group.maxSelect != null && countInGroup(group) >= group.maxSelect) {
-        return prev;
-      }
-      next.add(modifierId);
-      return next;
-    });
-  };
+      });
+    },
+    [countInGroup]
+  );
 
-  const selectedOptions = item.modifierGroups
-    .flatMap((g) => g.options)
-    .filter((o) => selected.has(o.modifierId));
+  const groupToggleHandlers = useMemo(() => {
+    const map = new Map<number | string, (modifierId: number) => void>();
+    for (const group of groups) {
+      const key = group.id ?? 'ungrouped';
+      map.set(key, (modifierId: number) => toggleInGroup(group, modifierId));
+    }
+    return map;
+  }, [groups, toggleInGroup]);
+
+  if (!item) return null;
+
+  const selectedOptions = groups.flatMap((g) => g.options).filter((o) => selected.has(o.modifierId));
   const totalPrice = item.price + selectedOptions.reduce((sum, o) => sum + o.price, 0);
 
-  const canConfirm = item.modifierGroups.every((g) => {
+  const canConfirm = groups.every((g) => {
     if (!g.id) return true;
-    const count = countInGroup(g);
-    return count >= g.minSelect && (g.maxSelect == null || count <= g.maxSelect);
+    const count = countInGroup(g, selected);
+    const optionCount = g.options.length;
+    const minSelect = Math.min(g.minSelect, optionCount);
+    const maxSelect = g.maxSelect == null ? null : Math.min(g.maxSelect, optionCount);
+    return count >= minSelect && (maxSelect == null || count <= maxSelect);
   });
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable style={styles.modalBox} onPress={(e) => e.stopPropagation()}>
+      {/* Backdrop и карточка — siblings. Раньше ScrollView сидел внутри Pressable
+          (stopPropagation), из‑за этого Android то отдавал жест скроллу, то
+          родителю → «свайп иногда игнорируется». */}
+      <View style={styles.modalBackdrop}>
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+        <View style={styles.modalBox}>
           <Text style={styles.title} numberOfLines={2}>
             {item.name}
           </Text>
 
-          <ScrollView style={styles.groupsScroll}>
-            {item.modifierGroups.map((group) => (
-              <View key={group.id ?? 'ungrouped'} style={styles.groupBlock}>
-                <View style={styles.groupHeader}>
-                  <Text style={styles.groupTitle}>{group.name}</Text>
-                  {group.id != null && (
-                    <Text style={styles.groupLimit}>
-                      {group.maxSelect === 1
-                        ? 'выберите один'
-                        : group.maxSelect != null
-                          ? `до ${group.maxSelect}`
-                          : 'любое количество'}
-                      {group.minSelect > 0 ? ' · обязательно' : ''}
-                    </Text>
-                  )}
-                </View>
+          <ScrollView
+            style={styles.groupsScroll}
+            contentContainerStyle={styles.groupsScrollContent}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator
+          >
+            {groups.map((group) => {
+              const key = group.id ?? 'ungrouped';
+              const onToggle = groupToggleHandlers.get(key)!;
+              const isRadio = group.maxSelect === 1;
+              return (
+                <View key={key} style={styles.groupBlock}>
+                  <View style={styles.groupHeader}>
+                    <Text style={styles.groupTitle}>{group.name}</Text>
+                    {group.id != null && (
+                      <Text style={styles.groupLimit}>
+                        {(() => {
+                          const optionCount = group.options.length;
+                          const maxSelect =
+                            group.maxSelect == null
+                              ? null
+                              : Math.min(group.maxSelect, optionCount);
+                          const minSelect = Math.min(group.minSelect, optionCount);
+                          if (maxSelect === 1) return 'выберите один';
+                          if (maxSelect != null) {
+                            return minSelect > 0 && minSelect === maxSelect
+                              ? `ровно ${maxSelect}`
+                              : `до ${maxSelect}`;
+                          }
+                          return 'любое количество';
+                        })()}
+                        {Math.min(group.minSelect, group.options.length) > 0 ? ' · обязательно' : ''}
+                      </Text>
+                    )}
+                  </View>
 
-                {group.options.map((opt) => {
-                  const isSelected = selected.has(opt.modifierId);
-                  const isRadio = group.maxSelect === 1;
-                  return (
-                    <Pressable
+                  {group.options.map((opt) => (
+                    <OptionRow
                       key={opt.modifierId}
-                      style={[styles.optionRow, isSelected && styles.optionRowSelected]}
-                      onPress={() => toggle(group, opt.modifierId)}
-                    >
-                      <View
-                        style={[
-                          styles.checkbox,
-                          isRadio && styles.checkboxRadio,
-                          isSelected && styles.checkboxChecked,
-                        ]}
-                      >
-                        {isSelected && (
-                          <View style={isRadio ? styles.radioDot : styles.checkboxTick} />
-                        )}
-                      </View>
-                      <Text style={styles.optionName}>{opt.name}</Text>
-                      <Text style={styles.optionPrice}>{formatOptionMeta(opt)}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ))}
+                      opt={opt}
+                      isSelected={selected.has(opt.modifierId)}
+                      isRadio={isRadio}
+                      onToggle={onToggle}
+                    />
+                  ))}
+                </View>
+              );
+            })}
           </ScrollView>
 
           <View style={styles.footer}>
@@ -155,8 +225,8 @@ export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) 
               </Pressable>
             </View>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -178,9 +248,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 16,
     padding: 20,
+    // Выше absoluteFill-backdrop, чтобы тачи шли в карточку, а не «сквозь» неё.
+    zIndex: 1,
+    elevation: 4,
   },
   title: { color: colors.text, fontSize: 17, fontWeight: '700', marginBottom: 8 },
-  groupsScroll: { marginBottom: 8 },
+  groupsScroll: { flexGrow: 0, flexShrink: 1, marginBottom: 8 },
+  groupsScrollContent: { paddingBottom: 4 },
   groupBlock: { marginBottom: 14 },
   groupHeader: {
     flexDirection: 'row',

@@ -10,7 +10,7 @@ import { renderVenuesSection } from '../views/venuesView.js';
 import { renderDevicesSection } from '../views/devicesView.js';
 import { renderUpdatesSection } from '../views/updatesView.js';
 import { renderReceiptsSection } from '../views/reportsView.js';
-import { fetchReceiptsPage, defaultDateRange, PAGE_SIZE } from './reports.js';
+import { fetchReceiptsPage, fetchReceiptsSummary, defaultDateRange, PAGE_SIZE } from './reports.js';
 import { renderDashboardFragment } from './stats.js';
 import { renderModifiersFragment } from './modifiers.js';
 import { fetchAllVenues } from '../utils/venues.js';
@@ -193,16 +193,24 @@ export async function renderFragmentHtml(key, c) {
   if (key === 'reports') {
     const { rows: venues } = await pool.query('SELECT id, name FROM venues ORDER BY name');
     const { from, to } = defaultDateRange();
-    const { rows: receipts, totalCount } = await fetchReceiptsPage({
-      venueId: null,
-      dateFrom: from,
-      dateTo: to,
-      page: 1,
-    });
+    const [{ rows: receipts, totalCount }, summary] = await Promise.all([
+      fetchReceiptsPage({
+        venueId: null,
+        dateFrom: from,
+        dateTo: to,
+        page: 1,
+      }),
+      fetchReceiptsSummary({
+        venueId: null,
+        dateFrom: from,
+        dateTo: to,
+      }),
+    ]);
     return renderReceiptsSection(venues, null, from, to, receipts, {
       page: 1,
       totalCount,
       pageSize: PAGE_SIZE,
+      summary,
     });
   }
 
