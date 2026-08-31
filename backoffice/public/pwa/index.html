@@ -100,10 +100,15 @@
       <div class="chart-sheet-compare" id="chartSheetCompare"></div>
       <div class="chart-sheet-plot" id="chartSheetPlot"></div>
       <div class="chart-sheet-legend">
-        <span class="chart-legend-item"><span class="chart-legend-dot chart-legend-dot-selected"></span>Выбранный день</span>
-        <span class="chart-legend-item"><span class="chart-legend-dot chart-legend-dot-compare"></span>Тот же день неделю назад</span>
+        <span class="chart-legend-item"><span class="chart-legend-dot chart-legend-dot-selected"></span><span id="chartLegendSelected">Выбранный день</span></span>
+        <span class="chart-legend-item"><span class="chart-legend-dot chart-legend-dot-compare"></span><span id="chartLegendCompare">Неделю назад</span></span>
       </div>
     </div>
+  </div>
+
+  <div class="update-toast screen-hidden" id="updateToast" role="status" aria-live="polite">
+    <span>Доступна новая версия</span>
+    <button type="button" id="updateToastBtn">Обновить</button>
   </div>
 
   <script src="/pwa/js/pwa.js"></script>

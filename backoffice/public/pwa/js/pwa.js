@@ -21,14 +21,22 @@
   var chartSheetPlot = document.getElementById('chartSheetPlot');
   var chartSheetClose = document.getElementById('chartSheetClose');
   var chartSheetX = document.getElementById('chartSheetX');
+  var chartLegendSelected = document.getElementById('chartLegendSelected');
+  var chartLegendCompare = document.getElementById('chartLegendCompare');
+  var updateToast = document.getElementById('updateToast');
+  var updateToastBtn = document.getElementById('updateToastBtn');
 
   var state = {
     date: null,
     venueId: '',
     compareDate: null,
     dates: [],
+    hourLabels: [],
     metrics: null,
   };
+
+  var APP_VERSION = null;
+  var pendingSwRegistration = null;
 
   // Поколение экрана авторизации: поздний ответ старого checkSession() не должен
   // вернуть форму входа поверх уже открытой статистики (типичная гонка на iPhone).
@@ -269,6 +277,7 @@
         state.date = data.date;
         state.compareDate = data.compareDate || null;
         state.dates = data.dates || [];
+        state.hourLabels = data.hourLabels || [];
         state.metrics = data.metrics || null;
         dateInput.value = data.date;
         updateDateLabels(data.compareDate);
@@ -294,13 +303,17 @@
     { key: 'guestCount', label: 'Гости', formatter: formatInt, deltaFormatter: formatSignedInt },
   ];
 
-  var COMPARE_OFFSET_FALLBACK = 7;
+  var COLOR_SELECTED = '#3f63e6';
+  var COLOR_COMPARE = '#c9a227';
+  var COLOR_GRID = '#34343c';
 
-  function sparkScale(values, width, height) {
-    var max = Math.max.apply(null, values.concat([1]));
+  function sparkScaleDual(seriesA, seriesB, width, height) {
+    var values = (seriesA || []).concat(seriesB || []).concat([1]);
+    var max = Math.max.apply(null, values);
     var min = Math.min.apply(null, values.concat([0]));
     var range = max - min || 1;
-    var stepX = values.length > 1 ? width / (values.length - 1) : 0;
+    var len = Math.max((seriesA && seriesA.length) || 0, (seriesB && seriesB.length) || 0, 1);
+    var stepX = len > 1 ? width / (len - 1) : 0;
     return {
       max: max,
       min: min,
@@ -315,66 +328,23 @@
     };
   }
 
-  function sparklinePath(values, width, height) {
-    if (!values || values.length === 0) return '';
-    var scale = sparkScale(values, width, height);
-    return values.map(function (v, i) {
+  function pathFromSeries(series, scale) {
+    if (!series || !series.length) return '';
+    return series.map(function (v, i) {
       var p = scale.point(v, i);
       return (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1);
     }).join(' ');
   }
 
-  function markerSvg(values, width, height, selectedIndex, compareIndex, lineColor) {
-    if (!values || values.length === 0) return '';
-    var scale = sparkScale(values, width, height);
-    var parts = [];
-
-    if (compareIndex != null && compareIndex >= 0 && compareIndex < values.length) {
-      var cp = scale.point(values[compareIndex], compareIndex);
-      parts.push(
-        '<line class="spark-guide spark-guide-compare" x1="' + cp.x.toFixed(1) + '" y1="0" x2="' +
-          cp.x.toFixed(1) + '" y2="' + height + '" />'
-      );
-      parts.push(
-        '<circle class="spark-dot spark-dot-compare" cx="' + cp.x.toFixed(1) + '" cy="' +
-          cp.y.toFixed(1) + '" r="3.2" />'
-      );
-    }
-
-    if (selectedIndex != null && selectedIndex >= 0 && selectedIndex < values.length) {
-      var sp = scale.point(values[selectedIndex], selectedIndex);
-      parts.push(
-        '<line class="spark-guide spark-guide-selected" x1="' + sp.x.toFixed(1) + '" y1="0" x2="' +
-          sp.x.toFixed(1) + '" y2="' + height + '" stroke="' + lineColor + '" />'
-      );
-      parts.push(
-        '<circle class="spark-dot spark-dot-selected" cx="' + sp.x.toFixed(1) + '" cy="' +
-          sp.y.toFixed(1) + '" r="3.8" fill="' + lineColor + '" stroke="' + lineColor + '" />'
-      );
-    }
-
-    return parts.join('');
-  }
-
-  function resolveIndices(m) {
-    var len = (m.trend && m.trend.length) || 0;
-    var selectedIndex = m.selectedIndex != null ? m.selectedIndex : (len ? len - 1 : null);
-    var compareIndex = m.compareIndex != null
-      ? m.compareIndex
-      : (selectedIndex != null ? selectedIndex - COMPARE_OFFSET_FALLBACK : null);
-    if (compareIndex != null && (compareIndex < 0 || compareIndex >= len)) compareIndex = null;
-    return { selectedIndex: selectedIndex, compareIndex: compareIndex };
-  }
-
   function renderCards(metrics) {
     cardsEl.innerHTML = CARD_DEFS.map(function (def) {
-      var m = metrics[def.key] || { value: 0, deltaPct: 0, deltaAbs: 0, trend: [] };
+      var m = metrics[def.key] || { value: 0, deltaPct: 0, deltaAbs: 0, trend: [], compareTrend: [] };
       var trendClass = m.deltaPct > 0.5 ? 'up' : m.deltaPct < -0.5 ? 'down' : 'flat';
       var arrow = trendClass === 'up' ? '\u25B2' : trendClass === 'down' ? '\u25BC' : '\u25CF';
-      var lineColor = trendClass === 'up' ? 'var(--success)' : trendClass === 'down' ? 'var(--danger)' : 'var(--text-muted)';
-      var idxs = resolveIndices(m);
-      var path = sparklinePath(m.trend, 110, 44);
-      var markers = markerSvg(m.trend, 110, 44, idxs.selectedIndex, idxs.compareIndex, lineColor);
+      var lineColor = trendClass === 'up' ? 'var(--success)' : trendClass === 'down' ? 'var(--danger)' : COLOR_SELECTED;
+      var scale = sparkScaleDual(m.trend, m.compareTrend, 110, 44);
+      var pathCompare = pathFromSeries(m.compareTrend, scale);
+      var pathSelected = pathFromSeries(m.trend, scale);
 
       return (
         '<button type="button" class="stat-card" data-metric="' + def.key + '" aria-label="' +
@@ -389,8 +359,10 @@
           '</div>' +
           '<div class="sparkline-wrap">' +
             '<svg class="sparkline" viewBox="0 0 110 44" preserveAspectRatio="none">' +
-              '<path d="' + path + '" fill="none" stroke="' + lineColor + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />' +
-              markers +
+              (pathCompare
+                ? '<path d="' + pathCompare + '" fill="none" stroke="' + COLOR_COMPARE + '" stroke-width="1.8" stroke-dasharray="3 3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />'
+                : '') +
+              '<path d="' + pathSelected + '" fill="none" stroke="' + lineColor + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />' +
             '</svg>' +
           '</div>' +
         '</button>'
@@ -398,89 +370,197 @@
     }).join('');
   }
 
-  function buildDetailChart(m, formatter) {
-    var width = 320;
-    var height = 160;
-    var padTop = 12;
-    var padBottom = 8;
-    var plotH = height - padTop - padBottom;
-    var values = m.trend || [];
-    if (!values.length) {
+  function formatCompactAxis(value) {
+    var num = Number(value) || 0;
+    var abs = Math.abs(num);
+    if (abs >= 1000000) return (Math.round((num / 1000000) * 10) / 10).toString().replace('.', ',') + 'M';
+    if (abs >= 1000) return (Math.round((num / 1000) * 10) / 10).toString().replace('.', ',') + 'K';
+    return String(Math.round(num));
+  }
+
+  function buildHourlyDetailChart(m, formatter) {
+    var selected = (m.hours && m.hours.selected) || [];
+    var compare = (m.hours && m.hours.compare) || [];
+    if (!selected.length && !compare.length) {
       return '<p class="empty-state">Нет данных за период</p>';
     }
 
-    var idxs = resolveIndices(m);
-    var max = Math.max.apply(null, values.concat([1]));
-    var min = Math.min.apply(null, values.concat([0]));
-    var range = max - min || 1;
-    var stepX = values.length > 1 ? width / (values.length - 1) : 0;
+    var labels = state.hourLabels.length ? state.hourLabels : selected.map(function (_, i) {
+      return String(i).padStart(2, '0');
+    });
+    var height = 200;
+    var padTop = 14;
+    var maxValue = Math.max(1, Math.max.apply(null, selected.concat(compare)));
+    var n = Math.max(selected.length, compare.length, 1);
+    var stepXPct = n > 1 ? 100 / (n - 1) : 0;
 
-    function xy(v, i) {
-      return {
-        x: i * stepX,
-        y: padTop + (plotH - ((v - min) / range) * plotH),
-      };
+    function yPct(v) {
+      return ((height - (v / maxValue) * (height - padTop)) / height) * 100;
     }
 
-    var path = values.map(function (v, i) {
-      var p = xy(v, i);
-      return (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1);
-    }).join(' ');
-
-    var guides = '';
-    var dots = '';
-
-    if (idxs.compareIndex != null) {
-      var cp = xy(values[idxs.compareIndex], idxs.compareIndex);
-      guides +=
-        '<line class="detail-guide detail-guide-compare" x1="' + cp.x.toFixed(1) + '" y1="' + padTop +
-        '" x2="' + cp.x.toFixed(1) + '" y2="' + (height - padBottom) + '" />';
-      dots +=
-        '<circle class="detail-dot detail-dot-compare" cx="' + cp.x.toFixed(1) + '" cy="' +
-        cp.y.toFixed(1) + '" r="5" />';
+    var points = [];
+    for (var i = 0; i < n; i += 1) {
+      var sel = selected[i] || 0;
+      var cmp = compare[i] || 0;
+      points.push({
+        xPct: stepXPct ? i * stepXPct : 50,
+        label: (labels[i] || String(i)) + ':00',
+        rows: [
+          { name: formatDateLabel(state.date), value: formatter(sel), color: COLOR_SELECTED, yPct: yPct(sel), raw: sel },
+          { name: formatDateLabel(state.compareDate), value: formatter(cmp), color: COLOR_COMPARE, yPct: yPct(cmp), raw: cmp },
+        ],
+      });
     }
 
-    if (idxs.selectedIndex != null) {
-      var sp = xy(values[idxs.selectedIndex], idxs.selectedIndex);
-      guides +=
-        '<line class="detail-guide detail-guide-selected" x1="' + sp.x.toFixed(1) + '" y1="' + padTop +
-        '" x2="' + sp.x.toFixed(1) + '" y2="' + (height - padBottom) + '" />';
-      dots +=
-        '<circle class="detail-dot detail-dot-selected" cx="' + sp.x.toFixed(1) + '" cy="' +
-        sp.y.toFixed(1) + '" r="6" />';
+    // SVG viewBox в логических единицах; оси — HTML рядом
+    var width = 640;
+    function scaleY(v) {
+      return height - (v / maxValue) * (height - padTop);
+    }
+    function scaleX(i) {
+      return n > 1 ? (i / (n - 1)) * width : width / 2;
     }
 
-    var dateLabels = '';
-    if (state.dates && state.dates.length) {
-      var first = formatDateLabel(state.dates[0]);
-      var last = formatDateLabel(state.dates[state.dates.length - 1]);
-      dateLabels =
-        '<div class="chart-sheet-xlabels">' +
-          '<span>' + escapeHtml(first) + '</span>' +
-          '<span>' + escapeHtml(last) + '</span>' +
-        '</div>';
+    function linePath(series) {
+      return series.map(function (v, idx) {
+        return (idx === 0 ? 'M' : 'L') + scaleX(idx).toFixed(1) + ',' + scaleY(v).toFixed(1);
+      }).join(' ');
     }
+
+    var grid = [0, 0.25, 0.5, 0.75, 1].map(function (f) {
+      var y = height - f * (height - padTop);
+      return '<line x1="0" y1="' + y.toFixed(1) + '" x2="' + width + '" y2="' + y.toFixed(1) +
+        '" stroke="' + COLOR_GRID + '" stroke-width="1" stroke-dasharray="4 4" />';
+    }).join('');
+
+    var dotsSelected = selected.map(function (v, idx) {
+      return '<circle cx="' + scaleX(idx).toFixed(1) + '" cy="' + scaleY(v).toFixed(1) +
+        '" r="3.2" fill="' + COLOR_SELECTED + '" />';
+    }).join('');
+
+    var yTicks = [0, 0.25, 0.5, 0.75, 1].map(function (f) {
+      var y = height - f * (height - padTop);
+      var translate = f === 1 ? '0' : f === 0 ? '-100%' : '-50%';
+      return '<span class="chart-y-axis-tick" style="top:' + y.toFixed(1) + 'px;transform:translateY(' + translate + ')">' +
+        escapeHtml(formatCompactAxis(f * maxValue)) + '</span>';
+    }).join('');
+
+    var xLabels = [0, 3, 6, 9, 12, 15, 18, 21].map(function (h) {
+      return '<span>' + String(h).padStart(2, '0') + '</span>';
+    }).join('');
+
+    var svg =
+      '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none" class="detail-chart-svg" role="img">' +
+        grid +
+        '<path d="' + linePath(compare) + '" fill="none" stroke="' + COLOR_COMPARE + '" stroke-width="2" stroke-dasharray="6 5" stroke-linejoin="round" stroke-linecap="round" />' +
+        '<path d="' + linePath(selected) + '" fill="none" stroke="' + COLOR_SELECTED + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />' +
+        dotsSelected +
+      '</svg>';
 
     return (
-      '<svg class="detail-chart" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none" role="img">' +
-        guides +
-        '<path d="' + path + '" fill="none" stroke="var(--accent-2)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />' +
-        dots +
-      '</svg>' +
-      dateLabels +
+      '<div class="detail-chart-wrap" data-points="' + escapeHtml(JSON.stringify(points)) + '">' +
+        '<div class="detail-chart-with-axis">' +
+          '<div class="chart-y-axis" style="height:' + height + 'px">' + yTicks + '</div>' +
+          '<div class="detail-chart-plot" style="height:' + height + 'px">' +
+            svg +
+            '<div class="chart-crosshair screen-hidden"></div>' +
+            '<div class="chart-hover-dots"></div>' +
+            '<div class="chart-tooltip screen-hidden"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="chart-x-labels">' + xLabels + '</div>' +
+      '</div>' +
       '<div class="chart-sheet-values">' +
         '<div class="chart-sheet-value-row">' +
           '<span class="chart-legend-dot chart-legend-dot-selected"></span>' +
-          '<span>' + escapeHtml(formatDateLabel(state.date)) + '</span>' +
+          '<span>' + escapeHtml(formatDateLabel(state.date)) + ' · итог</span>' +
           '<strong>' + formatter(m.value) + '</strong>' +
         '</div>' +
         '<div class="chart-sheet-value-row">' +
           '<span class="chart-legend-dot chart-legend-dot-compare"></span>' +
-          '<span>' + escapeHtml(formatDateLabel(state.compareDate)) + '</span>' +
+          '<span>' + escapeHtml(formatDateLabel(state.compareDate)) + ' · итог</span>' +
           '<strong>' + formatter(m.compareValue) + '</strong>' +
         '</div>' +
       '</div>'
     );
+  }
+
+  function bindChartInteractions(root) {
+    var plot = root.querySelector('.detail-chart-plot');
+    if (!plot) return;
+    var points;
+    try {
+      points = JSON.parse(root.getAttribute('data-points') || '[]');
+    } catch (e) {
+      points = [];
+    }
+    var crosshair = plot.querySelector('.chart-crosshair');
+    var dotsEl = plot.querySelector('.chart-hover-dots');
+    var tooltip = plot.querySelector('.chart-tooltip');
+
+    function hide() {
+      crosshair.classList.add('screen-hidden');
+      tooltip.classList.add('screen-hidden');
+      dotsEl.innerHTML = '';
+    }
+
+    function showAt(clientX) {
+      if (!points.length) return;
+      var rect = plot.getBoundingClientRect();
+      if (!rect.width) return;
+      var relX = ((clientX - rect.left) / rect.width) * 100;
+      var nearest = points[0];
+      var nearestDist = Infinity;
+      points.forEach(function (p) {
+        var dist = Math.abs(p.xPct - relX);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = p;
+        }
+      });
+
+      crosshair.classList.remove('screen-hidden');
+      crosshair.style.left = nearest.xPct + '%';
+
+      dotsEl.innerHTML = nearest.rows.map(function (row) {
+        return '<div class="chart-hover-dot" style="left:' + nearest.xPct + '%;top:' + row.yPct +
+          '%;background:' + row.color + '"></div>';
+      }).join('');
+
+      var minY = Math.min.apply(null, nearest.rows.map(function (r) { return r.yPct; }));
+      var left = nearest.xPct;
+      var translateX = '-50%';
+      if (left < 12) translateX = '0%';
+      else if (left > 88) translateX = '-100%';
+      tooltip.classList.remove('screen-hidden');
+      tooltip.style.left = left + '%';
+      tooltip.style.top = Math.max(0, minY - 8) + '%';
+      tooltip.style.transform = 'translate(' + translateX + ', -100%)';
+      tooltip.innerHTML =
+        '<div class="chart-tooltip-label">' + escapeHtml(nearest.label) + '</div>' +
+        nearest.rows.map(function (row) {
+          return (
+            '<div class="chart-tooltip-row">' +
+              '<span class="chart-tooltip-dot" style="background:' + row.color + '"></span>' +
+              '<span class="chart-tooltip-name">' + escapeHtml(row.name) + '</span>' +
+              '<span class="chart-tooltip-value">' + escapeHtml(row.value) + '</span>' +
+            '</div>'
+          );
+        }).join('');
+    }
+
+    plot.addEventListener('pointerdown', function (event) {
+      plot.setPointerCapture(event.pointerId);
+      showAt(event.clientX);
+    });
+    plot.addEventListener('pointermove', function (event) {
+      if (event.pointerType === 'mouse' || plot.hasPointerCapture(event.pointerId)) {
+        showAt(event.clientX);
+      }
+    });
+    plot.addEventListener('pointerup', hide);
+    plot.addEventListener('pointercancel', hide);
+    plot.addEventListener('pointerleave', hide);
   }
 
   function openChartSheet(metricKey) {
@@ -489,8 +569,12 @@
     var m = state.metrics[metricKey];
     chartSheetTitle.textContent = def.label;
     chartSheetCompare.textContent =
-      'Сравнение с ' + formatDateLabel(state.compareDate) + ' (тот же день неделю назад)';
-    chartSheetPlot.innerHTML = buildDetailChart(m, def.formatter);
+      'По часам · сравнение с ' + formatDateLabel(state.compareDate) + ' (тот же день неделю назад)';
+    if (chartLegendSelected) chartLegendSelected.textContent = formatDateLabel(state.date);
+    if (chartLegendCompare) chartLegendCompare.textContent = formatDateLabel(state.compareDate) + ' · неделя назад';
+    chartSheetPlot.innerHTML = buildHourlyDetailChart(m, def.formatter);
+    var wrap = chartSheetPlot.querySelector('.detail-chart-wrap');
+    if (wrap) bindChartInteractions(wrap);
     chartSheet.classList.remove('screen-hidden');
     chartSheet.setAttribute('aria-hidden', 'false');
     document.body.classList.add('chart-open');
@@ -526,6 +610,111 @@
       .replace(/'/g, '&#39;');
   }
 
+  // ---------- Автообновление PWA ----------
+
+  function showUpdateToast(onConfirm) {
+    if (!updateToast) {
+      onConfirm();
+      return;
+    }
+    updateToast.classList.remove('screen-hidden');
+    updateToastBtn.onclick = function () {
+      onConfirm();
+    };
+  }
+
+  function applyUpdateNow() {
+    if (pendingSwRegistration && pendingSwRegistration.waiting) {
+      pendingSwRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      return;
+    }
+    window.location.reload();
+  }
+
+  function checkAppVersion() {
+    return fetch('/pwa/version.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) {
+        if (!data || !data.v) return;
+        if (APP_VERSION == null) {
+          APP_VERSION = data.v;
+          try { localStorage.setItem('pwa-app-version', data.v); } catch (e) { /* ignore */ }
+          return;
+        }
+        if (data.v !== APP_VERSION) {
+          showUpdateToast(function () {
+            window.location.reload();
+          });
+        }
+      })
+      .catch(function () { /* офлайн — не мешаем */ });
+  }
+
+  function setupServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+
+    try {
+      APP_VERSION = localStorage.getItem('pwa-app-version');
+    } catch (e) {
+      APP_VERSION = null;
+    }
+
+    navigator.serviceWorker.addEventListener('message', function (event) {
+      if (event.data && event.data.type === 'PWA_UPDATED') {
+        showUpdateToast(function () {
+          window.location.reload();
+        });
+      }
+    });
+
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+
+    window.addEventListener('load', function () {
+      navigator.serviceWorker
+        .register('/pwa/sw.js', { updateViaCache: 'none' })
+        .then(function (reg) {
+          pendingSwRegistration = reg;
+          reg.update().catch(function () {});
+          if (reg.waiting) {
+            showUpdateToast(function () {
+              reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            });
+          }
+          reg.addEventListener('updatefound', function () {
+            var installing = reg.installing;
+            if (!installing) return;
+            installing.addEventListener('statechange', function () {
+              if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                showUpdateToast(function () {
+                  if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                  else window.location.reload();
+                });
+              }
+            });
+          });
+        })
+        .catch(function () {});
+
+      checkAppVersion();
+      setInterval(function () {
+        checkAppVersion();
+        if (pendingSwRegistration) pendingSwRegistration.update().catch(function () {});
+      }, 60 * 1000);
+    });
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') {
+        checkAppVersion();
+        if (pendingSwRegistration) pendingSwRegistration.update().catch(function () {});
+      }
+    });
+  }
+
   // ---------- Инициализация ----------
 
   function init() {
@@ -538,13 +727,7 @@
     return Promise.all([loadVenues(), loadStats()]);
   }
 
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/pwa/sw.js').catch(function () {
-        /* офлайн-режим не критичен — приложение всё равно работает онлайн */
-      });
-    });
-  }
+  setupServiceWorker();
 
   // Стартуем с экрана входа — иначе до ответа /me на долю секунды
   // мелькает «Показатели» (и раньше из-за бага с [hidden] он вообще всегда
