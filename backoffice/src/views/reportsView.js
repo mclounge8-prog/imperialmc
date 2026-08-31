@@ -14,41 +14,61 @@ function formatDateTime(value) {
   });
 }
 
-export function renderReceiptRow(receipt) {
-  const statusClass = receipt.status === 'paid' ? 'badge-active' : 'badge-inactive';
-  const methods = receipt.payment_methods
-    ? receipt.payment_methods
-        .split(',')
-        .map((m) => METHOD_LABELS[m.trim()] || m.trim())
-        .join(', ')
-    : '—';
-  const tableLabel = receipt.table_name ? escapeHtml(receipt.table_name) : 'Быстрый заказ';
-  const precheckBadge =
-    receipt.status === 'cancelled' && receipt.precheck_was_printed
-      ? ' <span class="badge badge-inactive">после пречека</span>'
-      : '';
-  const commentHint =
-    receipt.cancel_comment
-      ? `<div class="muted" style="font-size:12px;margin-top:2px;">${escapeHtml(receipt.cancel_comment)}</div>`
-      : '';
-  const discountHint =
-    Number(receipt.discount_percent) > 0
-      ? `<div class="muted" style="font-size:12px;margin-top:2px;">скидка ${Number(receipt.discount_percent)}%</div>`
-      : '';
+function formatMoney(value) {
+  return `${Number(value || 0).toFixed(2)} ₽`;
+}
+
+function formatDay(isoDay) {
+  if (!isoDay) return '—';
+  const [y, m, d] = isoDay.split('-');
+  return `${d}.${m}.${y}`;
+}
+
+function venueOptionsHtml(venues, selectedVenueId) {
+  return (
+    `<option value="">Все заведения</option>` +
+    venues
+      .map(
+        (v) =>
+          `<option value="${v.id}"${String(v.id) === String(selectedVenueId) ? ' selected' : ''}>${escapeHtml(v.name)}</option>`
+      )
+      .join('')
+  );
+}
+
+function exportHref(kind, venueId, dateFrom, dateTo, extra = '') {
+  const q = new URLSearchParams();
+  if (venueId) q.set('venueId', String(venueId));
+  if (dateFrom) q.set('from', dateFrom);
+  if (dateTo) q.set('to', dateTo);
+  if (extra) {
+    for (const [k, v] of Object.entries(extra)) q.set(k, v);
+  }
+  return `/reports/export/${kind}?${q.toString()}`;
+}
+
+function renderFiltersBar(actionPath, venues, selectedVenueId, dateFrom, dateTo, exportLinks = []) {
+  const exports = exportLinks
+    .map(
+      (link) =>
+        `<a class="btn-secondary report-export-btn" href="${link.href}" target="_blank" rel="noopener">${escapeHtml(link.label)}</a>`
+    )
+    .join('');
 
   return `
-    <tr>
-      <td>${formatDateTime(receipt.closed_at)}</td>
-      <td>${escapeHtml(receipt.venue_name || '—')}</td>
-      <td>${tableLabel} · ${escapeHtml(receipt.guest_label || '')}${commentHint}${discountHint}</td>
-      <td>${escapeHtml(receipt.staff_name || '—')}</td>
-      <td>${methods}</td>
-      <td><span class="badge ${statusClass}">${STATUS_LABELS[receipt.status] || receipt.status}</span>${precheckBadge}</td>
-      <td>${Number(receipt.total).toFixed(2)} ₽</td>
-      <td class="row-actions">
-        <button hx-get="/reports/receipts/${receipt.id}" hx-target="#main-content" hx-push-url="false">Открыть</button>
-      </td>
-    </tr>
+    <form
+      class="filters-bar"
+      hx-get="${actionPath}"
+      hx-target="#main-content"
+      hx-push-url="false"
+    >
+      <select name="venueId">${venueOptionsHtml(venues, selectedVenueId)}</select>
+      <input type="date" name="from" value="${dateFrom || ''}" placeholder="С">
+      <input type="date" name="to" value="${dateTo || ''}" placeholder="По">
+      <input type="hidden" name="page" value="1">
+      <button type="submit" class="btn-secondary">Применить</button>
+      ${exports}
+    </form>
   `;
 }
 
@@ -75,24 +95,56 @@ function renderReportTabs(active, venueId, dateFrom, dateTo) {
     <div class="report-tabs">
       ${tab('receipts', 'Чеки', '/reports/receipts')}
       ${tab('items', 'По блюдам', '/reports/items')}
+      ${tab('cash', 'Касса', '/reports/cash')}
     </div>
   `;
 }
 
-export function renderReceiptsSection(venues, selectedVenueId, dateFrom, dateTo, receipts, pagination) {
-  const venueOptions =
-    `<option value="">Все заведения</option>` +
-    venues
-      .map(
-        (v) =>
-          `<option value="${v.id}"${String(v.id) === String(selectedVenueId) ? ' selected' : ''}>${escapeHtml(v.name)}</option>`
-      )
-      .join('');
+export function renderReceiptRow(receipt) {
+  const statusClass = receipt.status === 'paid' ? 'badge-active' : 'badge-inactive';
+  const methods = receipt.payment_methods
+    ? receipt.payment_methods
+        .split(',')
+        .map((m) => METHOD_LABELS[m.trim()] || m.trim())
+        .join(', ')
+    : '—';
+  const tableLabel = receipt.table_name ? escapeHtml(receipt.table_name) : 'Быстрый заказ';
+  const precheckBadge =
+    receipt.status === 'cancelled' && receipt.precheck_was_printed
+      ? ' <span class="badge badge-inactive">после пречека</span>'
+      : '';
+  const commentHint = receipt.cancel_comment
+    ? `<div class="muted" style="font-size:12px;margin-top:2px;">${escapeHtml(receipt.cancel_comment)}</div>`
+    : '';
+  const discountHint =
+    Number(receipt.discount_percent) > 0
+      ? `<div class="muted" style="font-size:12px;margin-top:2px;">скидка ${Number(receipt.discount_percent)}%</div>`
+      : '';
 
+  return `
+    <tr>
+      <td>${formatDateTime(receipt.closed_at)}</td>
+      <td>${escapeHtml(receipt.venue_name || '—')}</td>
+      <td>${tableLabel} · ${escapeHtml(receipt.guest_label || '')}${commentHint}${discountHint}</td>
+      <td>${escapeHtml(receipt.staff_name || '—')}</td>
+      <td>${methods}</td>
+      <td><span class="badge ${statusClass}">${STATUS_LABELS[receipt.status] || receipt.status}</span>${precheckBadge}</td>
+      <td>${Number(receipt.total).toFixed(2)} ₽</td>
+      <td class="row-actions">
+        <button hx-get="/reports/receipts/${receipt.id}" hx-target="#main-content" hx-push-url="false">Открыть</button>
+      </td>
+    </tr>
+  `;
+}
+
+export function renderReceiptsSection(venues, selectedVenueId, dateFrom, dateTo, receipts, pagination) {
   const rows = receipts.map((r) => renderReceiptRow(r)).join('');
-  const paidTotal = receipts
-    .filter((r) => r.status === 'paid')
-    .reduce((sum, r) => sum + Number(r.total), 0);
+  const summary = pagination.summary || {
+    paidCount: 0,
+    cancelledCount: 0,
+    paidTotal: 0,
+    discountTotal: 0,
+  };
 
   const { page, totalCount, pageSize } = pagination;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -103,7 +155,7 @@ export function renderReceiptsSection(venues, selectedVenueId, dateFrom, dateTo,
   const fromQ = dateFrom || '';
   const toQ = dateTo || '';
 
-  const pagination_html = `
+  const paginationHtml = `
     <div class="pagination">
       <span class="pagination-info">
         Показано ${startIdx}–${endIdx} из ${totalCount} · страница ${page} из ${totalPages}
@@ -135,25 +187,32 @@ export function renderReceiptsSection(venues, selectedVenueId, dateFrom, dateTo,
 
     <div class="subsection">
       ${renderReportTabs('receipts', selectedVenueId, dateFrom, dateTo)}
-      <form
-        class="filters-bar"
-        hx-get="/reports/receipts"
-        hx-target="#main-content"
-        hx-push-url="false"
-      >
-        <select name="venueId">${venueOptions}</select>
-        <input type="date" name="from" value="${dateFrom || ''}" placeholder="С">
-        <input type="date" name="to" value="${dateTo || ''}" placeholder="По">
-        <input type="hidden" name="page" value="1">
-        <button type="submit" class="btn-secondary">Применить</button>
-      </form>
-      <p class="hint">По умолчанию показаны последние 7 дней — расширь диапазон дат, если нужна более старая история.</p>
+      ${renderFiltersBar('/reports/receipts', venues, selectedVenueId, dateFrom, dateTo, [
+        {
+          label: '⬇ CSV чеки',
+          href: exportHref('receipts', selectedVenueId, dateFrom, dateTo),
+        },
+      ])}
+      <p class="hint">По умолчанию — последние 7 дней. CSV выгружает весь выбранный период, не только текущую страницу.</p>
+    </div>
+
+    <div class="subsection report-summary">
+      <div class="report-summary-card">
+        <span class="report-summary-label">Оплачено</span>
+        <span class="report-summary-value">${summary.paidCount}</span>
+        <span class="report-summary-sub">${formatMoney(summary.paidTotal)}</span>
+      </div>
+      <div class="report-summary-card">
+        <span class="report-summary-label">Отменено</span>
+        <span class="report-summary-value">${summary.cancelledCount}</span>
+      </div>
+      <div class="report-summary-card">
+        <span class="report-summary-label">Скидки</span>
+        <span class="report-summary-value">${formatMoney(summary.discountTotal)}</span>
+      </div>
     </div>
 
     <div class="subsection">
-      <p class="hint">
-        Сумма оплаченных на этой странице: <strong>${paidTotal.toFixed(2)} ₽</strong>
-      </p>
       <table class="data-table">
         <thead>
           <tr>
@@ -169,7 +228,7 @@ export function renderReceiptsSection(venues, selectedVenueId, dateFrom, dateTo,
         </thead>
         <tbody>${rows || '<tr><td colspan="8" class="empty-hint">Чеков за этот период нет</td></tr>'}</tbody>
       </table>
-      ${pagination_html}
+      ${paginationHtml}
     </div>
   `;
 }
@@ -186,15 +245,6 @@ export function renderItemStatsRow(item) {
 }
 
 export function renderItemStatsSection(venues, selectedVenueId, dateFrom, dateTo, items) {
-  const venueOptions =
-    `<option value="">Все заведения</option>` +
-    venues
-      .map(
-        (v) =>
-          `<option value="${v.id}"${String(v.id) === String(selectedVenueId) ? ' selected' : ''}>${escapeHtml(v.name)}</option>`
-      )
-      .join('');
-
   const rows = items.map((i) => renderItemStatsRow(i)).join('');
   const grandQty = items.reduce((sum, i) => sum + Number(i.total_qty), 0);
   const grandRevenue = items.reduce((sum, i) => sum + Number(i.total_revenue), 0);
@@ -207,20 +257,11 @@ export function renderItemStatsSection(venues, selectedVenueId, dateFrom, dateTo
 
     <div class="subsection">
       ${renderReportTabs('items', selectedVenueId, dateFrom, dateTo)}
-      <form
-        class="filters-bar"
-        hx-get="/reports/items"
-        hx-target="#main-content"
-        hx-push-url="false"
-      >
-        <select name="venueId">${venueOptions}</select>
-        <input type="date" name="from" value="${dateFrom || ''}" placeholder="С">
-        <input type="date" name="to" value="${dateTo || ''}" placeholder="По">
-        <button type="submit" class="btn-secondary">Применить</button>
-      </form>
+      ${renderFiltersBar('/reports/items', venues, selectedVenueId, dateFrom, dateTo, [
+        { label: '⬇ CSV блюда', href: exportHref('items', selectedVenueId, dateFrom, dateTo) },
+      ])}
       <p class="hint">
-        Только оплаченные чеки — отменённые и незакрытые в статистику не входят.
-        По умолчанию — последние 7 дней. Отдельные чеки здесь не открываются, это агрегат по позициям.
+        Только оплаченные чеки. По умолчанию — последние 7 дней.
       </p>
     </div>
 
@@ -231,6 +272,155 @@ export function renderItemStatsSection(venues, selectedVenueId, dateFrom, dateTo
           <tr><th>Позиция</th><th>Категория</th><th>Кол-во продано</th><th>Выручка</th></tr>
         </thead>
         <tbody>${rows || '<tr><td colspan="4" class="empty-hint">За этот период продаж нет</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderCashDayRow(day) {
+  return `
+    <tr>
+      <td>${formatDay(day.day)}</td>
+      <td>${escapeHtml(day.venueName)}</td>
+      <td>${day.shiftsCount}</td>
+      <td>${day.receiptsCount}</td>
+      <td>${formatMoney(day.revenueTotal)}</td>
+      <td>${formatMoney(day.cashSales)}</td>
+      <td>${formatMoney(day.cardSales)}</td>
+      <td>${formatMoney(day.deposits)}</td>
+      <td>${formatMoney(day.withdrawals)}</td>
+      <td>${formatMoney(day.openingCash)}</td>
+      <td>${formatMoney(day.expectedCash)}</td>
+      <td>${day.countedShifts > 0 ? formatMoney(day.countedCash) : '—'}</td>
+      <td>${day.countedShifts > 0 ? formatMoney(day.difference) : '—'}</td>
+    </tr>
+  `;
+}
+
+function renderCashShiftRow(shift) {
+  const statusLabel = shift.status === 'open' ? 'Открыта' : 'Закрыта';
+  const statusClass = shift.status === 'open' ? 'badge-active' : 'badge-inactive';
+  return `
+    <tr>
+      <td>${formatDay(shift.day)}</td>
+      <td>#${shift.id}</td>
+      <td>${escapeHtml(shift.venueName)}</td>
+      <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+      <td>${formatDateTime(shift.openedAt)}</td>
+      <td>${formatDateTime(shift.closedAt)}</td>
+      <td>${escapeHtml(shift.openedByName || '—')}</td>
+      <td>${escapeHtml(shift.closedByName || '—')}</td>
+      <td>${formatMoney(shift.openingCash)}</td>
+      <td>${formatMoney(shift.cashSales)}</td>
+      <td>${formatMoney(shift.cardSales)}</td>
+      <td>${formatMoney(shift.deposits)}</td>
+      <td>${formatMoney(shift.withdrawals)}</td>
+      <td>${formatMoney(shift.expectedCash)}</td>
+      <td>${shift.countedCash != null ? formatMoney(shift.countedCash) : '—'}</td>
+      <td>${shift.difference != null ? formatMoney(shift.difference) : '—'}</td>
+      <td>${formatMoney(shift.revenueTotal)}</td>
+    </tr>
+  `;
+}
+
+export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byDay, shifts) {
+  const dayRows = byDay.map((d) => renderCashDayRow(d)).join('');
+  const shiftRows = shifts.map((s) => renderCashShiftRow(s)).join('');
+  const revenue = shifts.reduce((sum, s) => sum + s.revenueTotal, 0);
+  const cashSales = shifts.reduce((sum, s) => sum + s.cashSales, 0);
+  const cardSales = shifts.reduce((sum, s) => sum + s.cardSales, 0);
+
+  return `
+    <header>
+      <h1>Отчёты</h1>
+      <p>Касса по дням и сменам — наличные, внесения, инкассации, факт/ожидание</p>
+    </header>
+
+    <div class="subsection">
+      ${renderReportTabs('cash', selectedVenueId, dateFrom, dateTo)}
+      ${renderFiltersBar('/reports/cash', venues, selectedVenueId, dateFrom, dateTo, [
+        {
+          label: '⬇ CSV по дням',
+          href: exportHref('cash', selectedVenueId, dateFrom, dateTo, { mode: 'days' }),
+        },
+        {
+          label: '⬇ CSV по сменам',
+          href: exportHref('cash', selectedVenueId, dateFrom, dateTo, { mode: 'shifts' }),
+        },
+      ])}
+      <p class="hint">
+        Период считается по дате открытия смены. «По дням» — сумма всех смен заведения за календарный день.
+      </p>
+    </div>
+
+    <div class="subsection report-summary">
+      <div class="report-summary-card">
+        <span class="report-summary-label">Смен</span>
+        <span class="report-summary-value">${shifts.length}</span>
+      </div>
+      <div class="report-summary-card">
+        <span class="report-summary-label">Выручка</span>
+        <span class="report-summary-value">${formatMoney(revenue)}</span>
+      </div>
+      <div class="report-summary-card">
+        <span class="report-summary-label">Наличные</span>
+        <span class="report-summary-value">${formatMoney(cashSales)}</span>
+      </div>
+      <div class="report-summary-card">
+        <span class="report-summary-label">Карта</span>
+        <span class="report-summary-value">${formatMoney(cardSales)}</span>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h2>По дням</h2>
+      <table class="data-table data-table-compact">
+        <thead>
+          <tr>
+            <th>День</th>
+            <th>Заведение</th>
+            <th>Смен</th>
+            <th>Чеков</th>
+            <th>Выручка</th>
+            <th>Нал.</th>
+            <th>Карта</th>
+            <th>Внесения</th>
+            <th>Инкассации</th>
+            <th>Начало</th>
+            <th>Ожидалось</th>
+            <th>Факт</th>
+            <th>Разница</th>
+          </tr>
+        </thead>
+        <tbody>${dayRows || '<tr><td colspan="13" class="empty-hint">Смен за период нет</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <h2>По сменам</h2>
+      <table class="data-table data-table-compact">
+        <thead>
+          <tr>
+            <th>День</th>
+            <th>ID</th>
+            <th>Заведение</th>
+            <th>Статус</th>
+            <th>Открыта</th>
+            <th>Закрыта</th>
+            <th>Открыл</th>
+            <th>Закрыл</th>
+            <th>Начало</th>
+            <th>Нал. продажи</th>
+            <th>Карта</th>
+            <th>Внесения</th>
+            <th>Инкассации</th>
+            <th>Ожидалось</th>
+            <th>Факт</th>
+            <th>Разница</th>
+            <th>Выручка</th>
+          </tr>
+        </thead>
+        <tbody>${shiftRows || '<tr><td colspan="17" class="empty-hint">Смен за период нет</td></tr>'}</tbody>
       </table>
     </div>
   `;

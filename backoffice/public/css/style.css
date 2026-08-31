@@ -1305,6 +1305,52 @@ input[type="radio"] {
   padding: 9px 12px;
 }
 
+.report-export-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.report-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.report-summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.report-summary-label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.report-summary-value {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.report-summary-sub {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.data-table-compact th,
+.data-table-compact td {
+  font-size: 12px;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
 .receipt-total {
   color: var(--text);
   font-size: 16px;
