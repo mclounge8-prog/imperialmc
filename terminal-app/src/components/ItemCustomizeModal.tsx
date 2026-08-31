@@ -176,12 +176,22 @@ export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) 
                     <Text style={styles.groupTitle}>{group.name}</Text>
                     {group.id != null && (
                       <Text style={styles.groupLimit}>
-                        {group.maxSelect === 1
-                          ? 'выберите один'
-                          : group.maxSelect != null
-                            ? `до ${group.maxSelect}`
-                            : 'любое количество'}
-                        {group.minSelect > 0 ? ' · обязательно' : ''}
+                        {(() => {
+                          const optionCount = group.options.length;
+                          const maxSelect =
+                            group.maxSelect == null
+                              ? null
+                              : Math.min(group.maxSelect, optionCount);
+                          const minSelect = Math.min(group.minSelect, optionCount);
+                          if (maxSelect === 1) return 'выберите один';
+                          if (maxSelect != null) {
+                            return minSelect > 0 && minSelect === maxSelect
+                              ? `ровно ${maxSelect}`
+                              : `до ${maxSelect}`;
+                          }
+                          return 'любое количество';
+                        })()}
+                        {Math.min(group.minSelect, group.options.length) > 0 ? ' · обязательно' : ''}
                       </Text>
                     )}
                   </View>
