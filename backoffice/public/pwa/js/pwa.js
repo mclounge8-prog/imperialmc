@@ -623,14 +623,6 @@
     };
   }
 
-  function applyUpdateNow() {
-    if (pendingSwRegistration && pendingSwRegistration.waiting) {
-      pendingSwRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      return;
-    }
-    window.location.reload();
-  }
-
   function checkAppVersion() {
     return fetch('/pwa/version.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (res) { return res.ok ? res.json() : null; })
