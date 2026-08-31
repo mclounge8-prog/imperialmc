@@ -133,7 +133,8 @@ export default function ShiftToggle() {
           `По учёту: ${Math.round(expected).toLocaleString('ru-RU')} ₽\n` +
             `Факт: ${Math.round(counted).toLocaleString('ru-RU')} ₽\n` +
             `Разница: ${sign}${Math.round(diff).toLocaleString('ru-RU')} ₽`,
-          [{ text: 'OK', onPress: finishToPin }]
+          [{ text: 'OK', onPress: finishToPin }],
+          { cancelable: false }
         );
       } else {
         finishToPin();
