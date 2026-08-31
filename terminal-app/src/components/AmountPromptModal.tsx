@@ -1,14 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 
 type Props = {
@@ -22,6 +13,14 @@ type Props = {
   onConfirm: (amount: number) => void;
 };
 
+const KEY_ROWS = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['.', '0', '⌫'],
+];
+
+/** Свой экранный номпад — без системной Android-клавиатуры (как при оплате наличными). */
 export default function AmountPromptModal({
   visible,
   title,
@@ -37,10 +36,31 @@ export default function AmountPromptModal({
 
   useEffect(() => {
     if (visible) {
-      setText(initialValue);
+      setText(initialValue === '' ? '0' : initialValue);
       setError(null);
     }
   }, [visible, initialValue]);
+
+  const handleKeyPress = (key: string) => {
+    setError(null);
+    if (key === '⌫') {
+      setText((prev) => {
+        const next = prev.slice(0, -1);
+        return next === '' ? '0' : next;
+      });
+      return;
+    }
+    if (key === '.') {
+      setText((prev) => (prev.includes('.') ? prev : prev === '' ? '0.' : `${prev}.`));
+      return;
+    }
+    setText((prev) => {
+      const dotIndex = prev.indexOf('.');
+      if (dotIndex !== -1 && prev.length - dotIndex > 2) return prev;
+      if (prev === '0') return key;
+      return prev + key;
+    });
+  };
 
   const handleConfirm = () => {
     const normalized = text.replace(',', '.').trim();
@@ -58,23 +78,32 @@ export default function AmountPromptModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onCancel} />
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-          <TextInput
-            style={styles.input}
-            value={text}
-            onChangeText={setText}
-            keyboardType="decimal-pad"
-            placeholder="0"
-            placeholderTextColor={colors.textMuted}
-            autoFocus
-          />
+
+          <View style={styles.display}>
+            <Text style={styles.displayText}>{text || '0'} ₽</Text>
+          </View>
+
+          <View style={styles.keypad}>
+            {KEY_ROWS.map((row, rowIndex) => (
+              <View key={rowIndex} style={styles.keypadRow}>
+                {row.map((key) => (
+                  <Pressable
+                    key={key}
+                    style={({ pressed }) => [styles.key, pressed && styles.keyPressed]}
+                    onPress={() => handleKeyPress(key)}
+                  >
+                    <Text style={styles.keyText}>{key}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ))}
+          </View>
+
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <View style={styles.actions}>
             <Pressable style={styles.secondaryBtn} onPress={onCancel}>
@@ -85,7 +114,7 @@ export default function AmountPromptModal({
             </Pressable>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -97,7 +126,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   backdrop: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   card: {
@@ -110,17 +139,30 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.text, fontSize: 17, fontWeight: '700' },
   subtitle: { color: colors.textMuted, fontSize: 13, marginBottom: 4 },
-  input: {
+  display: {
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface2,
     borderRadius: 12,
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: '700',
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
+    alignItems: 'flex-end',
   },
+  displayText: { color: colors.text, fontSize: 28, fontWeight: '700' },
+  keypad: { gap: 8, marginTop: 4 },
+  keypadRow: { flexDirection: 'row', gap: 8 },
+  key: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 12,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  keyPressed: { opacity: 0.7, backgroundColor: colors.border },
+  keyText: { color: colors.text, fontSize: 22, fontWeight: '700' },
   error: { color: colors.danger, fontSize: 12 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 6 },
   secondaryBtn: {

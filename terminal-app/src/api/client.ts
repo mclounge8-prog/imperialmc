@@ -1,3 +1,5 @@
+import { emitStaffUnauthorized } from '../services/authSession';
+
 // Домен реального сервера. Вынести в конфиг окружения, когда появится
 // отдельный dev/staging контур — пока прод один, хардкодим осознанно.
 export const API_BASE_URL = 'https://imperial-mc.online';
@@ -99,7 +101,9 @@ export async function fetchDeviceStatus(token: string): Promise<DeviceStatus> {
 
   if (!response.ok) {
     const message = (data as ApiErrorBody).error || 'Не удалось получить статус устройства';
-    throw new Error(message);
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
 
   return data as DeviceStatus;
@@ -252,6 +256,20 @@ async function authorizedRequest<T>(
   if (!response.ok) {
     const body = data as ApiErrorBody;
     const message = body.error || 'Ошибка запроса';
+    if (response.status === 401) {
+      emitStaffUnauthorized(message);
+      throw new ApiRequestError(
+        message === 'Не авторизован'
+          ? 'Сессия истекла — войдите по PIN снова'
+          : message,
+        {
+          status: response.status,
+          code: body.code || 'UNAUTHORIZED',
+          expectedCash: body.expectedCash,
+          countedCash: body.countedCash,
+        }
+      );
+    }
     throw new ApiRequestError(message, {
       status: response.status,
       code: body.code,
@@ -458,6 +476,7 @@ export type PaidReceiptSummary = {
   staffName: string | null;
   total: number;
   closedAt: string;
+  status?: 'paid' | 'refunded' | string;
 };
 
 export type ReceiptDetailItemModifier = {
@@ -480,6 +499,11 @@ export type ReceiptDetailItem = {
   added: string[];
 };
 
+export type ReceiptPayment = {
+  method: 'cash' | 'card' | 'other' | string;
+  amount: number;
+};
+
 export type PaidReceiptDetail = {
   id: number;
   tableName: string | null;
@@ -488,6 +512,10 @@ export type PaidReceiptDetail = {
   total: number;
   closedAt: string;
   status: string;
+  refundedAt?: string | null;
+  refundedByName?: string | null;
+  fiscalStatus?: string | null;
+  payments: ReceiptPayment[];
   items: ReceiptDetailItem[];
 };
 
@@ -501,6 +529,15 @@ export async function fetchPaidReceipts(venueId: number, token: string): Promise
 
 export async function fetchPaidReceiptDetail(id: number, token: string): Promise<PaidReceiptDetail> {
   const { receipt } = await authorizedRequest<{ receipt: PaidReceiptDetail }>(`/api/receipts/${id}`, token);
+  return receipt;
+}
+
+export async function refundPaidReceipt(id: number, token: string): Promise<PaidReceiptDetail> {
+  const { receipt } = await authorizedRequest<{ receipt: PaidReceiptDetail }>(
+    `/api/receipts/${id}/refund`,
+    token,
+    { method: 'POST' }
+  );
   return receipt;
 }
 

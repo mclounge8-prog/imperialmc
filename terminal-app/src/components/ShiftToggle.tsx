@@ -12,6 +12,7 @@ import {
 import { colors } from '../theme/colors';
 import { useCurrentShift } from '../hooks/useCurrentShift';
 import { openShift, closeShift, ApiRequestError } from '../api/client';
+import { useSession } from '../context/SessionContext';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import AmountPromptModal from './AmountPromptModal';
 import PinPromptModal from './PinPromptModal';
@@ -30,6 +31,7 @@ function formatTime(value: string | null): string {
 
 export default function ShiftToggle() {
   const { session, venue, shift, setShift, loading, error, reload } = useCurrentShift();
+  const { logout } = useSession();
   const [toggling, setToggling] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [trackWidth, setTrackWidth] = useState(0);
@@ -116,7 +118,11 @@ export default function ShiftToggle() {
       setMismatchHint(null);
       setPrompt(null);
       setShift(null);
+      // Фискальные задания ещё с токеном текущей сессии — потом разлогин на PIN.
       runPendingFiscalJobs(liveVenue.id, liveSession.token);
+      const finishToPin = () => {
+        logout();
+      };
       const expected = closed.cash?.expectedCash;
       const counted = closed.cash?.countedCash;
       const diff = closed.cash?.difference;
@@ -126,8 +132,12 @@ export default function ShiftToggle() {
           forcePin ? 'Смена закрыта принудительно' : 'Смена закрыта',
           `По учёту: ${Math.round(expected).toLocaleString('ru-RU')} ₽\n` +
             `Факт: ${Math.round(counted).toLocaleString('ru-RU')} ₽\n` +
-            `Разница: ${sign}${Math.round(diff).toLocaleString('ru-RU')} ₽`
+            `Разница: ${sign}${Math.round(diff).toLocaleString('ru-RU')} ₽`,
+          [{ text: 'OK', onPress: finishToPin }],
+          { cancelable: false }
         );
+      } else {
+        finishToPin();
       }
     } catch (e) {
       if (e instanceof ApiRequestError && e.code === 'CASH_MISMATCH') {

@@ -1,7 +1,8 @@
 // Небольшой набор своих скриптов бэкофиса (не сторонняя библиотека — поэтому
-// не в /vendor). Пока — только поиск по каталогам (склад, модификаторы, меню):
-// они разрастаются до десятков категорий и сотен позиций, где сплошной список
-// без поиска и с полностью развёрнутыми аккордеонами становится нечитаемым.
+// не в /vendor). Поиск по каталогам (склад, модификаторы, меню): они
+// разрастаются до десятков категорий и сотен позиций, где сплошной список без
+// поиска и с полностью развёрнутыми аккордеонами становится нечитаемым.
+// Плюс наведение на графики статистики (см. views/charts.js).
 
 /**
  * Фильтрует строки таблиц внутри аккордеона по подстроке (без учёта регистра).
@@ -57,3 +58,55 @@ function filterCatalogSearch(inputEl, containerId) {
 
   container.dataset.searching = isSearching ? '1' : '0';
 }
+
+/**
+ * Alpine-компонент наведения для графиков на «Главной» (views/charts.js
+ * рендерит каждую точку сервером с координатами в процентах — xPct/yPct —
+ * и уже отформатированными значениями, JS здесь только ищет ближайшую по X
+ * точку и подставляет её в подсказку/линию-прицел).
+ *
+ * Раньше цифры при наведении показывались через нативный <title> у SVG-точек:
+ * у браузера это происходит с задержкой и только если попасть курсором точно
+ * в кружок радиусом 2-3px, поэтому казалось, что подсказка вообще не работает.
+ * Здесь вместо этого — область наведения на всю ширину графика.
+ */
+window.chartTooltip = function (points) {
+  return {
+    points: Array.isArray(points) ? points : [],
+    active: null,
+    onMove(event) {
+      if (!this.points.length) return;
+      var rect = event.currentTarget.getBoundingClientRect();
+      if (!rect.width) return;
+      var relX = ((event.clientX - rect.left) / rect.width) * 100;
+      var nearest = this.points[0];
+      var nearestDist = Infinity;
+      this.points.forEach(function (p) {
+        var dist = Math.abs(p.xPct - relX);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = p;
+        }
+      });
+      this.active = nearest;
+    },
+    hide() {
+      this.active = null;
+    },
+    get tooltipStyle() {
+      if (!this.active) return 'display:none';
+      var minY = Math.min.apply(
+        null,
+        this.active.rows.map(function (r) {
+          return r.yPct;
+        })
+      );
+      var left = this.active.xPct;
+      var translateX = '-50%';
+      if (left < 12) translateX = '0%';
+      else if (left > 88) translateX = '-100%';
+      var top = Math.max(0, minY - 10);
+      return 'left:' + left + '%; top:' + top + '%; transform:translate(' + translateX + ', -100%);';
+    },
+  };
+};

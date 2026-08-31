@@ -10,7 +10,7 @@ import { renderVenuesSection } from '../views/venuesView.js';
 import { renderDevicesSection } from '../views/devicesView.js';
 import { renderUpdatesSection } from '../views/updatesView.js';
 import { renderReceiptsSection } from '../views/reportsView.js';
-import { fetchReceiptsPage, defaultDateRange, PAGE_SIZE } from './reports.js';
+import { fetchReceiptsPage, fetchReceiptsSummary, defaultDateRange, PAGE_SIZE } from './reports.js';
 import { renderDashboardFragment } from './stats.js';
 import { renderModifiersFragment } from './modifiers.js';
 import { fetchAllVenues } from '../utils/venues.js';
@@ -76,7 +76,31 @@ export async function renderFragmentHtml(key, c) {
                 COALESCE(vws.min_stock_qty, 0) AS min_stock_qty
          FROM warehouse_items wi
          LEFT JOIN warehouse_categories wc ON wc.id = wi.category_id
-         LEFT JOIN venue_warehouse_stock vws ON vws.warehouse_item_id = wi.id AND vws.venue_id = $1
+         LEFT JOIN venue_warehouse_stock vws
+           ON vws.warehouse_item_id = wi.id AND vws.venue_id = $1
+         WHERE vws.venue_id IS NOT NULL
+            OR EXISTS (
+              SELECT 1
+              FROM modifiers m
+              JOIN menu_item_modifiers mim ON mim.modifier_id = m.id
+              JOIN menu_items mi ON mi.id = mim.menu_item_id
+              LEFT JOIN menu_categories mc ON mc.id = mi.category_id
+              WHERE m.warehouse_item_id = wi.id
+                AND (
+                  mc.id IS NULL
+                  OR NOT EXISTS (
+                    SELECT 1 FROM venue_hidden_menu_categories h
+                    WHERE h.venue_id = $1 AND h.category_id = mc.id
+                  )
+                )
+                AND (
+                  mc.parent_id IS NULL
+                  OR NOT EXISTS (
+                    SELECT 1 FROM venue_hidden_menu_categories h
+                    WHERE h.venue_id = $1 AND h.category_id = mc.parent_id
+                  )
+                )
+            )
          ORDER BY wi.name`,
         [selectedVenue.id]
       );
@@ -169,16 +193,24 @@ export async function renderFragmentHtml(key, c) {
   if (key === 'reports') {
     const { rows: venues } = await pool.query('SELECT id, name FROM venues ORDER BY name');
     const { from, to } = defaultDateRange();
-    const { rows: receipts, totalCount } = await fetchReceiptsPage({
-      venueId: null,
-      dateFrom: from,
-      dateTo: to,
-      page: 1,
-    });
+    const [{ rows: receipts, totalCount }, summary] = await Promise.all([
+      fetchReceiptsPage({
+        venueId: null,
+        dateFrom: from,
+        dateTo: to,
+        page: 1,
+      }),
+      fetchReceiptsSummary({
+        venueId: null,
+        dateFrom: from,
+        dateTo: to,
+      }),
+    ]);
     return renderReceiptsSection(venues, null, from, to, receipts, {
       page: 1,
       totalCount,
       pageSize: PAGE_SIZE,
+      summary,
     });
   }
 

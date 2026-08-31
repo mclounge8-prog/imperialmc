@@ -19,6 +19,7 @@ import apiShiftsRoutes from './routes/apiShifts.js';
 import apiReceiptsRoutes from './routes/apiReceipts.js';
 import apiFiscalRoutes from './routes/apiFiscal.js';
 import apiTerminalUpdatesRoutes from './routes/apiTerminalUpdates.js';
+import apiPwaStatsRoutes from './routes/apiPwaStats.js';
 import terminalUpdatesRoutes from './routes/terminalUpdates.js';
 import telegramRoutes from './routes/telegram.js';
 import reportsRoutes from './routes/reports.js';
@@ -35,6 +36,11 @@ import { ensureUpdatesDir } from './services/terminalUpdates.js';
 import { ensureTelegramSettingsRow } from './services/telegramNotify.js';
 
 const app = new Hono();
+
+app.use('*', async (c, next) => {
+  c.header('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  await next();
+});
 
 app.route('/api/auth', authRoutes);
 app.route('/', dashboardRoutes); // отдаёт /fragments/:section (защищено)
@@ -55,6 +61,7 @@ app.route('/api/shifts', apiShiftsRoutes); // JSON API смен: открыти�
 app.route('/api/receipts', apiReceiptsRoutes); // JSON API чеков: список оплаченных за сегодня + состав конкретного
 app.route('/api/fiscal', apiFiscalRoutes); // JSON API фискализации АТОЛ — очередь заданий, разбирает сам terminal-app
 app.route('/api', apiTerminalUpdatesRoutes); // манифест обновлений терминала
+app.route('/api/pwa', apiPwaStatsRoutes); // JSON API для мобильной PWA «Показатели»
 app.route('/reports', reportsRoutes); // Отчёты: чеки с фильтрами по заведению/датам
 app.route('/stats', statsRoutes); // Главный экран: сводная статистика продаж (графики)
 app.route('/preferences', preferencesRoutes); // Общий выбор заведения в шапке (cookie)

@@ -7,20 +7,15 @@ import {
 import { notifyFiscalError } from '../context/FiscalAlertsContext';
 import { isAtolAvailablePlatform, runAtolTask } from '../native/atol';
 
-// Настройки кассы почти никогда не меняются на ходу — кэшируем на время
-// сессии, а не запрашиваем перед каждым чеком.
-const settingsCache = new Map<number, AtolSettings>();
-
+// Настройки читаем на каждый проход очереди (раз в ~15с). Раньше кэш на
+// всю сессию ломал Карлу/новые точки: включили АТОЛ в бэкофисе, а терминал
+// продолжал считать enabled:false → задания висели pending с attempts=0.
 async function getSettings(venueId: number, token: string): Promise<AtolSettings> {
-  const cached = settingsCache.get(venueId);
-  if (cached) return cached;
-  const settings = await fetchAtolSettings(venueId, token);
-  settingsCache.set(venueId, settings);
-  return settings;
+  return fetchAtolSettings(venueId, token);
 }
 
-export function invalidateAtolSettingsCache(venueId: number): void {
-  settingsCache.delete(venueId);
+export function invalidateAtolSettingsCache(_venueId?: number): void {
+  // no-op: кэш убран; функция оставлена для старых вызовов/OTA-совместимости
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -57,6 +52,7 @@ function extractResponseFields(response: unknown): {
 
 function jobTypeLabel(type: string): string {
   if (type === 'receipt') return 'Чек';
+  if (type === 'receipt_return') return 'Возврат';
   if (type === 'open_shift') return 'Открытие смены';
   if (type === 'close_shift') return 'Закрытие смены';
   if (type === 'x_report') return 'X-отчёт';

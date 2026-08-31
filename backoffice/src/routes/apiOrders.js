@@ -335,7 +335,8 @@ async function fetchGuestItemsSnapshot(guestId, client) {
   for (const item of rows) {
     // eslint-disable-next-line no-await-in-loop
     const { rows: modRows } = await client.query(
-      'SELECT modifier_id, name, price FROM order_item_modifiers WHERE order_item_id = $1 ORDER BY id',
+      `SELECT modifier_id, name, price, warehouse_item_id, qty
+       FROM order_item_modifiers WHERE order_item_id = $1 ORDER BY id`,
       [item.id]
     );
     item.modifiers = modRows;
@@ -433,8 +434,17 @@ async function createReceipt(
     for (const mod of item.modifiers || []) {
       // eslint-disable-next-line no-await-in-loop
       await client.query(
-        'INSERT INTO receipt_item_modifiers (receipt_item_id, modifier_id, name, price) VALUES ($1, $2, $3, $4)',
-        [receiptItemId, mod.modifier_id, mod.name, mod.price]
+        `INSERT INTO receipt_item_modifiers
+           (receipt_item_id, modifier_id, name, price, warehouse_item_id, qty)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          receiptItemId,
+          mod.modifier_id,
+          mod.name,
+          mod.price,
+          mod.warehouse_item_id ?? null,
+          Number(mod.qty) || 0,
+        ]
       );
     }
   }
@@ -985,22 +995,28 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
       countsByGroup.set(groupId, (countsByGroup.get(groupId) || 0) + 1);
     }
     const groupsInvolved = new Map();
+    const optionsPerGroup = new Map();
     for (const a of attachments) {
-      if (a.group_id && !groupsInvolved.has(a.group_id)) {
+      if (!a.group_id) continue;
+      optionsPerGroup.set(a.group_id, (optionsPerGroup.get(a.group_id) || 0) + 1);
+      if (!groupsInvolved.has(a.group_id)) {
         groupsInvolved.set(a.group_id, { name: a.group_name, min: a.min_select, max: a.max_select });
       }
     }
     for (const [groupId, info] of groupsInvolved) {
       const count = countsByGroup.get(groupId) || 0;
-      if (info.max != null && count > info.max) {
+      const optionCount = optionsPerGroup.get(groupId) || 0;
+      const effectiveMax = info.max == null ? null : Math.min(info.max, optionCount);
+      const effectiveMin = Math.min(Math.max(info.min, 0), optionCount);
+      if (effectiveMax != null && count > effectiveMax) {
         await client.query('ROLLBACK');
         c.status(400);
-        return c.json({ error: `В группе «${info.name}» можно выбрать не больше ${info.max}` });
+        return c.json({ error: `В группе «${info.name}» можно выбрать не больше ${effectiveMax}` });
       }
-      if (info.min > 0 && count < info.min) {
+      if (effectiveMin > 0 && count < effectiveMin) {
         await client.query('ROLLBACK');
         c.status(400);
-        return c.json({ error: `В группе «${info.name}» нужно выбрать хотя бы ${info.min}` });
+        return c.json({ error: `В группе «${info.name}» нужно выбрать хотя бы ${effectiveMin}` });
       }
     }
 
