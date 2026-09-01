@@ -1,0 +1,18 @@
+{
+  "name": "imperial-mc-backoffice",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js",
+    "create-admin": "node scripts/create-admin.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "hono": "^4.6.9",
+    "pg": "^8.11.5"
+  }
+}

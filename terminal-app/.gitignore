@@ -1,0 +1,8 @@
+# Собранные артефакты
+dist/
+
+# Локальные секреты для publish-*.sh (SSHPASS и т.п.) — не коммитить
+.env.deploy
+
+# Android SDK path (локально)
+android/local.properties

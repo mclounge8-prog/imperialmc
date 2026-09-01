@@ -1,0 +1,16 @@
+{
+  "apk": {
+    "versionCode": 1,
+    "versionName": "1.0.0",
+    "file": null,
+    "mandatory": false,
+    "notes": "Первичная установка — загрузите release APK через раздел «Обновления»."
+  },
+  "js": {
+    "version": 0,
+    "minApkVersionCode": 1,
+    "file": null,
+    "mandatory": false,
+    "notes": ""
+  }
+}
