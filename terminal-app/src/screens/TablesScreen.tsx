@@ -381,7 +381,7 @@ export default function TablesScreen() {
 }
 
 function formatReceiptTime(value: string): string {
-  return new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return new Date(value).toLocaleTimeString('ru-RU', { timeZone: 'Asia/Yekaterinburg', hour: '2-digit', minute: '2-digit' });
 }
 
 const styles = StyleSheet.create({

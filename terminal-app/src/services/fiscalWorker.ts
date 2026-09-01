@@ -53,6 +53,8 @@ function extractResponseFields(response: unknown): {
 function jobTypeLabel(type: string): string {
   if (type === 'receipt') return 'Чек';
   if (type === 'receipt_return') return 'Возврат';
+  if (type === 'receipt_copy') return 'Копия чека';
+  if (type === 'precheck') return 'Предчек';
   if (type === 'open_shift') return 'Открытие смены';
   if (type === 'close_shift') return 'Закрытие смены';
   if (type === 'x_report') return 'X-отчёт';

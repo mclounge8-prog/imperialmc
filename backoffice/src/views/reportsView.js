@@ -1,17 +1,11 @@
 import { escapeHtml } from './escapeHtml.js';
+import { formatVenueDateTime } from '../utils/timezone.js';
 
 const METHOD_LABELS = { cash: 'Наличные', card: 'Карта', other: 'Другое' };
 const STATUS_LABELS = { paid: 'Оплачен', cancelled: 'Отменён' };
 
 function formatDateTime(value) {
-  if (!value) return '—';
-  return new Date(value).toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatVenueDateTime(value);
 }
 
 function formatMoney(value) {

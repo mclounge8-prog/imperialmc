@@ -17,7 +17,7 @@ export function formatMoney(value) {
 export function formatDateTime(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
   return d.toLocaleString('ru-RU', {
-    timeZone: 'Europe/Moscow',
+    timeZone: 'Asia/Yekaterinburg',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

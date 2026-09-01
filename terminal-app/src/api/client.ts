@@ -515,6 +515,7 @@ export type PaidReceiptDetail = {
   refundedAt?: string | null;
   refundedByName?: string | null;
   fiscalStatus?: string | null;
+  fiscalDocNumber?: number | null;
   payments: ReceiptPayment[];
   items: ReceiptDetailItem[];
 };
@@ -539,6 +540,15 @@ export async function refundPaidReceipt(id: number, token: string): Promise<Paid
     { method: 'POST' }
   );
   return receipt;
+}
+
+export async function printPaidReceiptCopy(
+  id: number,
+  token: string
+): Promise<{ ok: boolean; jobId: number }> {
+  return authorizedRequest<{ ok: boolean; jobId: number }>(`/api/receipts/${id}/print-copy`, token, {
+    method: 'POST',
+  });
 }
 
 /* ---------- Смены (открытие/закрытие, X-отчёт, чеки смены) ---------- */

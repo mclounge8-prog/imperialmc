@@ -140,6 +140,11 @@ apiTerminal.get('/menu', requireStaffToken, async (c) => {
       if (maxSelect != null) {
         maxSelect = Math.min(Number(maxSelect), optionCount);
       }
+      // Дефолтные ингредиенты сверху списка.
+      group.options.sort((a, b) => {
+        if (a.isDefault === b.isDefault) return String(a.name).localeCompare(String(b.name), 'ru');
+        return a.isDefault ? -1 : 1;
+      });
       return { ...group, minSelect, maxSelect };
     });
   }

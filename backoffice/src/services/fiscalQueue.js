@@ -3,6 +3,7 @@
 // где крутится backend. Вместо этого backend только кладёт задания в очередь
 // (fiscal_jobs), а выполняет их сам terminal-app.
 import { pool } from '../db.js';
+import { formatVenueDateTime } from '../utils/timezone.js';
 
 export async function fetchAtolSettings(venueId) {
   const { rows } = await pool.query('SELECT * FROM venue_atol_settings WHERE venue_id = $1', [
@@ -19,8 +20,57 @@ async function isAtolEnabledForVenue(client, venueId) {
   return !!(rows[0] && rows[0].enabled);
 }
 
+/**
+ * Формат строки как на терминале: «N. Название ×qty», без qty слева у драйвера.
+ * Для этого quantity=1, а в price — сумма строки (unit×qty).
+ * Платные допы — отдельные позиции «N. + Соус … ×qty» с их ценой.
+ */
+export function expandItemsForPrint(items) {
+  const out = [];
+  (items || []).forEach((item, index) => {
+    const n = index + 1;
+    const qty = Number(item.qty) || 1;
+    const unitPrice = Number(item.price) || 0;
+    const mods = Array.isArray(item.modifiers) ? item.modifiers : [];
+    const paidMods = mods.filter((m) => Number(m.price) > 0);
+    const freeMods = mods.filter((m) => !(Number(m.price) > 0));
+    const paidSum = paidMods.reduce((s, m) => s + Number(m.price), 0);
+    const baseUnit = Math.round((unitPrice - paidSum) * 100) / 100;
+    const baseLine = Math.round(Math.max(0, baseUnit) * qty * 100) / 100;
+
+    let name = `${n}. ${item.name} ×${qty}`;
+    if (freeMods.length) {
+      const freeLabel = freeMods.map((m) => m.name).join(', ');
+      name = `${name} (${freeLabel})`;
+    }
+    // Лимит имени АТОЛ ~128 символов
+    if (name.length > 120) name = `${name.slice(0, 117)}…`;
+
+    out.push({
+      name,
+      price: baseLine,
+      qty: 1,
+      modifiers: [],
+    });
+
+    for (const mod of paidMods) {
+      const modLine = Math.round(Number(mod.price) * qty * 100) / 100;
+      let modName = `${n}. + ${mod.name} ×${qty}`;
+      if (modName.length > 120) modName = `${modName.slice(0, 117)}…`;
+      out.push({
+        name: modName,
+        price: modLine,
+        qty: 1,
+        modifiers: [],
+      });
+    }
+  });
+  return out;
+}
+
 function buildFiscalReceiptPayload(type, { items, payments, total, operatorName }) {
-  const fiscalItems = applyDiscountToFiscalItems(items, total);
+  const expanded = expandItemsForPrint(items);
+  const fiscalItems = applyDiscountToFiscalItems(expanded, total);
   return {
     type,
     ...(operatorName ? { operator: { name: operatorName } } : {}),
@@ -28,8 +78,8 @@ function buildFiscalReceiptPayload(type, { items, payments, total, operatorName 
       type: 'position',
       name: item.name,
       price: Number(item.price),
-      quantity: item.qty,
-      amount: Math.round(Number(item.price) * item.qty * 100) / 100,
+      quantity: Number(item.qty) || 1,
+      amount: Math.round(Number(item.price) * (Number(item.qty) || 1) * 100) / 100,
       measurementUnit: 0,
       paymentMethod: 'fullPayment',
       paymentObject: 'commodity',
@@ -135,27 +185,29 @@ export function buildPrecheckPayload({
   if (operatorName) lines.push({ type: 'text', text: `Официант: ${operatorName}` });
   lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
 
-  for (const item of items) {
+  (items || []).forEach((item, index) => {
+    const n = index + 1;
     const price = Number(item.price);
     const qty = Number(item.qty);
     const lineTotal = Math.round(price * qty * 100) / 100;
     lines.push({
       type: 'text',
-      text: `${item.name}`,
+      text: `${n}. ${item.name} ×${qty}`,
     });
     lines.push({
       type: 'text',
-      text: `  ${qty} x ${price.toFixed(2)} = ${lineTotal.toFixed(2)}`,
+      text: `     ${price.toFixed(2)} = ${lineTotal.toFixed(2)}`,
     });
     for (const mod of item.modifiers || []) {
       const modPrice = Number(mod.price) || 0;
+      // Цена позиции уже включает допы — строки ниже только расшифровка.
       if (modPrice > 0) {
         lines.push({ type: 'text', text: `  + ${mod.name} ${modPrice.toFixed(2)}` });
       } else {
         lines.push({ type: 'text', text: `  · ${mod.name}` });
       }
     }
-  }
+  });
 
   lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
   if (discountPercent > 0) {
@@ -301,4 +353,133 @@ export async function enqueueCashFiscalJob(client, { venueId, shiftId, type, amo
     `INSERT INTO fiscal_jobs (venue_id, type, shift_id, payload) VALUES ($1, $2, $3, $4)`,
     [venueId, type, shiftId || null, JSON.stringify(payload)]
   );
+}
+
+const METHOD_LABELS = { cash: 'Наличные', card: 'Безнал', other: 'Другое' };
+
+/** Нефискальная копия оплаченного чека (расшифровка как на фискальном). */
+export function buildReceiptCopyPayload({
+  items,
+  payments,
+  total,
+  subtotal,
+  discountPercent = 0,
+  discountAmount = 0,
+  tableName,
+  guestLabel,
+  operatorName,
+  venueName,
+  closedAt,
+  receiptId,
+  fiscalDocNumber,
+}) {
+  const lines = [];
+  lines.push({ type: 'text', text: '=== КОПИЯ ЧЕКА ===', alignment: 'center' });
+  lines.push({ type: 'text', text: 'НЕ ФИСКАЛЬНЫЙ ДОКУМЕНТ', alignment: 'center' });
+  if (venueName) lines.push({ type: 'text', text: String(venueName), alignment: 'center' });
+  if (receiptId) lines.push({ type: 'text', text: `Чек #${receiptId}`, alignment: 'center' });
+  if (fiscalDocNumber) {
+    lines.push({ type: 'text', text: `ФД ${fiscalDocNumber}`, alignment: 'center' });
+  }
+  if (closedAt) {
+    lines.push({ type: 'text', text: formatVenueDateTime(closedAt), alignment: 'center' });
+  }
+  lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
+  if (tableName) lines.push({ type: 'text', text: `Стол: ${tableName}` });
+  if (guestLabel) lines.push({ type: 'text', text: `Гость: ${guestLabel}` });
+  if (operatorName) lines.push({ type: 'text', text: `Кассир: ${operatorName}` });
+  lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
+
+  (items || []).forEach((item, index) => {
+    const n = index + 1;
+    const price = Number(item.price);
+    const qty = Number(item.qty);
+    const lineTotal = Math.round(price * qty * 100) / 100;
+    lines.push({ type: 'text', text: `${n}. ${item.name} ×${qty}` });
+    lines.push({ type: 'text', text: `     ${price.toFixed(2)} = ${lineTotal.toFixed(2)}` });
+    for (const mod of item.modifiers || []) {
+      const modPrice = Number(mod.price) || 0;
+      if (modPrice > 0) {
+        lines.push({ type: 'text', text: `  + ${mod.name} ${modPrice.toFixed(2)}` });
+      } else {
+        lines.push({ type: 'text', text: `  · ${mod.name}` });
+      }
+    }
+  });
+
+  lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
+  if (discountPercent > 0) {
+    lines.push({
+      type: 'text',
+      text: `Сумма: ${Number(subtotal ?? total).toFixed(2)} руб.`,
+      alignment: 'right',
+    });
+    lines.push({
+      type: 'text',
+      text: `Скидка ${discountPercent}%: −${Number(discountAmount).toFixed(2)} руб.`,
+      alignment: 'right',
+    });
+  }
+  lines.push({
+    type: 'text',
+    text: `ИТОГО: ${Number(total).toFixed(2)} руб.`,
+    alignment: 'right',
+  });
+  for (const p of payments || []) {
+    const label = METHOD_LABELS[p.method] || p.method;
+    lines.push({
+      type: 'text',
+      text: `${label}: ${Number(p.amount).toFixed(2)} руб.`,
+      alignment: 'right',
+    });
+  }
+  lines.push({ type: 'text', text: ' ' });
+  lines.push({ type: 'text', text: 'Копия для гостя', alignment: 'center' });
+
+  return { type: 'nonFiscal', items: lines };
+}
+
+export async function enqueueReceiptCopyFiscalJob(
+  client,
+  {
+    venueId,
+    receiptId,
+    items,
+    payments,
+    total,
+    subtotal,
+    discountPercent,
+    discountAmount,
+    tableName,
+    guestLabel,
+    operatorName,
+    venueName,
+    closedAt,
+    fiscalDocNumber,
+  }
+) {
+  if (!venueId) return null;
+  const enabled = await isAtolEnabledForVenue(client, venueId);
+  if (!enabled) return null;
+
+  const payload = buildReceiptCopyPayload({
+    items,
+    payments,
+    total,
+    subtotal,
+    discountPercent,
+    discountAmount,
+    tableName,
+    guestLabel,
+    operatorName,
+    venueName,
+    closedAt,
+    receiptId,
+    fiscalDocNumber,
+  });
+  const { rows } = await client.query(
+    `INSERT INTO fiscal_jobs (venue_id, type, receipt_id, payload) VALUES ($1, 'receipt_copy', $2, $3) RETURNING id`,
+    [venueId, receiptId || null, JSON.stringify(payload)]
+  );
+  return rows[0]?.id ?? null;
 }

@@ -47,11 +47,12 @@ function formatWhen(value: string | null | undefined): string {
   if (!value) return '—';
   try {
     return new Date(value).toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    timeZone: 'Asia/Yekaterinburg',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
   } catch {
     return String(value);
   }

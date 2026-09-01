@@ -1,19 +1,19 @@
 import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
-import { enqueueReceiptReturnFiscalJob } from '../services/fiscalQueue.js';
+import {
+  enqueueReceiptReturnFiscalJob,
+  enqueueReceiptCopyFiscalJob,
+} from '../services/fiscalQueue.js';
 import {
   buildReceiptRefundMessage,
   fetchVenueName,
   notifyTelegramSafe,
 } from '../services/telegramNotify.js';
+import { venueDayBounds } from '../utils/timezone.js';
 
 const apiReceipts = new Hono();
 apiReceipts.use('*', requireStaffToken);
-
-function startOfUTCDay(date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
 
 function roundMoney(value) {
   return Math.round(Number(value) * 100) / 100;
@@ -23,7 +23,7 @@ async function loadReceiptDetail(id) {
   const { rows: receiptRows } = await pool.query(
     `SELECT id, venue_id, shift_id, table_name, guest_label, staff_name, total, subtotal,
             discount, discount_percent, closed_at, status, refunded_at, refunded_by_name,
-            fiscal_status
+            fiscal_status, fiscal_doc_number
      FROM receipts WHERE id = $1`,
     [id]
   );
@@ -102,6 +102,7 @@ async function loadReceiptDetail(id) {
     refundedAt: receipt.refunded_at,
     refundedByName: receipt.refunded_by_name,
     fiscalStatus: receipt.fiscal_status,
+    fiscalDocNumber: receipt.fiscal_doc_number ?? null,
     payments: paymentRows.map((p) => ({
       method: p.method,
       amount: Number(p.amount),
@@ -192,7 +193,7 @@ apiReceipts.get('/', async (c) => {
     return c.json({ error: 'Не указано заведение' });
   }
 
-  const todayStart = startOfUTCDay(new Date());
+  const { start: todayStart } = venueDayBounds();
   const { rows } = await pool.query(
     `SELECT id, table_name, guest_label, staff_name, total, closed_at, status
      FROM receipts
@@ -223,6 +224,64 @@ apiReceipts.get('/:id', async (c) => {
     return c.json({ error: 'Чек не найден' });
   }
   return c.json({ receipt: detail });
+});
+
+/** Печать копии чека на ККТ (нефискальный документ с расшифровкой позиций и допов). */
+apiReceipts.post('/:id/print-copy', async (c) => {
+  const id = c.req.param('id');
+  const staff = c.get('staff');
+  const detail = await loadReceiptDetail(id);
+  if (!detail) {
+    c.status(404);
+    return c.json({ error: 'Чек не найден' });
+  }
+  if (detail.status !== 'paid' && detail.status !== 'refunded') {
+    c.status(409);
+    return c.json({ error: 'Копию можно печатать только для оплаченного или возвращённого чека' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const venueName = await fetchVenueName(detail.venueId);
+    const jobId = await enqueueReceiptCopyFiscalJob(client, {
+      venueId: detail.venueId,
+      receiptId: detail.id,
+      items: detail.items.map((item) => ({
+        name: item.name,
+        price: item.price,
+        qty: item.qty,
+        modifiers: (item.modifiers || []).map((m) => ({
+          name: m.name,
+          price: m.price,
+        })),
+      })),
+      payments: detail.payments,
+      total: detail.total,
+      subtotal: detail.subtotal,
+      discountPercent: detail.discountPercent,
+      discountAmount: detail.discount,
+      tableName: detail.tableName,
+      guestLabel: detail.guestLabel,
+      operatorName: staff?.name || detail.staffName,
+      venueName,
+      closedAt: detail.closedAt,
+      fiscalDocNumber: detail.fiscalDocNumber,
+    });
+    await client.query('COMMIT');
+    if (!jobId) {
+      c.status(409);
+      return c.json({ error: 'Касса АТОЛ не включена для этого заведения' });
+    }
+    return c.json({ ok: true, jobId });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[receipts/print-copy]', err);
+    c.status(500);
+    return c.json({ error: 'Не удалось поставить копию в очередь печати' });
+  } finally {
+    client.release();
+  }
 });
 
 // Возврат уже оплаченного чека (нал и/или безнал). Требует открытую смену.

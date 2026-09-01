@@ -18,7 +18,7 @@ function formatMoney(value: number): string {
 }
 
 function formatTime(value: string): string {
-  return new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return new Date(value).toLocaleTimeString('ru-RU', { timeZone: 'Asia/Yekaterinburg', hour: '2-digit', minute: '2-digit' });
 }
 
 function ReceiptRow({ receipt }: { receipt: ShiftReceipt }) {

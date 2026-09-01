@@ -29,6 +29,7 @@ function formatMoney(value: number): string {
 
 function formatWhen(value: string): string {
   return new Date(value).toLocaleString('ru-RU', {
+    timeZone: 'Asia/Yekaterinburg',
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
