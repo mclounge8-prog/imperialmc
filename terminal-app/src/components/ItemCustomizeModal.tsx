@@ -93,7 +93,16 @@ export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) 
     setSelected(defaults);
   }, [item]);
 
-  const groups = item?.modifierGroups ?? [];
+  const groups = useMemo(() => {
+    const list = item?.modifierGroups ?? [];
+    // Группы с дефолтными ингредиентами выше, допы — ниже.
+    return [...list].sort((a, b) => {
+      const aDef = a.options.some((o) => o.isDefault) ? 0 : 1;
+      const bDef = b.options.some((o) => o.isDefault) ? 0 : 1;
+      if (aDef !== bDef) return aDef - bDef;
+      return a.name.localeCompare(b.name, 'ru');
+    });
+  }, [item]);
 
   const countInGroup = useCallback(
     (group: ModifierGroup, selectedSet: Set<number>): number =>
@@ -170,6 +179,11 @@ export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) 
               const key = group.id ?? 'ungrouped';
               const onToggle = groupToggleHandlers.get(key)!;
               const isRadio = group.maxSelect === 1;
+              // Сначала то, что входит по умолчанию (галочки), ниже — допы.
+              const orderedOptions = [...group.options].sort((a, b) => {
+                if (a.isDefault === b.isDefault) return a.name.localeCompare(b.name, 'ru');
+                return a.isDefault ? -1 : 1;
+              });
               return (
                 <View key={key} style={styles.groupBlock}>
                   <View style={styles.groupHeader}>
@@ -196,7 +210,7 @@ export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) 
                     )}
                   </View>
 
-                  {group.options.map((opt) => (
+                  {orderedOptions.map((opt) => (
                     <OptionRow
                       key={opt.modifierId}
                       opt={opt}

@@ -7,21 +7,20 @@ import {
   renderItemStatsSection,
   renderCashSection,
 } from '../views/reportsView.js';
+import { formatVenueDateTime, venueDayBounds, venueTodayISO } from '../utils/timezone.js';
 
 const reports = new Hono();
 reports.use('*', requireAuthApi);
 
 export const PAGE_SIZE = 50;
 
-// По умолчанию — последние 7 дней, а не вся история разом: при ~1000 чеках в
-// сутки "показать всё" и медленно, и бесполезно листать. Явный диапазон дат
-// в фильтре всегда можно расширить.
+// По умолчанию — последние 7 дней (календарь Asia/Yekaterinburg).
 export function defaultDateRange() {
-  const to = new Date();
-  const from = new Date();
-  from.setDate(from.getDate() - 7);
-  const fmt = (d) => d.toISOString().slice(0, 10);
-  return { from: fmt(from), to: fmt(to) };
+  const to = venueTodayISO();
+  const toDate = new Date(`${to}T12:00:00+05:00`);
+  toDate.setDate(toDate.getDate() - 7);
+  const from = venueTodayISO(toDate);
+  return { from, to };
 }
 
 function parseReportFilters(c) {
@@ -70,13 +69,15 @@ function receiptWhere({ venueId, dateFrom, dateTo }, alias = 'r') {
     idx += 1;
   }
   if (dateFrom) {
+    const { start } = venueDayBounds(dateFrom);
     conditions.push(`${alias}.closed_at >= $${idx}`);
-    params.push(`${dateFrom} 00:00:00`);
+    params.push(start.toISOString());
     idx += 1;
   }
   if (dateTo) {
+    const { end } = venueDayBounds(dateTo);
     conditions.push(`${alias}.closed_at <= $${idx}`);
-    params.push(`${dateTo} 23:59:59`);
+    params.push(end.toISOString());
     idx += 1;
   }
   return {
@@ -166,12 +167,12 @@ async function fetchItemStats({ venueId, dateFrom, dateTo }) {
   }
   if (dateFrom) {
     conditions.push(`r.closed_at >= $${idx}`);
-    params.push(`${dateFrom} 00:00:00`);
+    params.push(venueDayBounds(dateFrom).start.toISOString());
     idx += 1;
   }
   if (dateTo) {
     conditions.push(`r.closed_at <= $${idx}`);
-    params.push(`${dateTo} 23:59:59`);
+    params.push(venueDayBounds(dateTo).end.toISOString());
     idx += 1;
   }
 
@@ -207,12 +208,12 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo }) {
   // Период по дате открытия; закрытые смены «за день» обычно открыты в тот же день.
   if (dateFrom) {
     conditions.push(`s.opened_at >= $${idx}`);
-    params.push(`${dateFrom} 00:00:00`);
+    params.push(venueDayBounds(dateFrom).start.toISOString());
     idx += 1;
   }
   if (dateTo) {
     conditions.push(`s.opened_at <= $${idx}`);
-    params.push(`${dateTo} 23:59:59`);
+    params.push(venueDayBounds(dateTo).end.toISOString());
     idx += 1;
   }
 
@@ -393,7 +394,7 @@ reports.get('/export/receipts', async (c) => {
       .join(', ');
     return [
       r.id,
-      r.closed_at ? new Date(r.closed_at).toLocaleString('ru-RU') : '',
+      r.closed_at ? formatVenueDateTime(r.closed_at) : '',
       r.venue_name || '',
       r.table_name || 'Быстрый заказ',
       r.guest_label || '',
@@ -460,8 +461,8 @@ reports.get('/export/cash', async (c) => {
       s.id,
       s.venueName,
       s.status === 'open' ? 'Открыта' : 'Закрыта',
-      s.openedAt ? new Date(s.openedAt).toLocaleString('ru-RU') : '',
-      s.closedAt ? new Date(s.closedAt).toLocaleString('ru-RU') : '',
+      s.openedAt ? formatVenueDateTime(s.openedAt) : '',
+      s.closedAt ? formatVenueDateTime(s.closedAt) : '',
       s.openedByName || '',
       s.closedByName || '',
       s.openingCash.toFixed(2),

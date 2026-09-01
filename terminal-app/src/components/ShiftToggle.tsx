@@ -26,7 +26,7 @@ const COMPLETE_RATIO = 0.82;
 
 function formatTime(value: string | null): string {
   if (!value) return '';
-  return new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return new Date(value).toLocaleTimeString('ru-RU', { timeZone: 'Asia/Yekaterinburg', hour: '2-digit', minute: '2-digit' });
 }
 
 export default function ShiftToggle() {

@@ -10,6 +10,7 @@ function formatMoney(value: number): string {
 function formatDateTime(value: string | null): string {
   if (!value) return '—';
   return new Date(value).toLocaleString('ru-RU', {
+    timeZone: 'Asia/Yekaterinburg',
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',

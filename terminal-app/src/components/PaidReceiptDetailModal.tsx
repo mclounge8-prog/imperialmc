@@ -10,9 +10,10 @@ import {
   View,
 } from 'react-native';
 import { colors } from '../theme/colors';
-import { fetchPaidReceiptDetail, refundPaidReceipt } from '../api/client';
+import { fetchPaidReceiptDetail, refundPaidReceipt, printPaidReceiptCopy } from '../api/client';
 import type { PaidReceiptDetail } from '../api/client';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
+import { formatVenueDateTime } from '../utils/timezone';
 
 const METHOD_LABELS: Record<string, string> = {
   cash: 'Наличные',
@@ -25,12 +26,7 @@ function formatMoney(value: number): string {
 }
 
 function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatVenueDateTime(value);
 }
 
 type Props = {
@@ -90,6 +86,23 @@ export default function PaidReceiptDetailModal({
     );
   };
 
+  const doPrintCopy = async () => {
+    if (!detail) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await printPaidReceiptCopy(detail.id, token);
+      if (venueId) {
+        runPendingFiscalJobs(venueId, token);
+      }
+      Alert.alert('Печать', 'Копия чека отправлена на кассу');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось напечатать копию');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const doRefund = async () => {
     if (!detail) return;
     setBusy(true);
@@ -110,6 +123,8 @@ export default function PaidReceiptDetailModal({
 
   const isRefunded = detail?.status === 'refunded';
   const canRefund = detail?.status === 'paid' && !busy;
+  const canPrintCopy =
+    detail != null && (detail.status === 'paid' || detail.status === 'refunded') && !busy;
 
   return (
     <Modal visible={receiptId !== null} transparent animationType="fade" onRequestClose={onClose}>
@@ -186,6 +201,17 @@ export default function PaidReceiptDetailModal({
           ) : null}
 
           <View style={styles.actions}>
+            {canPrintCopy ? (
+              <Pressable
+                style={[styles.copyBtn, busy && styles.refundBtnDisabled]}
+                onPress={() => {
+                  void doPrintCopy();
+                }}
+                disabled={busy}
+              >
+                <Text style={styles.copyBtnText}>Копия чека</Text>
+              </Pressable>
+            ) : null}
             {canRefund ? (
               <Pressable
                 style={[styles.refundBtn, busy && styles.refundBtnDisabled]}
@@ -266,6 +292,16 @@ const styles = StyleSheet.create({
   totalValue: { color: colors.text, fontSize: 18, fontWeight: '700' },
   totalRefunded: { textDecorationLine: 'line-through', color: colors.textMuted },
   actions: { marginTop: 10, gap: 4 },
+  copyBtn: {
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  copyBtnText: { color: colors.text, fontSize: 15, fontWeight: '700' },
   refundBtn: {
     backgroundColor: colors.danger,
     borderRadius: 12,
