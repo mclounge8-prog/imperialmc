@@ -10,7 +10,6 @@ import {
   fetchVenueName,
   notifyTelegramSafe,
 } from '../services/telegramNotify.js';
-import { venueDayBounds } from '../utils/timezone.js';
 
 const apiReceipts = new Hono();
 apiReceipts.use('*', requireStaffToken);
@@ -51,6 +50,7 @@ async function loadReceiptDetail(id) {
 
     let removed = [];
     let added = [];
+    let defaultIds = new Set();
     if (item.menu_item_id) {
       // eslint-disable-next-line no-await-in-loop
       const { rows: currentAttachments } = await pool.query(
@@ -61,6 +61,9 @@ async function loadReceiptDetail(id) {
         [item.menu_item_id]
       );
       const appliedIds = new Set(modRows.map((m) => m.modifier_id).filter((v) => v !== null));
+      defaultIds = new Set(
+        currentAttachments.filter((a) => a.is_default).map((a) => a.modifier_id)
+      );
       removed = currentAttachments
         .filter((a) => a.is_default && !appliedIds.has(a.modifier_id))
         .map((a) => a.name);
@@ -76,11 +79,15 @@ async function loadReceiptDetail(id) {
       price: Number(item.price),
       qty: item.qty,
       lineTotal: Number(item.line_total),
-      modifiers: modRows.map((m) => ({
-        modifierId: m.modifier_id,
-        name: m.name,
-        price: Number(m.price),
-      })),
+      modifiers: modRows.map((m) => {
+        const isDefault = m.modifier_id != null && defaultIds.has(m.modifier_id);
+        return {
+          modifierId: m.modifier_id,
+          name: m.name,
+          price: Number(m.price),
+          isDefault,
+        };
+      }),
       removed,
       added,
     });
@@ -182,10 +189,9 @@ async function enrichReceiptModifiersWithStockSnapshot(client, items) {
   }
 }
 
-// Оплаченные чеки заведения за сегодня — переключатель «Оплаченные» на общем
-// экране столов. В отличие от /api/shifts/receipts (которые только про
-// текущую открытую смену), тут просто "что оплачено сегодня по этому
-// заведению" — не зависит от того, открыта ли сейчас смена.
+// Оплаченные чеки текущей открытой смены — вкладка «Оплаченные» на столах.
+// Пока смена открыта, чеки видны; после закрытия смены список пуст
+// (исторические чеки — в отчётах / экране чеков смены до закрытия).
 apiReceipts.get('/', async (c) => {
   const venueId = c.req.query('venueId');
   if (!venueId) {
@@ -193,15 +199,23 @@ apiReceipts.get('/', async (c) => {
     return c.json({ error: 'Не указано заведение' });
   }
 
-  const { start: todayStart } = venueDayBounds();
+  const { rows: shiftRows } = await pool.query(
+    "SELECT id FROM shifts WHERE venue_id = $1 AND status = 'open'",
+    [venueId]
+  );
+  const openShift = shiftRows[0];
+  if (!openShift) {
+    return c.json({ receipts: [], shiftId: null });
+  }
+
   const { rows } = await pool.query(
     `SELECT id, table_name, guest_label, staff_name, total, closed_at, status
      FROM receipts
      WHERE venue_id = $1
+       AND shift_id = $2
        AND status IN ('paid', 'refunded')
-       AND closed_at >= $2
      ORDER BY closed_at DESC`,
-    [venueId, todayStart.toISOString()]
+    [venueId, openShift.id]
   );
 
   const receipts = rows.map((r) => ({
@@ -214,7 +228,7 @@ apiReceipts.get('/', async (c) => {
     status: r.status,
   }));
 
-  return c.json({ receipts });
+  return c.json({ receipts, shiftId: openShift.id });
 });
 
 apiReceipts.get('/:id', async (c) => {
@@ -254,6 +268,7 @@ apiReceipts.post('/:id/print-copy', async (c) => {
         modifiers: (item.modifiers || []).map((m) => ({
           name: m.name,
           price: m.price,
+          isDefault: !!m.isDefault,
         })),
       })),
       payments: detail.payments,
@@ -349,9 +364,14 @@ apiReceipts.post('/:id/refund', async (c) => {
     for (const item of itemRows) {
       // eslint-disable-next-line no-await-in-loop
       const { rows: modRows } = await client.query(
-        `SELECT modifier_id, name, price, warehouse_item_id, qty
-         FROM receipt_item_modifiers WHERE receipt_item_id = $1 ORDER BY id`,
-        [item.id]
+        `SELECT rim.modifier_id, rim.name, rim.price, rim.warehouse_item_id, rim.qty,
+                COALESCE(mim.is_default, false) AS is_default
+         FROM receipt_item_modifiers rim
+         LEFT JOIN menu_item_modifiers mim
+           ON mim.menu_item_id = $2 AND mim.modifier_id = rim.modifier_id
+         WHERE rim.receipt_item_id = $1
+         ORDER BY rim.id`,
+        [item.id, item.menu_item_id]
       );
       items.push({
         menu_item_id: item.menu_item_id,
@@ -365,6 +385,8 @@ apiReceipts.post('/:id/refund', async (c) => {
           price: Number(m.price),
           warehouse_item_id: m.warehouse_item_id,
           qty: Number(m.qty) || 0,
+          is_default: !!m.is_default,
+          isDefault: !!m.is_default,
         })),
       });
     }

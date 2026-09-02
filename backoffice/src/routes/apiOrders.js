@@ -324,22 +324,37 @@ async function fetchGuestForSettlement(orderId, guestId, client) {
 }
 
 async function fetchGuestItemsSnapshot(guestId, client) {
+  // ORDER BY oi.id — порядок как при набивке чека (иначе фискальная печать «рандомит»).
   const { rows } = await client.query(
     `SELECT oi.id, oi.menu_item_id, oi.name, oi.price, oi.qty, mi.category_id, mc.name AS category_name
      FROM order_items oi
      LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id
      LEFT JOIN menu_categories mc ON mc.id = mi.category_id
-     WHERE oi.guest_id = $1`,
+     WHERE oi.guest_id = $1
+     ORDER BY oi.id`,
     [guestId]
   );
   for (const item of rows) {
     // eslint-disable-next-line no-await-in-loop
     const { rows: modRows } = await client.query(
-      `SELECT modifier_id, name, price, warehouse_item_id, qty
-       FROM order_item_modifiers WHERE order_item_id = $1 ORDER BY id`,
-      [item.id]
+      `SELECT oim.modifier_id, oim.name, oim.price, oim.warehouse_item_id, oim.qty,
+              COALESCE(mim.is_default, false) AS is_default
+       FROM order_item_modifiers oim
+       LEFT JOIN menu_item_modifiers mim
+         ON mim.menu_item_id = $2 AND mim.modifier_id = oim.modifier_id
+       WHERE oim.order_item_id = $1
+       ORDER BY oim.id`,
+      [item.id, item.menu_item_id]
     );
-    item.modifiers = modRows;
+    item.modifiers = modRows.map((m) => ({
+      modifier_id: m.modifier_id,
+      name: m.name,
+      price: m.price,
+      warehouse_item_id: m.warehouse_item_id,
+      qty: m.qty,
+      is_default: !!m.is_default,
+      isDefault: !!m.is_default,
+    }));
   }
   return rows;
 }
