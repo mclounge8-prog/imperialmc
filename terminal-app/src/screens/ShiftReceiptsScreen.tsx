@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
@@ -18,7 +19,11 @@ function formatMoney(value: number): string {
 }
 
 function formatTime(value: string): string {
-  return new Date(value).toLocaleTimeString('ru-RU', { timeZone: 'Asia/Yekaterinburg', hour: '2-digit', minute: '2-digit' });
+  return new Date(value).toLocaleTimeString('ru-RU', {
+    timeZone: 'Asia/Yekaterinburg',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function ReceiptRow({ receipt }: { receipt: ShiftReceipt }) {
@@ -42,7 +47,9 @@ function ReceiptRow({ receipt }: { receipt: ShiftReceipt }) {
         <Text style={[styles.rowTotal, (!isPaid || isRefunded) && styles.rowTotalCancelled]}>
           {formatMoney(receipt.total)}
         </Text>
-        {!isPaid && <Text style={styles.statusLabel}>{STATUS_LABELS[receipt.status] || receipt.status}</Text>}
+        {!isPaid && (
+          <Text style={styles.statusLabel}>{STATUS_LABELS[receipt.status] || receipt.status}</Text>
+        )}
       </View>
     </View>
   );
@@ -59,7 +66,11 @@ export default function ShiftReceiptsScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!session || !venue) return;
+    if (!session || !venue) {
+      // После вылета сессии не зависаем в спиннере — ждём PIN / venue.
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -73,9 +84,27 @@ export default function ShiftReceiptsScreen() {
     }
   }, [session, venue]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load])
+  );
+
+  if (!session) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.hint}>Войдите по PIN, чтобы увидеть чеки смены</Text>
+      </View>
+    );
+  }
+
+  if (!venue) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.hint}>Нет привязки к заведению</Text>
+      </View>
+    );
+  }
 
   if (loading) {
     return (
@@ -100,7 +129,9 @@ export default function ShiftReceiptsScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.title}>Смена не открыта</Text>
-        <Text style={styles.hint}>Откройте смену переключателем в «Настройках», чтобы увидеть её чеки.</Text>
+        <Text style={styles.hint}>
+          Откройте смену переключателем в «Настройках», чтобы увидеть её чеки.
+        </Text>
       </View>
     );
   }

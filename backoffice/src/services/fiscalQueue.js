@@ -20,52 +20,81 @@ async function isAtolEnabledForVenue(client, venueId) {
   return !!(rows[0] && rows[0].enabled);
 }
 
+function isDefaultModifier(mod) {
+  return mod?.isDefault === true || mod?.is_default === true;
+}
+
 /**
- * Формат строки как на терминале: «N. Название ×qty», без qty слева у драйвера.
- * Для этого quantity=1, а в price — сумма строки (unit×qty).
- * Платные допы — отдельные позиции «N. + Соус … ×qty» с их ценой.
+ * Печать только дополнений (нестандартных модификаторов).
+ * Если у позиции всего 1 модификатор — его не печатаем.
+ * Стандартные (is_default) не печатаем никогда.
+ * Пустой «<Дополнения:>» не выводим.
+ */
+export function additionsSuffixForPrint(item) {
+  const mods = Array.isArray(item?.modifiers) ? item.modifiers : [];
+  if (mods.length <= 1) return '';
+  const additions = mods.filter((m) => !isDefaultModifier(m));
+  if (additions.length === 0) return '';
+  return ` <Дополнения: ${additions.map((m) => m.name).join(' / ')}>`;
+}
+
+export function formatItemPrintName(item, index) {
+  const n = index + 1;
+  let name = `${n}. ${item.name}${additionsSuffixForPrint(item)}`;
+  // Лимит имени АТОЛ ~128 символов
+  if (name.length > 120) name = `${name.slice(0, 117)}…`;
+  return name;
+}
+
+/**
+ * Одна фискальная позиция на блюдо: полная цена с допами, без ×qty в имени,
+ * без отдельных строк модификаторов (иначе получается «1.1 / 1.2»).
+ * quantity=1, в price — сумма строки (unit×qty) — так удобнее драйверу АТОЛ.
  */
 export function expandItemsForPrint(items) {
-  const out = [];
-  (items || []).forEach((item, index) => {
-    const n = index + 1;
+  return (items || []).map((item, index) => {
     const qty = Number(item.qty) || 1;
     const unitPrice = Number(item.price) || 0;
-    const mods = Array.isArray(item.modifiers) ? item.modifiers : [];
-    const paidMods = mods.filter((m) => Number(m.price) > 0);
-    const freeMods = mods.filter((m) => !(Number(m.price) > 0));
-    const paidSum = paidMods.reduce((s, m) => s + Number(m.price), 0);
-    const baseUnit = Math.round((unitPrice - paidSum) * 100) / 100;
-    const baseLine = Math.round(Math.max(0, baseUnit) * qty * 100) / 100;
-
-    let name = `${n}. ${item.name} ×${qty}`;
-    if (freeMods.length) {
-      const freeLabel = freeMods.map((m) => m.name).join(', ');
-      name = `${name} (${freeLabel})`;
-    }
-    // Лимит имени АТОЛ ~128 символов
-    if (name.length > 120) name = `${name.slice(0, 117)}…`;
-
-    out.push({
-      name,
-      price: baseLine,
+    const lineTotal = Math.round(unitPrice * qty * 100) / 100;
+    return {
+      name: formatItemPrintName(item, index),
+      price: lineTotal,
       qty: 1,
       modifiers: [],
-    });
+    };
+  });
+}
 
-    for (const mod of paidMods) {
-      const modLine = Math.round(Number(mod.price) * qty * 100) / 100;
-      let modName = `${n}. + ${mod.name} ×${qty}`;
-      if (modName.length > 120) modName = `${modName.slice(0, 117)}…`;
-      out.push({
-        name: modName,
-        price: modLine,
-        qty: 1,
-        modifiers: [],
+/** Строки позиций для пречека / копии: имя, дополнения мельче в одну линию, полная сумма. */
+function appendPrintItemLines(lines, items) {
+  (items || []).forEach((item, index) => {
+    const n = index + 1;
+    const price = Number(item.price) || 0;
+    const qty = Number(item.qty) || 1;
+    const lineTotal = Math.round(price * qty * 100) / 100;
+    const suffix = additionsSuffixForPrint(item);
+    lines.push({
+      type: 'text',
+      text: `${n}. ${item.name}`,
+    });
+    if (suffix) {
+      // Чуть меньший шрифт; в одну строку через « / », без 1.1 / 1.2.
+      lines.push({
+        type: 'text',
+        text: suffix.trim(),
+        font: 1,
       });
     }
+    const amountText =
+      qty > 1
+        ? `${price.toFixed(2)} x ${qty} = ${lineTotal.toFixed(2)}`
+        : lineTotal.toFixed(2);
+    lines.push({
+      type: 'text',
+      text: amountText,
+      alignment: 'right',
+    });
   });
-  return out;
 }
 
 function buildFiscalReceiptPayload(type, { items, payments, total, operatorName }) {
@@ -185,29 +214,7 @@ export function buildPrecheckPayload({
   if (operatorName) lines.push({ type: 'text', text: `Официант: ${operatorName}` });
   lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
 
-  (items || []).forEach((item, index) => {
-    const n = index + 1;
-    const price = Number(item.price);
-    const qty = Number(item.qty);
-    const lineTotal = Math.round(price * qty * 100) / 100;
-    lines.push({
-      type: 'text',
-      text: `${n}. ${item.name} ×${qty}`,
-    });
-    lines.push({
-      type: 'text',
-      text: `     ${price.toFixed(2)} = ${lineTotal.toFixed(2)}`,
-    });
-    for (const mod of item.modifiers || []) {
-      const modPrice = Number(mod.price) || 0;
-      // Цена позиции уже включает допы — строки ниже только расшифровка.
-      if (modPrice > 0) {
-        lines.push({ type: 'text', text: `  + ${mod.name} ${modPrice.toFixed(2)}` });
-      } else {
-        lines.push({ type: 'text', text: `  · ${mod.name}` });
-      }
-    }
-  });
+  appendPrintItemLines(lines, items);
 
   lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
   if (discountPercent > 0) {
@@ -390,22 +397,7 @@ export function buildReceiptCopyPayload({
   if (operatorName) lines.push({ type: 'text', text: `Кассир: ${operatorName}` });
   lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
 
-  (items || []).forEach((item, index) => {
-    const n = index + 1;
-    const price = Number(item.price);
-    const qty = Number(item.qty);
-    const lineTotal = Math.round(price * qty * 100) / 100;
-    lines.push({ type: 'text', text: `${n}. ${item.name} ×${qty}` });
-    lines.push({ type: 'text', text: `     ${price.toFixed(2)} = ${lineTotal.toFixed(2)}` });
-    for (const mod of item.modifiers || []) {
-      const modPrice = Number(mod.price) || 0;
-      if (modPrice > 0) {
-        lines.push({ type: 'text', text: `  + ${mod.name} ${modPrice.toFixed(2)}` });
-      } else {
-        lines.push({ type: 'text', text: `  · ${mod.name}` });
-      }
-    }
-  });
+  appendPrintItemLines(lines, items);
 
   lines.push({ type: 'text', text: '------------------------', alignment: 'center' });
   if (discountPercent > 0) {

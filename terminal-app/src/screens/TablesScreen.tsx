@@ -56,7 +56,11 @@ export default function TablesScreen() {
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
-      if (!session || !venue) return;
+      if (!session || !venue) {
+        // После вылета сессии не оставляем вечный спиннер.
+        if (!opts?.silent) setLoading(false);
+        return;
+      }
       const silent = opts?.silent === true;
       if (!silent) {
         setLoading(true);
@@ -66,6 +70,7 @@ export default function TablesScreen() {
         const [tablesData, ordersData, paidData] = await Promise.all([
           fetchTables(venue.id, session.token),
           fetchOpenOrders(venue.id, session.token),
+          // Чеки текущей открытой смены (бэкенд фильтрует по shift_id).
           fetchPaidReceipts(venue.id, session.token),
         ]);
         const nextZones = tablesData.zones.map((zone) => ({
