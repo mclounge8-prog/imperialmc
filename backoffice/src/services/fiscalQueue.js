@@ -47,25 +47,24 @@ export function formatItemPrintName(item, index) {
 }
 
 /**
- * Одна фискальная позиция на блюдо: полная цена с допами, без ×qty в имени,
+ * Одна фискальная позиция на блюдо: полная цена единицы с допами, без ×qty в имени,
  * без отдельных строк модификаторов (иначе получается «1.1 / 1.2»).
- * quantity=1, в price — сумма строки (unit×qty) — так удобнее драйверу АТОЛ.
+ * В quantity — реальное кол-во, чтобы на чеке было «цена × N = сумма», а не всегда «× 1».
  */
 export function expandItemsForPrint(items) {
   return (items || []).map((item, index) => {
     const qty = Number(item.qty) || 1;
-    const unitPrice = Number(item.price) || 0;
-    const lineTotal = Math.round(unitPrice * qty * 100) / 100;
+    const unitPrice = Math.round((Number(item.price) || 0) * 100) / 100;
     return {
       name: formatItemPrintName(item, index),
-      price: lineTotal,
-      qty: 1,
+      price: unitPrice,
+      qty,
       modifiers: [],
     };
   });
 }
 
-/** Строки позиций для пречека / копии: имя, дополнения мельче в одну линию, полная сумма. */
+/** Строки позиций для пречека / копии: имя, дополнения мельче, «цена × qty = сумма». */
 function appendPrintItemLines(lines, items) {
   (items || []).forEach((item, index) => {
     const n = index + 1;
@@ -85,13 +84,9 @@ function appendPrintItemLines(lines, items) {
         font: 1,
       });
     }
-    const amountText =
-      qty > 1
-        ? `${price.toFixed(2)} x ${qty} = ${lineTotal.toFixed(2)}`
-        : lineTotal.toFixed(2);
     lines.push({
       type: 'text',
-      text: amountText,
+      text: `${price.toFixed(2)} x ${qty} = ${lineTotal.toFixed(2)}`,
       alignment: 'right',
     });
   });
