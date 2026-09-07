@@ -766,10 +766,6 @@ body.chart-open {
   box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.35);
 }
 
-.stat-card-cash-on-hand .sparkline-wrap {
-  display: none;
-}
-
 .cash-on-hand-detail {
   display: flex;
   flex-direction: column;
