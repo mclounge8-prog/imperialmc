@@ -78,10 +78,41 @@ body.is-login {
   gap: 14px;
 }
 
-.brand-mark img {
+.brand-plate {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 18px 12px;
+  border-radius: 16px;
+  background:
+    radial-gradient(90% 70% at 50% 35%, #2a2a30 0%, #0a0a0c 58%, #000 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 16px 40px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.brand-plate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 55% 40% at 50% 42%, rgba(255, 255, 255, 0.07), transparent 70%);
+  pointer-events: none;
+}
+
+.brand-mark img,
+.brand-plate img {
+  position: relative;
+  z-index: 1;
   width: 200px;
   height: auto;
-  filter: drop-shadow(0 0 18px rgba(232, 232, 236, 0.08));
+  display: block;
+  mix-blend-mode: lighten;
+  filter: none;
 }
 
 .brand-sonic {
