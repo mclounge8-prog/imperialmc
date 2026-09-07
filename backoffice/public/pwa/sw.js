@@ -2,7 +2,7 @@
 // CACHE_VERSION бампится при каждом деплое оболочки — activate чистит старые кэши.
 // Оболочка отдаётся network-first: после деплоя клиенты сразу получают новый
 // JS/CSS/HTML, без удаления ярлыка. Офлайн — fallback на последний кэш.
-const CACHE_VERSION = 'v14';
+const CACHE_VERSION = 'v15';
 const CACHE_NAME = `imperial-mc-pwa-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -26,16 +26,13 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  // Не шлём PWA_UPDATED: клиент и так перезагружается на controllerchange.
+  // Старый postMessage + устаревший localStorage давали вечную плашку «новая версия».
   event.waitUntil(
     caches
       .keys()
       .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
-      .then(() =>
-        self.clients.matchAll({ type: 'window' }).then((clients) => {
-          clients.forEach((client) => client.postMessage({ type: 'PWA_UPDATED', version: CACHE_VERSION }));
-        })
-      )
   );
 });
 

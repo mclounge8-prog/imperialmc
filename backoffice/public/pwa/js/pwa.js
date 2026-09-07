@@ -38,8 +38,13 @@
     metrics: null,
   };
 
-  var APP_VERSION = null;
+  // Версия этой оболочки — должна совпадать с /pwa/version.json и CACHE_VERSION в sw.js.
+  // Не берём «истину» только из localStorage: после авто-reload от SW старое
+  // значение в storage вечно показывало «Доступна новая версия».
+  var SHELL_VERSION = 'v15';
+  var APP_VERSION = SHELL_VERSION;
   var pendingSwRegistration = null;
+  var updateToastVisible = false;
 
   // Поколение экрана авторизации: поздний ответ старого checkSession() не должен
   // вернуть форму входа поверх уже открытой статистики (типичная гонка на iPhone).
@@ -676,15 +681,37 @@
 
   // ---------- Автообновление PWA ----------
 
+  function rememberAppVersion(version) {
+    if (!version) return;
+    APP_VERSION = version;
+    try {
+      localStorage.setItem('pwa-app-version', version);
+    } catch (e) { /* ignore */ }
+  }
+
+  function hideUpdateToast() {
+    updateToastVisible = false;
+    if (!updateToast) return;
+    updateToast.classList.add('screen-hidden');
+    updateToastBtn.onclick = null;
+  }
+
   function showUpdateToast(onConfirm) {
     if (!updateToast) {
       onConfirm();
       return;
     }
+    updateToastVisible = true;
     updateToast.classList.remove('screen-hidden');
     updateToastBtn.onclick = function () {
+      hideUpdateToast();
       onConfirm();
     };
+  }
+
+  function applyRemoteUpdate(remoteVersion) {
+    rememberAppVersion(remoteVersion || SHELL_VERSION);
+    window.location.reload();
   }
 
   function checkAppVersion() {
@@ -692,16 +719,16 @@
       .then(function (res) { return res.ok ? res.json() : null; })
       .then(function (data) {
         if (!data || !data.v) return;
-        if (APP_VERSION == null) {
-          APP_VERSION = data.v;
-          try { localStorage.setItem('pwa-app-version', data.v); } catch (e) { /* ignore */ }
+        // Уже загружена актуальная оболочка — просто синхронизируем storage и прячем плашку.
+        if (data.v === SHELL_VERSION) {
+          rememberAppVersion(data.v);
+          hideUpdateToast();
           return;
         }
-        if (data.v !== APP_VERSION) {
-          showUpdateToast(function () {
-            window.location.reload();
-          });
-        }
+        // На сервере новее, чем этот JS — предложить обновление.
+        showUpdateToast(function () {
+          applyRemoteUpdate(data.v);
+        });
       })
       .catch(function () { /* офлайн — не мешаем */ });
   }
@@ -709,24 +736,16 @@
   function setupServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
 
-    try {
-      APP_VERSION = localStorage.getItem('pwa-app-version');
-    } catch (e) {
-      APP_VERSION = null;
-    }
+    // Загруженный JS — источник правды; подтягиваем storage к нему сразу.
+    rememberAppVersion(SHELL_VERSION);
 
-    navigator.serviceWorker.addEventListener('message', function (event) {
-      if (event.data && event.data.type === 'PWA_UPDATED') {
-        showUpdateToast(function () {
-          window.location.reload();
-        });
-      }
-    });
-
+    // skipWaiting в sw.js + controllerchange: новый SW сам перезагружает вкладку.
+    // Плашку по postMessage больше не показываем — она и зависала после reload.
     var refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (refreshing) return;
       refreshing = true;
+      rememberAppVersion(SHELL_VERSION);
       window.location.reload();
     });
 
@@ -736,20 +755,16 @@
         .then(function (reg) {
           pendingSwRegistration = reg;
           reg.update().catch(function () {});
+          // SW сам делает skipWaiting при install — waiting бывает редко.
           if (reg.waiting) {
-            showUpdateToast(function () {
-              reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-            });
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
           }
           reg.addEventListener('updatefound', function () {
             var installing = reg.installing;
             if (!installing) return;
             installing.addEventListener('statechange', function () {
-              if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-                showUpdateToast(function () {
-                  if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                  else window.location.reload();
-                });
+              if (installing.state === 'installed' && reg.waiting) {
+                reg.waiting.postMessage({ type: 'SKIP_WAITING' });
               }
             });
           });
