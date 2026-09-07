@@ -23,6 +23,9 @@
   var chartSheetX = document.getElementById('chartSheetX');
   var chartLegendSelected = document.getElementById('chartLegendSelected');
   var chartLegendCompare = document.getElementById('chartLegendCompare');
+  var chartSheetLegend = chartLegendSelected
+    ? chartLegendSelected.closest('.chart-sheet-legend')
+    : null;
   var updateToast = document.getElementById('updateToast');
   var updateToastBtn = document.getElementById('updateToastBtn');
 
@@ -296,6 +299,7 @@
   // ---------- Рендер карточек ----------
 
   var CARD_DEFS = [
+    { key: 'cashOnHand', label: 'Наличка', formatter: formatMoney, deltaFormatter: formatSignedMoney, kind: 'cashOnHand' },
     { key: 'cash', label: 'Наличными за день', formatter: formatMoney, deltaFormatter: formatSignedMoney },
     { key: 'revenue', label: 'Выручка', formatter: formatMoney, deltaFormatter: formatSignedMoney },
     { key: 'avgCheck', label: 'Средний чек', formatter: formatMoney, deltaFormatter: formatSignedMoney },
@@ -339,6 +343,26 @@
   function renderCards(metrics) {
     cardsEl.innerHTML = CARD_DEFS.map(function (def) {
       var m = metrics[def.key] || { value: 0, deltaPct: 0, deltaAbs: 0, trend: [], compareTrend: [] };
+
+      if (def.kind === 'cashOnHand') {
+        var openCount = (m.venues || []).filter(function (v) { return v.hasOpenShift; }).length;
+        return (
+          '<button type="button" class="stat-card stat-card-cash-on-hand" data-metric="' + def.key + '" aria-label="' +
+            escapeHtml(def.label) + ': открыть разбивку">' +
+            '<div class="stat-card-info">' +
+              '<div class="stat-card-label">' + escapeHtml(def.label) + '</div>' +
+              '<div class="stat-card-value">' + def.formatter(m.value) + '</div>' +
+              '<div class="stat-card-delta flat">' +
+                '<span>сейчас в кассе</span>' +
+                '<span class="stat-card-delta-abs">' +
+                  (openCount ? openCount + ' откр.' : 'нет открытых') +
+                '</span>' +
+              '</div>' +
+            '</div>' +
+          '</button>'
+        );
+      }
+
       var trendClass = m.deltaPct > 0.5 ? 'up' : m.deltaPct < -0.5 ? 'down' : 'flat';
       var arrow = trendClass === 'up' ? '\u25B2' : trendClass === 'down' ? '\u25BC' : '\u25CF';
       var lineColor = trendClass === 'up' ? 'var(--success)' : trendClass === 'down' ? 'var(--danger)' : COLOR_SELECTED;
@@ -563,11 +587,51 @@
     plot.addEventListener('pointerleave', hide);
   }
 
+  function buildCashOnHandDetail(m) {
+    var venues = m.venues || [];
+    if (!venues.length) {
+      return '<p class="empty-state">Нет заведений</p>';
+    }
+    return (
+      '<div class="cash-on-hand-detail">' +
+        '<div class="cash-on-hand-detail-total">' +
+          '<span>Всего</span>' +
+          '<strong>' + formatMoney(m.value) + '</strong>' +
+        '</div>' +
+        '<ul class="cash-on-hand-detail-list">' +
+          venues.map(function (v) {
+            var amount = v.hasOpenShift
+              ? formatMoney(v.expectedCash)
+              : 'смена закрыта';
+            return (
+              '<li class="cash-on-hand-detail-row' + (v.hasOpenShift ? '' : ' is-closed') + '">' +
+                '<span>' + escapeHtml(v.venueName) + '</span>' +
+                '<strong>' + amount + '</strong>' +
+              '</li>'
+            );
+          }).join('') +
+        '</ul>' +
+      '</div>'
+    );
+  }
+
   function openChartSheet(metricKey) {
     var def = CARD_DEFS.find(function (d) { return d.key === metricKey; });
     if (!def || !state.metrics || !state.metrics[metricKey]) return;
     var m = state.metrics[metricKey];
     chartSheetTitle.textContent = def.label;
+
+    if (def.kind === 'cashOnHand') {
+      chartSheetCompare.textContent = 'Сейчас в кассе по открытым сменам';
+      if (chartSheetLegend) chartSheetLegend.style.display = 'none';
+      chartSheetPlot.innerHTML = buildCashOnHandDetail(m);
+      chartSheet.classList.remove('screen-hidden');
+      chartSheet.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('chart-open');
+      return;
+    }
+
+    if (chartSheetLegend) chartSheetLegend.style.display = '';
     chartSheetCompare.textContent =
       'По часам · сравнение с ' + formatDateLabel(state.compareDate) + ' (тот же день неделю назад)';
     if (chartLegendSelected) chartLegendSelected.textContent = formatDateLabel(state.date);

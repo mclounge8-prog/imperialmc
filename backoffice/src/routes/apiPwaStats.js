@@ -8,6 +8,7 @@ import {
   venueShiftDaysISO,
   venueTodayISO,
 } from '../utils/timezone.js';
+import { fetchCashOnHand } from '../services/cashOnHand.js';
 
 /**
  * JSON-версия статистики «Главной» для мобильного PWA (public/pwa/).
@@ -181,6 +182,7 @@ apiPwa.get('/stats', async (c) => {
   const hourLabels = Array.from({ length: HOURS }, (_, h) => String(h).padStart(2, '0'));
 
   const trendDates = allBuckets.slice(COMPARE_OFFSET_DAYS).map((b) => b.date);
+  const cashOnHand = await fetchCashOnHand(venueId);
 
   return c.json({
     date: selectedDay,
@@ -190,6 +192,16 @@ apiPwa.get('/stats', async (c) => {
     compareOffsetDays: COMPARE_OFFSET_DAYS,
     venueId: venueId || null,
     metrics: {
+      cashOnHand: {
+        value: cashOnHand.total,
+        compareValue: cashOnHand.total,
+        deltaAbs: 0,
+        deltaPct: 0,
+        trend: [],
+        compareTrend: [],
+        hours: { selected: [], compare: [] },
+        venues: cashOnHand.venues,
+      },
       cash: buildMetric(allBuckets, (b) => b.cash, selectedHours.cash, compareHours.cash),
       revenue: buildMetric(allBuckets, (b) => b.revenue, selectedHours.revenue, compareHours.revenue),
       avgCheck: buildMetric(allBuckets, avgCheckOf, selectedHours.avgCheck, compareHours.avgCheck),
