@@ -71,7 +71,7 @@ export function renderDashboardShell({ username, initialKey, initialSectionHtml,
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <img src="/img/logo-white.webp" alt="Imperial MC">
+        <img src="/img/logo-white.webp?v=imc4" alt="Imperial MC">
       </div>
 
       ${renderVenueSwitcher(venues, selectedVenueId, initialKey)}

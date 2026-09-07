@@ -75,28 +75,89 @@ body.is-login {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .brand-mark img {
-  width: 200px;
+  width: 220px;
   height: auto;
+  display: block;
+  mix-blend-mode: lighten;
 }
 
-.brand-mark .underline {
-  width: 48px;
-  height: 3px;
+.brand-sonic {
+  position: relative;
+  width: 150px;
+  height: 34px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.brand-sonic-ring {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  border: 1.5px solid rgba(232, 232, 236, 0.55);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: sonic-ring 2.8s cubic-bezier(0.15, 0.7, 0.25, 1) infinite;
+}
+
+.brand-sonic-ring:nth-child(2) { animation-delay: 0.9s; }
+.brand-sonic-ring:nth-child(3) { animation-delay: 1.8s; }
+
+.brand-eq {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  height: 26px;
+  padding: 0 8px;
+}
+
+.brand-eq span {
+  display: block;
+  width: 3px;
+  height: 30%;
   border-radius: 2px;
-  background: var(--accent-2);
-  box-shadow: 0 0 12px 2px rgba(63, 99, 230, 0.6);
-  /* Всегда пульсирует: на iPhone часто включён Reduce Motion, и тогда
-     анимация внутри prefers-reduced-motion: no-preference просто не стартует. */
-  animation: accent-glow 2.4s ease-in-out infinite;
+  background: linear-gradient(180deg, #f4f4f6 0%, #9aa3b5 100%);
+  transform-origin: bottom center;
+  /* Всегда крутится: на iPhone Reduce Motion часто включён, и тогда
+     анимация внутри prefers-reduced-motion: no-preference не стартует. */
+  animation: eq-bounce 1.05s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(244, 244, 246, 0.25);
 }
 
-@keyframes accent-glow {
-  0%, 100% { box-shadow: 0 0 10px 2px rgba(63, 99, 230, 0.4); opacity: 0.85; }
-  50%      { box-shadow: 0 0 18px 4px rgba(63, 99, 230, 0.75); opacity: 1; }
+.brand-eq span:nth-child(1)  { animation-duration: 0.92s; animation-delay: 0.00s; }
+.brand-eq span:nth-child(2)  { animation-duration: 1.18s; animation-delay: 0.08s; }
+.brand-eq span:nth-child(3)  { animation-duration: 0.84s; animation-delay: 0.16s; }
+.brand-eq span:nth-child(4)  { animation-duration: 1.32s; animation-delay: 0.04s; }
+.brand-eq span:nth-child(5)  { animation-duration: 0.76s; animation-delay: 0.20s; }
+.brand-eq span:nth-child(6)  { animation-duration: 1.05s; animation-delay: 0.12s; }
+.brand-eq span:nth-child(7)  { animation-duration: 0.88s; animation-delay: 0.00s; }
+.brand-eq span:nth-child(8)  { animation-duration: 1.22s; animation-delay: 0.18s; }
+.brand-eq span:nth-child(9)  { animation-duration: 0.95s; animation-delay: 0.06s; }
+.brand-eq span:nth-child(10) { animation-duration: 1.10s; animation-delay: 0.14s; }
+.brand-eq span:nth-child(11) { animation-duration: 0.80s; animation-delay: 0.10s; }
+
+@keyframes sonic-ring {
+  0% { transform: scale(0.35); opacity: 0.7; }
+  70% { opacity: 0.18; }
+  100% { transform: scale(4.2); opacity: 0; }
+}
+
+@keyframes eq-bounce {
+  0%, 100% { height: 18%; }
+  20% { height: 72%; }
+  40% { height: 34%; }
+  55% { height: 92%; }
+  75% { height: 42%; }
 }
 
 .login-card {
