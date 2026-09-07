@@ -72,7 +72,7 @@ export function renderDashboardShell({ username, initialKey, initialSectionHtml,
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-plate brand-plate--sidebar">
-          <img src="/img/logo-white.webp?v=imc2" alt="Imperial Music Community">
+          <img src="/img/logo-white.webp?v=imc3" alt="Imperial MC">
         </div>
       </div>
 
