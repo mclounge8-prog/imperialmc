@@ -125,6 +125,51 @@ function renderTodayWidget(today) {
   `;
 }
 
+/* ---------- Наличка сейчас ---------- */
+
+function renderCashOnHandWidget(cashOnHand) {
+  const venues = cashOnHand?.venues || [];
+  const total = cashOnHand?.total || 0;
+  const openCount = venues.filter((v) => v.hasOpenShift).length;
+  const rows =
+    venues.length === 0
+      ? `<p class="hint cash-on-hand-empty">Нет заведений</p>`
+      : `
+        <ul class="cash-on-hand-list">
+          ${venues
+            .map(
+              (v) => `
+            <li class="cash-on-hand-row${v.hasOpenShift ? '' : ' is-closed'}">
+              <span class="cash-on-hand-venue">${escapeHtml(v.venueName)}</span>
+              <span class="cash-on-hand-amount">${
+                v.hasOpenShift ? formatMoney(v.expectedCash, { decimals: 2 }) : 'смена закрыта'
+              }</span>
+            </li>
+          `
+            )
+            .join('')}
+        </ul>
+      `;
+
+  return `
+    <div class="stat-card cash-on-hand-card" id="cash-on-hand-widget">
+      <div class="widget-header">
+        <div>
+          <h2>Наличка</h2>
+          <p class="hint">Сейчас в кассе по открытым сменам${
+            openCount ? ` · ${openCount} откр.` : ''
+          }</p>
+        </div>
+      </div>
+      <div class="stat-card-summary">
+        <div class="stat-card-value">${formatMoney(total, { decimals: 2 })}</div>
+        <div class="stat-card-caption">всего</div>
+      </div>
+      ${rows}
+    </div>
+  `;
+}
+
 /* ---------- Выручка по часам ---------- */
 
 function hourLabel(h) {
@@ -167,6 +212,7 @@ export function renderDashboardSection({
   revenueTrend,
   topItems,
   periodTotals,
+  cashOnHand,
 }) {
   const venueOptions =
     `<option value="">Все заведения</option>` +
@@ -192,6 +238,10 @@ export function renderDashboardSection({
         hx-swap="innerHTML"
       >${venueOptions}</select>
     </header>
+
+    <div class="board-row board-row-cash">
+      ${renderCashOnHandWidget(cashOnHand)}
+    </div>
 
     <div class="board-row board-row-2">
       ${renderHourlyWidget(hourly)}

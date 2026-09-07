@@ -18,6 +18,7 @@ import {
   venueShiftDaysISO,
   venueTodayISO,
 } from '../utils/timezone.js';
+import { fetchCashOnHand } from '../services/cashOnHand.js';
 
 const stats = new Hono();
 stats.use('*', requireAuthApi);
@@ -238,15 +239,16 @@ async function fetchHourlyComparison(venueId) {
 async function buildDashboardData(venueId) {
   const { rows: venues } = await pool.query('SELECT id, name FROM venues ORDER BY name');
 
-  const [today, hourly, revenueTrend, topItems, periodTotals] = await Promise.all([
+  const [today, hourly, revenueTrend, topItems, periodTotals, cashOnHand] = await Promise.all([
     fetchTodayStats(venueId),
     fetchHourlyComparison(venueId),
     fetchTrend('week', venueId),
     fetchTopItems('day', venueId, 5),
     fetchPeriodTotals(venueId),
+    fetchCashOnHand(venueId),
   ]);
 
-  return { venues, venueId, today, hourly, revenueTrend, topItems, periodTotals };
+  return { venues, venueId, today, hourly, revenueTrend, topItems, periodTotals, cashOnHand };
 }
 
 export async function renderDashboardFragment(venueId) {
