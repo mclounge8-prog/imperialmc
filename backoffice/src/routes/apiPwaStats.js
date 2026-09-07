@@ -2,10 +2,16 @@ import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
 import { fetchAllVenues } from '../utils/venues.js';
+import {
+  venueDayRange,
+  venueHour,
+  venueShiftDaysISO,
+  venueTodayISO,
+} from '../utils/timezone.js';
 
 /**
  * JSON-версия статистики «Главной» для мобильного PWA (public/pwa/).
- * Сутки в UTC, интервалы полуоткрытые [start, end) — как в stats.js.
+ * Сутки и часы — Asia/Yekaterinburg (как отчёты и stats.js).
  *
  * По каждой метрике отдаём:
  *  - 14-дневный тренд + «тень» недели назад (compareTrend) для спарклайна;
@@ -15,24 +21,14 @@ import { fetchAllVenues } from '../utils/venues.js';
 const apiPwa = new Hono();
 apiPwa.use('*', requireAuthApi);
 
-const DAY_MS = 86400000;
 const TREND_DAYS = 14;
 const COMPARE_OFFSET_DAYS = 7;
 const HOURS = 24;
 
-function startOfUTCDay(date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
 function parseDateParam(value) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
-  if (!match) return startOfUTCDay(new Date());
-  const d = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-  return Number.isNaN(d.getTime()) ? startOfUTCDay(new Date()) : d;
-}
-
-function fmtDate(d) {
-  return d.toISOString().slice(0, 10);
+  const raw = String(value || '');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  return venueTodayISO();
 }
 
 function emptyHours() {
@@ -63,14 +59,15 @@ async function fetchReceiptsAndCash(rangeStart, rangeEnd, venueId) {
   return { receiptRows, cashRows };
 }
 
-function buildDayBuckets(rangeStart, days) {
+function buildDayBuckets(startDayISO, days) {
   const buckets = [];
   for (let i = 0; i < days; i += 1) {
-    const start = new Date(rangeStart.getTime() + i * DAY_MS);
+    const day = venueShiftDaysISO(startDayISO, i);
+    const { start, end } = venueDayRange(day);
     buckets.push({
-      date: fmtDate(start),
+      date: day,
       startMs: start.getTime(),
-      endMs: start.getTime() + DAY_MS,
+      endMs: end.getTime(),
       revenue: 0,
       receiptCount: 0,
       cash: 0,
@@ -99,12 +96,13 @@ function fillDayBuckets(buckets, receiptRows, cashRows) {
 }
 
 /**
- * Почасовые суммы за один UTC-день.
+ * Почасовые суммы за один день venue TZ.
  * avgCheck[h] = revenue[h] / receiptCount[h] (0 если чеков нет).
  */
-function buildHourlyForDay(dayStart, receiptRows, cashRows) {
-  const startMs = dayStart.getTime();
-  const endMs = startMs + DAY_MS;
+function buildHourlyForDay(dayISO, receiptRows, cashRows) {
+  const { start, end } = venueDayRange(dayISO);
+  const startMs = start.getTime();
+  const endMs = end.getTime();
   const revenue = emptyHours();
   const cash = emptyHours();
   const receiptCount = emptyHours();
@@ -112,14 +110,14 @@ function buildHourlyForDay(dayStart, receiptRows, cashRows) {
   for (const r of receiptRows) {
     const t = new Date(r.closed_at).getTime();
     if (t < startMs || t >= endMs) continue;
-    const hour = new Date(r.closed_at).getUTCHours();
+    const hour = venueHour(r.closed_at);
     revenue[hour] += Number(r.total);
     receiptCount[hour] += 1;
   }
   for (const r of cashRows) {
     const t = new Date(r.closed_at).getTime();
     if (t < startMs || t >= endMs) continue;
-    const hour = new Date(r.closed_at).getUTCHours();
+    const hour = venueHour(r.closed_at);
     cash[hour] += Number(r.amount);
   }
 
@@ -168,13 +166,14 @@ apiPwa.get('/venues', async (c) => {
 apiPwa.get('/stats', async (c) => {
   const venueId = c.req.query('venueId') || null;
   const selectedDay = parseDateParam(c.req.query('date'));
-  const compareDay = new Date(selectedDay.getTime() - COMPARE_OFFSET_DAYS * DAY_MS);
+  const compareDay = venueShiftDaysISO(selectedDay, -COMPARE_OFFSET_DAYS);
   const totalDays = TREND_DAYS + COMPARE_OFFSET_DAYS;
-  const rangeStart = new Date(selectedDay.getTime() - (totalDays - 1) * DAY_MS);
-  const rangeEnd = new Date(selectedDay.getTime() + DAY_MS);
+  const rangeStartDay = venueShiftDaysISO(selectedDay, -(totalDays - 1));
+  const { start: rangeStart } = venueDayRange(rangeStartDay);
+  const { end: rangeEnd } = venueDayRange(selectedDay);
 
   const { receiptRows, cashRows } = await fetchReceiptsAndCash(rangeStart, rangeEnd, venueId);
-  const allBuckets = buildDayBuckets(rangeStart, totalDays);
+  const allBuckets = buildDayBuckets(rangeStartDay, totalDays);
   fillDayBuckets(allBuckets, receiptRows, cashRows);
 
   const selectedHours = buildHourlyForDay(selectedDay, receiptRows, cashRows);
@@ -184,8 +183,8 @@ apiPwa.get('/stats', async (c) => {
   const trendDates = allBuckets.slice(COMPARE_OFFSET_DAYS).map((b) => b.date);
 
   return c.json({
-    date: fmtDate(selectedDay),
-    compareDate: fmtDate(compareDay),
+    date: selectedDay,
+    compareDate: compareDay,
     dates: trendDates,
     hourLabels,
     compareOffsetDays: COMPARE_OFFSET_DAYS,

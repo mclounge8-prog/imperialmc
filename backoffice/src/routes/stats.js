@@ -7,59 +7,68 @@ import {
   renderTopItemsWidgetBody,
   renderTopItemsDonutBody,
 } from '../views/statsView.js';
+import {
+  formatVenueDayShort,
+  formatVenueMonthShort,
+  venueDayRange,
+  venueHour,
+  venueMondayISO,
+  venueMonthStartISO,
+  venueQuarterStartISO,
+  venueShiftDaysISO,
+  venueTodayISO,
+} from '../utils/timezone.js';
 
 const stats = new Hono();
 stats.use('*', requireAuthApi);
 
 // ============================================================
-// Границы бакетов для трендов «по дням / по неделям / по месяцам».
-// Всё в UTC — так же, как и остальной бэкофис считает даты в reports.js
-// (defaultDateRange там тоже работает через toISOString без смещения
-// часового пояса). Если завести отдельный TZ для статистики, сутки в этом
-// дэшборде разойдутся с сутками в разделе «Отчёты» — поэтому здесь
-// сознательно та же конвенция.
+// Границы бакетов — Asia/Yekaterinburg (как отчёты).
+// Раньше здесь был UTC: почасовые графики сдвигались на −5 ч.
 // ============================================================
 
-function startOfUTCDay(date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
-function mondayOfWeek(dayStart) {
-  const isoDay = dayStart.getUTCDay() === 0 ? 7 : dayStart.getUTCDay(); // 1..7, Пн..Вс
-  return new Date(dayStart.getTime() - (isoDay - 1) * 86400000);
-}
-
-function buildDayBuckets(count, now) {
-  const todayStart = startOfUTCDay(now);
+function buildDayBuckets(count, todayISO) {
   const buckets = [];
   for (let i = count - 1; i >= 0; i -= 1) {
-    const start = new Date(todayStart.getTime() - i * 86400000);
-    const end = new Date(start.getTime() + 86400000);
-    buckets.push({ start, end, label: start.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) });
+    const day = venueShiftDaysISO(todayISO, -i);
+    const { start, end } = venueDayRange(day);
+    buckets.push({ start, end, label: formatVenueDayShort(day), day });
   }
   return buckets;
 }
 
-function buildWeekBuckets(count, now) {
-  const thisWeekStart = mondayOfWeek(startOfUTCDay(now));
+function buildWeekBuckets(count, todayISO) {
+  const thisWeekStartISO = venueMondayISO(todayISO);
   const buckets = [];
   for (let i = count - 1; i >= 0; i -= 1) {
-    const start = new Date(thisWeekStart.getTime() - i * 7 * 86400000);
-    const end = new Date(start.getTime() + 7 * 86400000);
-    const endInclusive = new Date(end.getTime() - 86400000);
-    const label = `${start.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}–${endInclusive.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}`;
-    buckets.push({ start, end, label });
+    const weekStartISO = venueShiftDaysISO(thisWeekStartISO, -i * 7);
+    const weekEndISO = venueShiftDaysISO(weekStartISO, 6);
+    const { start } = venueDayRange(weekStartISO);
+    const { end } = venueDayRange(weekEndISO);
+    buckets.push({
+      start,
+      end,
+      label: `${formatVenueDayShort(weekStartISO)}–${formatVenueDayShort(weekEndISO)}`,
+    });
   }
   return buckets;
 }
 
-function buildMonthBuckets(count, now) {
+function buildMonthBuckets(count, todayISO) {
+  const months = [];
+  let cursor = venueMonthStartISO(todayISO);
+  for (let i = 0; i < count; i += 1) {
+    months.unshift(cursor);
+    cursor = venueMonthStartISO(venueShiftDaysISO(cursor, -1));
+  }
+  const nextAfterCurrent = venueMonthStartISO(venueShiftDaysISO(venueMonthStartISO(todayISO), 32));
   const buckets = [];
-  for (let i = count - 1; i >= 0; i -= 1) {
-    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
-    const label = start.toLocaleDateString('ru-RU', { month: 'short', year: '2-digit' });
-    buckets.push({ start, end, label });
+  for (let i = 0; i < months.length; i += 1) {
+    const startISO = months[i];
+    const endISO = i + 1 < months.length ? months[i + 1] : nextAfterCurrent;
+    const { start } = venueDayRange(startISO);
+    const { start: end } = venueDayRange(endISO);
+    buckets.push({ start, end, label: formatVenueMonthShort(startISO) });
   }
   return buckets;
 }
@@ -71,23 +80,24 @@ function normalizePeriod(period) {
   return TREND_BUILDERS[period] ? period : 'day';
 }
 
-function buildTrendBuckets(period, now) {
+function buildTrendBuckets(period, todayISO) {
   const safePeriod = normalizePeriod(period);
-  return TREND_BUILDERS[safePeriod](TREND_BUCKET_COUNT[safePeriod], now);
+  return TREND_BUILDERS[safePeriod](TREND_BUCKET_COUNT[safePeriod], todayISO);
 }
 
-// «Текущий период на сегодня» — для топ-5 блюд: не историческая серия,
-// а срез «сегодня / текущая неделя / текущий месяц» на данный момент.
-function currentPeriodRange(period, now) {
-  const todayStart = startOfUTCDay(now);
+function currentPeriodRange(period, now = new Date()) {
+  const todayISO = venueTodayISO(now);
   const safePeriod = normalizePeriod(period);
   if (safePeriod === 'week') {
-    return { start: mondayOfWeek(todayStart), end: now };
+    const { start } = venueDayRange(venueMondayISO(todayISO));
+    return { start, end: now };
   }
   if (safePeriod === 'month') {
-    return { start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)), end: now };
+    const { start } = venueDayRange(venueMonthStartISO(todayISO));
+    return { start, end: now };
   }
-  return { start: todayStart, end: now };
+  const { start } = venueDayRange(todayISO);
+  return { start, end: now };
 }
 
 async function fetchPaidReceiptsInRange(start, end, venueId) {
@@ -104,12 +114,9 @@ async function fetchPaidReceiptsInRange(start, end, venueId) {
   return rows;
 }
 
-// Одним запросом тянем все чеки за весь диапазон бакетов, дальше раскладываем
-// по бакетам в памяти — бакетов максимум 14, а строк на бэкофис одного бара
-// умеренное количество, гонять по запросу на бакет смысла нет.
 async function fetchTrend(period, venueId) {
-  const now = new Date();
-  const buckets = buildTrendBuckets(period, now);
+  const todayISO = venueTodayISO();
+  const buckets = buildTrendBuckets(period, todayISO);
   const rows = await fetchPaidReceiptsInRange(buckets[0].start, buckets[buckets.length - 1].end, venueId);
 
   return buckets.map((b) => {
@@ -127,8 +134,7 @@ async function fetchTrend(period, venueId) {
 }
 
 async function fetchTopItems(period, venueId, limit = 5) {
-  const now = new Date();
-  const { start, end } = currentPeriodRange(period, now);
+  const { start, end } = currentPeriodRange(period);
   const conditions = [`r.status = 'paid'`, `r.closed_at >= $1`, `r.closed_at < $2`];
   const params = [start.toISOString(), end.toISOString()];
   if (venueId) {
@@ -150,9 +156,10 @@ async function fetchTopItems(period, venueId, limit = 5) {
 
 async function fetchTodayStats(venueId) {
   const now = new Date();
-  const todayStart = startOfUTCDay(now);
-  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
-  const tomorrowStart = new Date(todayStart.getTime() + 86400000);
+  const todayISO = venueTodayISO(now);
+  const yesterdayISO = venueShiftDaysISO(todayISO, -1);
+  const { start: todayStart, end: tomorrowStart } = venueDayRange(todayISO);
+  const { start: yesterdayStart } = venueDayRange(yesterdayISO);
 
   const [todayRows, yesterdayRows] = await Promise.all([
     fetchPaidReceiptsInRange(todayStart, tomorrowStart, venueId),
@@ -175,11 +182,11 @@ async function fetchTodayStats(venueId) {
 /** Итоги: сегодня / неделя / месяц / квартал — для подвала виджета «Выручка». */
 async function fetchPeriodTotals(venueId) {
   const now = new Date();
-  const todayStart = startOfUTCDay(now);
-  const weekStart = mondayOfWeek(todayStart);
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const quarterMonth = Math.floor(now.getUTCMonth() / 3) * 3;
-  const quarterStart = new Date(Date.UTC(now.getUTCFullYear(), quarterMonth, 1));
+  const todayISO = venueTodayISO(now);
+  const { start: todayStart } = venueDayRange(todayISO);
+  const { start: weekStart } = venueDayRange(venueMondayISO(todayISO));
+  const { start: monthStart } = venueDayRange(venueMonthStartISO(todayISO));
+  const { start: quarterStart } = venueDayRange(venueQuarterStartISO(todayISO));
 
   const rows = await fetchPaidReceiptsInRange(quarterStart, now, venueId);
 
@@ -201,18 +208,19 @@ async function fetchPeriodTotals(venueId) {
 
 async function fetchHourlyComparison(venueId) {
   const now = new Date();
-  const todayStart = startOfUTCDay(now);
-  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
-  const tomorrowStart = new Date(todayStart.getTime() + 86400000);
+  const todayISO = venueTodayISO(now);
+  const yesterdayISO = venueShiftDaysISO(todayISO, -1);
+  const { start: todayStart, end: tomorrowStart } = venueDayRange(todayISO);
+  const { start: yesterdayStart } = venueDayRange(yesterdayISO);
   const rows = await fetchPaidReceiptsInRange(yesterdayStart, tomorrowStart, venueId);
 
   const todayHours = new Array(24).fill(0);
   const yesterdayHours = new Array(24).fill(0);
-  const currentHour = now.getUTCHours();
+  const currentHour = venueHour(now);
 
   for (const r of rows) {
     const closedAt = new Date(r.closed_at);
-    const hour = closedAt.getUTCHours();
+    const hour = venueHour(closedAt);
     const amount = Number(r.total);
     if (closedAt >= todayStart) {
       todayHours[hour] += amount;
