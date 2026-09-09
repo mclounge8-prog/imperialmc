@@ -28,20 +28,49 @@
     : null;
   var updateToast = document.getElementById('updateToast');
   var updateToastBtn = document.getElementById('updateToastBtn');
+  var pageTitle = document.getElementById('pageTitle');
+  var datePill = document.getElementById('datePill');
+  var periodPill = document.getElementById('periodPill');
+  var periodPrimary = document.getElementById('periodPrimary');
+  var periodSecondary = document.getElementById('periodSecondary');
+  var tabMetrics = document.getElementById('tabMetrics');
+  var tabReports = document.getElementById('tabReports');
+  var bottomNav = document.getElementById('bottomNav');
+  var reportKindEl = document.getElementById('reportKind');
+  var reportPresets = document.getElementById('reportPresets');
+  var reportRangeRow = document.getElementById('reportRangeRow');
+  var reportFrom = document.getElementById('reportFrom');
+  var reportTo = document.getElementById('reportTo');
+  var reportRangeApply = document.getElementById('reportRangeApply');
+  var reportSummary = document.getElementById('reportSummary');
+  var reportList = document.getElementById('reportList');
+  var reportPager = document.getElementById('reportPager');
+  var reportPrev = document.getElementById('reportPrev');
+  var reportNext = document.getElementById('reportNext');
+  var reportPageLabel = document.getElementById('reportPageLabel');
 
   var state = {
+    tab: 'metrics',
     date: null,
     venueId: '',
     compareDate: null,
     dates: [],
     hourLabels: [],
     metrics: null,
+    reportKind: 'items',
+    reportPreset: 'last7',
+    reportFrom: null,
+    reportTo: null,
+    reportPage: 1,
+    reportTotalCount: 0,
+    reportPageSize: 50,
+    reportsLoaded: false,
   };
 
   // Версия этой оболочки — должна совпадать с /pwa/version.json и CACHE_VERSION в sw.js.
   // Не берём «истину» только из localStorage: после авто-reload от SW старое
   // значение в storage вечно показывало «Доступна новая версия».
-  var SHELL_VERSION = 'v15';
+  var SHELL_VERSION = 'v16';
   var APP_VERSION = SHELL_VERSION;
   var pendingSwRegistration = null;
   var updateToastVisible = false;
@@ -232,18 +261,492 @@
     state.venueId = venueSelect.value;
     var selected = venueSelect.options[venueSelect.selectedIndex];
     venueLabel.textContent = selected ? selected.textContent : 'Все заведения';
-    loadStats();
+    refreshActiveTab();
   });
 
   refreshBtn.addEventListener('click', function () {
-    loadStats();
+    refreshActiveTab();
   });
+
+  function refreshActiveTab() {
+    if (state.tab === 'reports') return loadReports();
+    return loadStats();
+  }
 
   function updateDateLabels(compareIso) {
     datePrimary.textContent = formatDateLabel(state.date);
     if (compareIso) {
       dateCompare.textContent = formatDateLabel(compareIso);
     }
+  }
+
+  function formatQty(value) {
+    var num = Number(value) || 0;
+    if (Math.abs(num - Math.round(num)) < 0.001) return Math.round(num).toLocaleString('ru-RU');
+    return num.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+  }
+
+  var PRESET_LABELS = {
+    today: 'Сегодня',
+    yesterday: 'Вчера',
+    last7: '7 дней',
+    week: 'Неделя',
+    month: 'Месяц',
+    custom: 'Период',
+  };
+
+  var STATUS_LABELS = {
+    paid: 'Оплачен',
+    cancelled: 'Отменён',
+  };
+
+  var METHOD_LABELS = {
+    cash: 'Наличные',
+    card: 'Карта',
+    other: 'Другое',
+  };
+
+  function updatePeriodLabels() {
+    if (!periodPrimary) return;
+    var from = state.reportFrom;
+    var to = state.reportTo;
+    if (from && to && from === to) {
+      periodPrimary.textContent = formatDateLabel(from);
+    } else if (from && to) {
+      periodPrimary.textContent = formatDateLabel(from) + ' — ' + formatDateLabel(to);
+    } else {
+      periodPrimary.textContent = PRESET_LABELS[state.reportPreset] || 'Период';
+    }
+    if (periodSecondary) {
+      periodSecondary.textContent =
+        state.reportKind === 'receipts' ? 'чеки' : 'блюда';
+    }
+  }
+
+  function setTab(tab) {
+    state.tab = tab === 'reports' ? 'reports' : 'metrics';
+    var isReports = state.tab === 'reports';
+
+    if (pageTitle) pageTitle.textContent = isReports ? 'Отчёты' : 'Показатели';
+
+    if (tabMetrics) {
+      tabMetrics.classList.toggle('screen-hidden', isReports);
+      tabMetrics.setAttribute('aria-hidden', isReports ? 'true' : 'false');
+    }
+    if (tabReports) {
+      tabReports.classList.toggle('screen-hidden', !isReports);
+      tabReports.setAttribute('aria-hidden', isReports ? 'false' : 'true');
+    }
+    if (datePill) {
+      datePill.classList.toggle('screen-hidden', isReports);
+      datePill.setAttribute('aria-hidden', isReports ? 'true' : 'false');
+    }
+    if (periodPill) {
+      periodPill.classList.toggle('screen-hidden', !isReports);
+      periodPill.setAttribute('aria-hidden', isReports ? 'false' : 'true');
+    }
+
+    if (bottomNav) {
+      Array.prototype.forEach.call(bottomNav.querySelectorAll('.bottom-nav-btn'), function (btn) {
+        var active = btn.getAttribute('data-tab') === state.tab;
+        btn.classList.toggle('is-active', active);
+        if (active) btn.setAttribute('aria-current', 'page');
+        else btn.removeAttribute('aria-current');
+      });
+    }
+
+    if (isReports) {
+      updatePeriodLabels();
+      loadReports();
+    }
+  }
+
+  if (bottomNav) {
+    bottomNav.addEventListener('click', function (event) {
+      var btn = event.target.closest('.bottom-nav-btn');
+      if (!btn || !bottomNav.contains(btn)) return;
+      setTab(btn.getAttribute('data-tab'));
+    });
+  }
+
+  function syncReportKindUi() {
+    if (!reportKindEl) return;
+    Array.prototype.forEach.call(reportKindEl.querySelectorAll('.segmented-btn'), function (btn) {
+      var active = btn.getAttribute('data-kind') === state.reportKind;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+  }
+
+  function syncReportPresetUi() {
+    if (!reportPresets) return;
+    Array.prototype.forEach.call(reportPresets.querySelectorAll('.preset-chip'), function (btn) {
+      btn.classList.toggle('is-active', btn.getAttribute('data-preset') === state.reportPreset);
+    });
+    var custom = state.reportPreset === 'custom';
+    if (reportRangeRow) {
+      reportRangeRow.classList.toggle('screen-hidden', !custom);
+      reportRangeRow.setAttribute('aria-hidden', custom ? 'false' : 'true');
+    }
+  }
+
+  if (reportKindEl) {
+    reportKindEl.addEventListener('click', function (event) {
+      var btn = event.target.closest('.segmented-btn');
+      if (!btn) return;
+      var kind = btn.getAttribute('data-kind');
+      if (!kind || kind === state.reportKind) return;
+      state.reportKind = kind;
+      state.reportPage = 1;
+      syncReportKindUi();
+      updatePeriodLabels();
+      loadReports();
+    });
+  }
+
+  if (reportPresets) {
+    reportPresets.addEventListener('click', function (event) {
+      var btn = event.target.closest('.preset-chip');
+      if (!btn) return;
+      var preset = btn.getAttribute('data-preset');
+      if (!preset) return;
+      state.reportPreset = preset;
+      state.reportPage = 1;
+      syncReportPresetUi();
+      if (preset === 'custom') {
+        if (reportFrom && !reportFrom.value) reportFrom.value = state.reportFrom || todayISO();
+        if (reportTo && !reportTo.value) reportTo.value = state.reportTo || todayISO();
+        updatePeriodLabels();
+        return;
+      }
+      loadReports();
+    });
+  }
+
+  if (reportRangeApply) {
+    reportRangeApply.addEventListener('click', function () {
+      var from = reportFrom && reportFrom.value;
+      var to = reportTo && reportTo.value;
+      if (!from || !to) return;
+      if (from > to) {
+        var tmp = from;
+        from = to;
+        to = tmp;
+        if (reportFrom) reportFrom.value = from;
+        if (reportTo) reportTo.value = to;
+      }
+      state.reportPreset = 'custom';
+      state.reportFrom = from;
+      state.reportTo = to;
+      state.reportPage = 1;
+      syncReportPresetUi();
+      loadReports();
+    });
+  }
+
+  if (reportPrev) {
+    reportPrev.addEventListener('click', function () {
+      if (state.reportPage <= 1) return;
+      state.reportPage -= 1;
+      loadReports();
+    });
+  }
+
+  if (reportNext) {
+    reportNext.addEventListener('click', function () {
+      var maxPage = Math.max(1, Math.ceil(state.reportTotalCount / state.reportPageSize));
+      if (state.reportPage >= maxPage) return;
+      state.reportPage += 1;
+      loadReports();
+    });
+  }
+
+  if (reportList) {
+    reportList.addEventListener('click', function (event) {
+      var row = event.target.closest('[data-receipt-id]');
+      if (!row || !reportList.contains(row)) return;
+      openReceiptDetail(row.getAttribute('data-receipt-id'));
+    });
+  }
+
+  function reportQueryParams() {
+    var params = new URLSearchParams();
+    if (state.venueId) params.set('venueId', state.venueId);
+    if (state.reportPreset === 'custom') {
+      if (state.reportFrom) params.set('from', state.reportFrom);
+      if (state.reportTo) params.set('to', state.reportTo);
+    } else {
+      params.set('preset', state.reportPreset || 'last7');
+    }
+    if (state.reportKind === 'receipts') params.set('page', String(state.reportPage || 1));
+    return params;
+  }
+
+  function renderSummaryCards(cards) {
+    if (!reportSummary) return;
+    reportSummary.innerHTML = cards
+      .map(function (card) {
+        return (
+          '<div class="report-summary-card">' +
+            '<div class="report-summary-label">' + escapeHtml(card.label) + '</div>' +
+            '<div class="report-summary-value">' + escapeHtml(card.value) + '</div>' +
+          '</div>'
+        );
+      })
+      .join('');
+  }
+
+  function renderItemsReport(data) {
+    var items = data.items || [];
+    var summary = data.summary || {};
+    renderSummaryCards([
+      { label: 'Позиций', value: formatInt(summary.itemCount) },
+      { label: 'Кол-во', value: formatQty(summary.totalQty) },
+      { label: 'Выручка', value: formatMoney(summary.totalRevenue) },
+      {
+        label: 'Период',
+        value:
+          data.from === data.to
+            ? formatDateLabel(data.from)
+            : formatDateLabel(data.from) + ' – ' + formatDateLabel(data.to),
+      },
+    ]);
+
+    if (!items.length) {
+      reportList.innerHTML = '<div class="report-empty">Нет продаж блюд за период</div>';
+      return;
+    }
+
+    reportList.innerHTML = items
+      .map(function (item) {
+        return (
+          '<div class="report-row">' +
+            '<div class="report-row-main">' +
+              '<div class="report-row-title">' + escapeHtml(item.name) + '</div>' +
+              '<div class="report-row-meta">' + escapeHtml(item.categoryName || 'Без категории') + '</div>' +
+            '</div>' +
+            '<div class="report-row-side">' +
+              '<div class="report-row-value">' + formatMoney(item.revenue) + '</div>' +
+              '<div class="report-row-side-meta">× ' + formatQty(item.qty) + '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      })
+      .join('');
+  }
+
+  function renderReceiptsReport(data) {
+    var receipts = data.receipts || [];
+    var summary = data.summary || {};
+    renderSummaryCards([
+      { label: 'Оплачено', value: formatInt(summary.paidCount) },
+      { label: 'Выручка', value: formatMoney(summary.paidTotal) },
+      { label: 'Отмены', value: formatInt(summary.cancelledCount) },
+      { label: 'Скидки', value: formatMoney(summary.discountTotal) },
+    ]);
+
+    if (!receipts.length) {
+      reportList.innerHTML = '<div class="report-empty">Нет чеков за период</div>';
+      return;
+    }
+
+    reportList.innerHTML = receipts
+      .map(function (r) {
+        var title =
+          (r.tableName ? r.tableName : 'Быстрый заказ') +
+          (r.guestLabel ? ' · ' + r.guestLabel : '');
+        var metaParts = [
+          r.closedAtLabel || '',
+          r.venueName || '',
+          STATUS_LABELS[r.status] || r.status,
+          r.paymentLabel || '',
+        ].filter(Boolean);
+        var cancelled = r.status === 'cancelled';
+        return (
+          '<button type="button" class="report-row' + (cancelled ? ' is-cancelled' : '') + '" data-receipt-id="' + r.id + '">' +
+            '<div class="report-row-main">' +
+              '<div class="report-row-title">№' + r.id + ' · ' + escapeHtml(title) + '</div>' +
+              '<div class="report-row-meta">' + escapeHtml(metaParts.join(' · ')) + '</div>' +
+            '</div>' +
+            '<div class="report-row-side">' +
+              '<div class="report-row-value">' + formatMoney(r.total) + '</div>' +
+              '<div class="report-row-side-meta">' + escapeHtml(r.staffName || '—') + '</div>' +
+            '</div>' +
+          '</button>'
+        );
+      })
+      .join('');
+  }
+
+  function updateReportPager(data) {
+    if (!reportPager) return;
+    var show = state.reportKind === 'receipts';
+    reportPager.classList.toggle('screen-hidden', !show);
+    reportPager.setAttribute('aria-hidden', show ? 'false' : 'true');
+    if (!show) return;
+
+    var page = data.page || state.reportPage || 1;
+    var pageSize = data.pageSize || state.reportPageSize || 50;
+    var total = data.totalCount || 0;
+    var maxPage = Math.max(1, Math.ceil(total / pageSize) || 1);
+    state.reportPage = page;
+    state.reportTotalCount = total;
+    state.reportPageSize = pageSize;
+
+    if (reportPageLabel) {
+      reportPageLabel.textContent =
+        total === 0 ? 'Нет чеков' : 'Стр. ' + page + ' / ' + maxPage + ' · ' + formatInt(total);
+    }
+    if (reportPrev) reportPrev.disabled = page <= 1;
+    if (reportNext) reportNext.disabled = page >= maxPage;
+  }
+
+  function loadReports() {
+    if (!reportList) return Promise.resolve();
+    reportList.setAttribute('aria-busy', 'true');
+    var params = reportQueryParams();
+    var url =
+      state.reportKind === 'receipts'
+        ? '/api/pwa/reports/receipts?' + params.toString()
+        : '/api/pwa/reports/items?' + params.toString();
+
+    return apiFetch(url)
+      .then(function (res) {
+        if (res.status === 401) {
+          showLogin('Сессия истекла, войдите снова');
+          throw new Error('unauth');
+        }
+        if (!res.ok) throw new Error('reports');
+        return res.json();
+      })
+      .then(function (data) {
+        state.reportFrom = data.from;
+        state.reportTo = data.to;
+        if (data.preset) state.reportPreset = data.preset;
+        else if (state.reportPreset !== 'custom') state.reportPreset = 'custom';
+        if (reportFrom && state.reportFrom) reportFrom.value = state.reportFrom;
+        if (reportTo && state.reportTo) reportTo.value = state.reportTo;
+        state.reportsLoaded = true;
+        syncReportKindUi();
+        syncReportPresetUi();
+        updatePeriodLabels();
+        if (state.reportKind === 'receipts') {
+          renderReceiptsReport(data);
+          updateReportPager(data);
+        } else {
+          renderItemsReport(data);
+          updateReportPager({ page: 1, pageSize: 50, totalCount: 0 });
+        }
+      })
+      .catch(function (err) {
+        if (err.message === 'unauth') return;
+        reportSummary.innerHTML = '';
+        reportList.innerHTML = '<div class="report-empty">Не удалось загрузить отчёт. Нажмите ↻.</div>';
+        if (reportPager) {
+          reportPager.classList.add('screen-hidden');
+          reportPager.setAttribute('aria-hidden', 'true');
+        }
+      })
+      .finally(function () {
+        reportList.removeAttribute('aria-busy');
+      });
+  }
+
+  function openReceiptDetail(receiptId) {
+    if (!receiptId || !chartSheet) return;
+    chartSheetTitle.textContent = 'Чек №' + receiptId;
+    chartSheetCompare.textContent = 'Загрузка…';
+    if (chartSheetLegend) chartSheetLegend.style.display = 'none';
+    chartSheetPlot.innerHTML = '<p class="empty-state">Загрузка…</p>';
+    chartSheet.classList.remove('screen-hidden');
+    chartSheet.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('chart-open');
+
+    apiFetch('/api/pwa/reports/receipts/' + encodeURIComponent(receiptId))
+      .then(function (res) {
+        if (res.status === 401) {
+          showLogin('Сессия истекла, войдите снова');
+          throw new Error('unauth');
+        }
+        if (!res.ok) throw new Error('detail');
+        return res.json();
+      })
+      .then(function (data) {
+        var r = data.receipt || {};
+        var items = data.items || [];
+        var payments = data.payments || [];
+        chartSheetCompare.textContent =
+          (r.closedAtLabel || '') + (r.venueName ? ' · ' + r.venueName : '');
+
+        var itemHtml = items.length
+          ? items
+              .map(function (item) {
+                return (
+                  '<div class="receipt-line">' +
+                    '<div class="receipt-line-main">' +
+                      '<div class="receipt-line-name">' + escapeHtml(item.name) + '</div>' +
+                      '<div class="receipt-line-sub">' +
+                        escapeHtml(item.categoryName || '—') +
+                        ' · ' +
+                        formatQty(item.qty) +
+                        ' × ' +
+                        formatMoney(item.price) +
+                      '</div>' +
+                    '</div>' +
+                    '<div class="receipt-line-value">' + formatMoney(item.lineTotal) + '</div>' +
+                  '</div>'
+                );
+              })
+              .join('')
+          : '<div class="report-empty">Позиций нет</div>';
+
+        var payHtml = payments.length
+          ? payments
+              .map(function (p) {
+                return (
+                  '<div class="receipt-line">' +
+                    '<div class="receipt-line-main">' +
+                      '<div class="receipt-line-name">' +
+                        escapeHtml(METHOD_LABELS[p.method] || p.method) +
+                      '</div>' +
+                    '</div>' +
+                    '<div class="receipt-line-value">' + formatMoney(p.amount) + '</div>' +
+                  '</div>'
+                );
+              })
+              .join('')
+          : '<div class="report-empty">Оплаты нет</div>';
+
+        chartSheetPlot.innerHTML =
+          '<div class="receipt-detail">' +
+            '<div class="receipt-detail-meta">' +
+              '<div><strong>Статус:</strong> ' + escapeHtml(STATUS_LABELS[r.status] || r.status || '—') + '</div>' +
+              '<div><strong>Стол:</strong> ' + escapeHtml(r.tableName || 'Быстрый заказ') +
+                (r.guestLabel ? ' · ' + escapeHtml(r.guestLabel) : '') + '</div>' +
+              '<div><strong>Сотрудник:</strong> ' + escapeHtml(r.staffName || '—') + '</div>' +
+              '<div><strong>Открыт:</strong> ' + escapeHtml(r.openedAtLabel || '—') + '</div>' +
+              '<div><strong>Закрыт:</strong> ' + escapeHtml(r.closedAtLabel || '—') + '</div>' +
+              (Number(r.discount) > 0
+                ? '<div><strong>Скидка:</strong> ' + formatMoney(r.discount) +
+                  (r.discountPercent ? ' (' + r.discountPercent + '%)' : '') + '</div>'
+                : '') +
+              (r.cancelComment
+                ? '<div><strong>Отмена:</strong> ' + escapeHtml(r.cancelComment) + '</div>'
+                : '') +
+            '</div>' +
+            '<div class="receipt-detail-block"><h3>Позиции</h3>' + itemHtml + '</div>' +
+            '<div class="receipt-detail-block"><h3>Оплата</h3>' + payHtml + '</div>' +
+            '<div class="receipt-detail-total"><span>Итого</span><strong>' + formatMoney(r.total) + '</strong></div>' +
+          '</div>';
+      })
+      .catch(function (err) {
+        if (err.message === 'unauth') {
+          closeChartSheet();
+          return;
+        }
+        chartSheetCompare.textContent = '';
+        chartSheetPlot.innerHTML = '<p class="empty-state">Не удалось загрузить чек</p>';
+      });
   }
 
   // ---------- Загрузка данных ----------
@@ -795,6 +1298,11 @@
       dateInput.max = todayISO();
       updateDateLabels(null);
     }
+    if (reportFrom) reportFrom.max = todayISO();
+    if (reportTo) reportTo.max = todayISO();
+    syncReportKindUi();
+    syncReportPresetUi();
+    setTab(state.tab || 'metrics');
     return Promise.all([loadVenues(), loadStats()]);
   }
 
