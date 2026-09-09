@@ -10,7 +10,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Показатели">
+  <meta name="apple-mobile-web-app-title" content="Imperial MC">
 
   <link rel="manifest" href="/pwa/manifest.webmanifest">
   <link rel="icon" href="/pwa/icons/icon-192.png">
@@ -53,13 +53,14 @@
     </div>
   </main>
 
-  <!-- Основной экран статистики — до входа полностью выключен классом screen-hidden -->
+  <!-- Основной экран — до входа скрыт -->
   <div class="app-screen screen-hidden" id="appScreen" aria-hidden="true">
     <header class="app-header">
       <button type="button" class="icon-btn" id="logoutBtn" aria-label="Выйти" title="Выйти">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       </button>
 
+      <!-- Дата для вкладки «Показатели» -->
       <div class="date-pill" id="datePill">
         <div class="date-pill-text">
           <span class="date-pill-primary" id="datePrimary">—</span>
@@ -71,12 +72,20 @@
         <input type="date" id="dateInput" class="date-pill-input" aria-label="Выбрать дату">
       </div>
 
+      <!-- Период для вкладки «Отчёты» -->
+      <div class="date-pill period-pill screen-hidden" id="periodPill" aria-hidden="true">
+        <div class="date-pill-text">
+          <span class="date-pill-primary" id="periodPrimary">—</span>
+          <span class="date-pill-compare" id="periodSecondary">период</span>
+        </div>
+      </div>
+
       <button type="button" class="icon-btn" id="refreshBtn" aria-label="Обновить" title="Обновить">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><polyline points="21 3 21 8 16 8"/></svg>
       </button>
     </header>
 
-    <h1 class="page-title">Показатели</h1>
+    <h1 class="page-title" id="pageTitle">Показатели</h1>
 
     <div class="venue-pill" id="venuePill">
       <span class="venue-pill-chevron" aria-hidden="true">
@@ -88,14 +97,64 @@
       </select>
     </div>
 
-    <main class="cards" id="cards">
-      <!-- карточки статистики рендерятся в js/pwa.js -->
-    </main>
+    <!-- Вкладка: Показатели -->
+    <section class="tab-panel" id="tabMetrics" data-tab="metrics">
+      <main class="cards" id="cards">
+        <!-- карточки статистики рендерятся в js/pwa.js -->
+      </main>
+      <p class="updated-hint" id="updatedHint"></p>
+    </section>
 
-    <p class="updated-hint" id="updatedHint"></p>
+    <!-- Вкладка: Отчёты -->
+    <section class="tab-panel screen-hidden" id="tabReports" data-tab="reports" aria-hidden="true">
+      <div class="segmented" id="reportKind" role="tablist" aria-label="Тип отчёта">
+        <button type="button" class="segmented-btn is-active" data-kind="items" role="tab" aria-selected="true">Блюда</button>
+        <button type="button" class="segmented-btn" data-kind="receipts" role="tab" aria-selected="false">Чеки</button>
+      </div>
+
+      <div class="preset-row" id="reportPresets" role="group" aria-label="Период">
+        <button type="button" class="preset-chip" data-preset="today">Сегодня</button>
+        <button type="button" class="preset-chip" data-preset="yesterday">Вчера</button>
+        <button type="button" class="preset-chip is-active" data-preset="last7">7 дней</button>
+        <button type="button" class="preset-chip" data-preset="week">Неделя</button>
+        <button type="button" class="preset-chip" data-preset="month">Месяц</button>
+        <button type="button" class="preset-chip" data-preset="custom">Период</button>
+      </div>
+
+      <div class="range-row screen-hidden" id="reportRangeRow" aria-hidden="true">
+        <label class="range-field">
+          <span>С</span>
+          <input type="date" id="reportFrom" aria-label="Дата с">
+        </label>
+        <label class="range-field">
+          <span>По</span>
+          <input type="date" id="reportTo" aria-label="Дата по">
+        </label>
+        <button type="button" class="range-apply" id="reportRangeApply">Показать</button>
+      </div>
+
+      <div class="report-summary" id="reportSummary"></div>
+      <div class="report-list" id="reportList" aria-busy="false"></div>
+      <div class="report-pager screen-hidden" id="reportPager" aria-hidden="true">
+        <button type="button" class="pager-btn" id="reportPrev" disabled>Назад</button>
+        <span class="pager-label" id="reportPageLabel">1</span>
+        <button type="button" class="pager-btn" id="reportNext" disabled>Ещё</button>
+      </div>
+    </section>
+
+    <nav class="bottom-nav" id="bottomNav" aria-label="Разделы">
+      <button type="button" class="bottom-nav-btn is-active" data-tab="metrics" aria-current="page">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 3 5-6"/></svg>
+        <span>Показатели</span>
+      </button>
+      <button type="button" class="bottom-nav-btn" data-tab="reports">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+        <span>Отчёты</span>
+      </button>
+    </nav>
   </div>
 
-  <!-- Детальный график по тапу на карточку -->
+  <!-- Детальный график / чек -->
   <div class="chart-sheet screen-hidden" id="chartSheet" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="chartSheetTitle">
     <button type="button" class="chart-sheet-backdrop" id="chartSheetClose" aria-label="Закрыть"></button>
     <div class="chart-sheet-panel">

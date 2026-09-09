@@ -155,7 +155,7 @@ async function fetchReceiptsForExport({ venueId, dateFrom, dateTo }) {
 }
 
 // Агрегат по позициям меню — только оплаченные чеки (без отмен/возвратов)
-async function fetchItemStats({ venueId, dateFrom, dateTo }) {
+export async function fetchItemStats({ venueId, dateFrom, dateTo }) {
   const conditions = [`r.status = 'paid'`];
   const params = [];
   let idx = 1;

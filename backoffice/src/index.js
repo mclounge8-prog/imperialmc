@@ -20,6 +20,7 @@ import apiReceiptsRoutes from './routes/apiReceipts.js';
 import apiFiscalRoutes from './routes/apiFiscal.js';
 import apiTerminalUpdatesRoutes from './routes/apiTerminalUpdates.js';
 import apiPwaStatsRoutes from './routes/apiPwaStats.js';
+import apiPwaReportsRoutes from './routes/apiPwaReports.js';
 import terminalUpdatesRoutes from './routes/terminalUpdates.js';
 import telegramRoutes from './routes/telegram.js';
 import reportsRoutes from './routes/reports.js';
@@ -62,6 +63,7 @@ app.route('/api/receipts', apiReceiptsRoutes); // JSON API чеков: спис�
 app.route('/api/fiscal', apiFiscalRoutes); // JSON API фискализации АТОЛ — очередь заданий, разбирает сам terminal-app
 app.route('/api', apiTerminalUpdatesRoutes); // манифест обновлений терминала
 app.route('/api/pwa', apiPwaStatsRoutes); // JSON API для мобильной PWA «Показатели»
+app.route('/api/pwa', apiPwaReportsRoutes); // JSON API отчётов PWA: блюда / чеки
 app.route('/reports', reportsRoutes); // Отчёты: чеки с фильтрами по заведению/датам
 app.route('/stats', statsRoutes); // Главный экран: сводная статистика продаж (графики)
 app.route('/preferences', preferencesRoutes); // Общий выбор заведения в шапке (cookie)
