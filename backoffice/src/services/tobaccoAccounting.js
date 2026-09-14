@@ -383,3 +383,156 @@ export async function saveTobaccoTareMovement({
     client.release();
   }
 }
+
+/** Позиции учитываемого табака на складе точки с остатками. */
+export async function fetchVenueTobaccoWarehouseStocks(venueId) {
+  const { rows } = await pool.query(
+    `SELECT
+       wi.id AS warehouse_item_id,
+       wi.name AS item_name,
+       COALESCE(vws.stock_qty, 0)::numeric AS stock_qty
+     FROM venue_tobacco_items vti
+     JOIN warehouse_items wi ON wi.id = vti.warehouse_item_id
+     LEFT JOIN venue_warehouse_stock vws
+       ON vws.venue_id = vti.venue_id AND vws.warehouse_item_id = vti.warehouse_item_id
+     WHERE vti.venue_id = $1
+     ORDER BY COALESCE(vws.stock_qty, 0) DESC, wi.name`,
+    [venueId]
+  );
+  return rows.map((r) => ({
+    warehouseItemId: r.warehouse_item_id,
+    itemName: r.item_name,
+    stockQty: Number(r.stock_qty) || 0,
+  }));
+}
+
+/**
+ * Списание остатка табака (меласса) в граммах со склада точки.
+ * Нельзя списать больше текущего суммарного остатка учитываемых позиций.
+ * amountG — граммы; распределяется по позициям с остатком (сначала большие).
+ */
+export async function saveTobaccoStockWriteoff({
+  venueId,
+  shiftId,
+  amountG,
+  staffId,
+  staffName,
+  comment,
+}) {
+  const amount = roundGrams(amountG);
+  if (!(amount > 0)) {
+    const err = new Error('Укажите количество грамм больше 0');
+    err.status = 400;
+    throw err;
+  }
+
+  const stocks = await fetchVenueTobaccoWarehouseStocks(venueId);
+  if (!stocks.length) {
+    const err = new Error('На заведении не выбраны складские позиции для учёта табака');
+    err.status = 409;
+    throw err;
+  }
+
+  const stockBefore = roundGrams(stocks.reduce((s, r) => s + r.stockQty, 0));
+  if (amount > stockBefore + 0.0005) {
+    const err = new Error(
+      `Нельзя списать ${amount} г: на точке доступно не больше ${stockBefore} г`
+    );
+    err.status = 400;
+    err.code = 'STOCK_WRITEOFF_LIMIT';
+    throw err;
+  }
+
+  // Распределяем списание по позициям с положительным остатком (сначала большие).
+  let remaining = amount;
+  const allocation = [];
+  for (const row of stocks) {
+    if (remaining <= 0) break;
+    if (!(row.stockQty > 0)) continue;
+    const take = roundGrams(Math.min(row.stockQty, remaining));
+    if (!(take > 0)) continue;
+    allocation.push({
+      warehouseItemId: row.warehouseItemId,
+      itemName: row.itemName,
+      amountG: take,
+    });
+    remaining = roundGrams(remaining - take);
+  }
+
+  if (remaining > 0.0005 || !allocation.length) {
+    const err = new Error('Не удалось распределить списание по складским позициям');
+    err.status = 400;
+    throw err;
+  }
+
+  const note =
+    typeof comment === 'string' && comment.trim()
+      ? comment.trim().slice(0, 500)
+      : null;
+  const stockAfter = roundGrams(stockBefore - amount);
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `INSERT INTO tobacco_stock_writeoffs
+         (venue_id, shift_id, amount_g, stock_before_g, stock_after_g, staff_id, staff_name, comment)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, created_at`,
+      [
+        venueId,
+        shiftId || null,
+        amount,
+        stockBefore,
+        stockAfter,
+        staffId || null,
+        staffName || null,
+        note,
+      ]
+    );
+    const writeoffId = rows[0].id;
+    const createdAt = rows[0].created_at;
+
+    for (const line of allocation) {
+      // eslint-disable-next-line no-await-in-loop
+      await client.query(
+        `INSERT INTO tobacco_stock_writeoff_lines
+           (writeoff_id, warehouse_item_id, item_name, amount_g)
+         VALUES ($1, $2, $3, $4)`,
+        [writeoffId, line.warehouseItemId, line.itemName, line.amountG]
+      );
+      // eslint-disable-next-line no-await-in-loop
+      await client.query(
+        `INSERT INTO venue_warehouse_stock (venue_id, warehouse_item_id, stock_qty, min_stock_qty)
+         VALUES ($1, $2, 0, 0)
+         ON CONFLICT (venue_id, warehouse_item_id)
+         DO UPDATE SET stock_qty = GREATEST(0, venue_warehouse_stock.stock_qty - $3::numeric)`,
+        [venueId, line.warehouseItemId, line.amountG]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    return {
+      writeoff: {
+        id: writeoffId,
+        amountG: amount,
+        // Намеренно без stock_before/after на терминал — остатки склада не светятся кассиру.
+        comment: note,
+        staffName: staffName || null,
+        createdAt,
+      },
+      // Для Telegram / внутреннего аудита
+      audit: {
+        stockBeforeG: stockBefore,
+        stockAfterG: stockAfter,
+        lines: allocation,
+      },
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}

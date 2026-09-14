@@ -717,6 +717,30 @@ export async function createTobaccoTareMovement(
   });
 }
 
+export type TobaccoStockWriteoff = {
+  id: number;
+  amountG: number;
+  comment: string | null;
+  staffName: string | null;
+  createdAt: string;
+};
+
+/** Списание остатка табака (меласса) в граммах со склада точки. */
+export async function createTobaccoStockWriteoff(
+  venueId: number,
+  token: string,
+  payload: { amountG: number; comment?: string }
+): Promise<{ writeoff: TobaccoStockWriteoff }> {
+  return authorizedRequest('/api/tobacco/stock-writeoffs', token, {
+    method: 'POST',
+    body: {
+      venue_id: venueId,
+      amount_g: payload.amountG,
+      comment: payload.comment || null,
+    },
+  });
+}
+
 export async function saveTobaccoCount(
   venueId: number,
   token: string,

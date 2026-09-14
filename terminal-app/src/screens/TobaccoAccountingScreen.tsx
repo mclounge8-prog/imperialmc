@@ -15,6 +15,7 @@ import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import { useDevice } from '../context/DeviceContext';
 import { useSession } from '../context/SessionContext';
 import {
+  createTobaccoStockWriteoff,
   createTobaccoTareMovement,
   fetchTobaccoState,
   saveTobaccoCount,
@@ -82,6 +83,10 @@ export default function TobaccoAccountingScreen() {
   const [movementLines, setMovementLines] = useState<MovementLineDraft[]>([newMovementLine()]);
   const [movementComment, setMovementComment] = useState('');
 
+  const [stockWriteoffOpen, setStockWriteoffOpen] = useState(false);
+  const [stockWriteoffAmount, setStockWriteoffAmount] = useState('');
+  const [stockWriteoffComment, setStockWriteoffComment] = useState('');
+
   const load = useCallback(async () => {
     if (!venueId || !token) return;
     setLoading(true);
@@ -127,6 +132,34 @@ export default function TobaccoAccountingScreen() {
     setMovementType(null);
     setMovementLines([newMovementLine()]);
     setMovementComment('');
+  };
+
+  const openStockWriteoff = () => {
+    setStockWriteoffAmount('');
+    setStockWriteoffComment('');
+    setStockWriteoffOpen(true);
+  };
+
+  const submitStockWriteoff = async () => {
+    if (!venueId || !token) return;
+    const amountG = Number(String(stockWriteoffAmount).replace(',', '.'));
+    if (!Number.isFinite(amountG) || !(amountG > 0)) {
+      Alert.alert('Не хватает данных', 'Укажите количество списания в граммах.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await createTobaccoStockWriteoff(venueId, token, {
+        amountG,
+        comment: stockWriteoffComment.trim() || undefined,
+      });
+      setStockWriteoffOpen(false);
+      Alert.alert('Списание сохранено', `Списано ${formatG(result.writeoff.amountG)} с остатка точки.`);
+    } catch (e) {
+      Alert.alert('Ошибка', e instanceof Error ? e.message : 'Не удалось списать остаток');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const submitMovement = async () => {
@@ -252,8 +285,8 @@ export default function TobaccoAccountingScreen() {
     <ScreenSwipeHost screen="TobaccoAccounting">
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.hint}>
-          Остаток тары меняется через «Приход» и «Списание». Подсчёт — отдельно: взвесьте табак
-          частями через «+», программа вычтет вес тары × кол-во банок.
+          Тара — через «Приход» и «Списание». «Списание остатка» убирает граммы табака (меласса) со
+          склада точки. Подсчёт — отдельно: вес частями через «+», минус тара × банки.
         </Text>
 
         {lastCountNet != null ? (
@@ -293,9 +326,14 @@ export default function TobaccoAccountingScreen() {
             style={[styles.actionBtn, styles.actionWriteoff]}
             onPress={() => openMovement('writeoff')}
           >
-            <Text style={styles.actionBtnText}>Списание</Text>
+            <Text style={styles.actionBtnText}>Списание тары</Text>
           </Pressable>
         </View>
+
+        <Pressable style={styles.stockWriteoffBtn} onPress={openStockWriteoff}>
+          <Text style={styles.actionBtnText}>Списание остатка</Text>
+          <Text style={styles.actionBtnSub}>меласса, граммы</Text>
+        </Pressable>
 
         <Pressable style={styles.primaryBtn} onPress={openCount}>
           <Text style={styles.primaryBtnText}>Подсчёт</Text>
@@ -395,6 +433,47 @@ export default function TobaccoAccountingScreen() {
               </Pressable>
               <Pressable style={styles.primaryBtn} onPress={submitMovement} disabled={saving}>
                 <Text style={styles.primaryBtnText}>{saving ? '…' : 'Сохранить'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={stockWriteoffOpen} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <Text style={styles.modalTitle}>Списание остатка</Text>
+            <Text style={styles.modalHint}>
+              Укажите, сколько грамм табака списать со склада точки (меласса / неприготавливаемый
+              продукт). Больше текущего остатка списать нельзя.
+            </Text>
+            <Text style={styles.fieldLabel}>Количество, г</Text>
+            <TextInput
+              style={styles.partInput}
+              keyboardType="decimal-pad"
+              value={stockWriteoffAmount}
+              placeholder="0"
+              placeholderTextColor={colors.textMuted}
+              onChangeText={setStockWriteoffAmount}
+            />
+            <Text style={styles.fieldLabel}>Комментарий (необязательно)</Text>
+            <TextInput
+              style={styles.partInput}
+              value={stockWriteoffComment}
+              placeholder="Например: меласса после переборки"
+              placeholderTextColor={colors.textMuted}
+              onChangeText={setStockWriteoffComment}
+            />
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.secondaryBtn}
+                onPress={() => setStockWriteoffOpen(false)}
+                disabled={saving}
+              >
+                <Text style={styles.secondaryBtnText}>Отмена</Text>
+              </Pressable>
+              <Pressable style={styles.primaryBtn} onPress={submitStockWriteoff} disabled={saving}>
+                <Text style={styles.primaryBtnText}>{saving ? '…' : 'Списать'}</Text>
               </Pressable>
             </View>
           </View>
@@ -531,7 +610,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.danger || '#c44',
   },
+  actionStockWriteoff: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    paddingVertical: 12,
+    flexGrow: 0,
+    flex: undefined as unknown as number,
+  },
   actionBtnText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  actionBtnSub: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
   primaryBtn: {
     flex: 1,
     backgroundColor: colors.accent,

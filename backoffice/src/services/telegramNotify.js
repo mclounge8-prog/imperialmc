@@ -386,6 +386,34 @@ export function buildTobaccoTareMovementMessage({
   return linesOut.join('\n');
 }
 
+/** Алерт по списанию остатка табака (меласса) в граммах. */
+export function buildTobaccoStockWriteoffMessage({
+  venueName,
+  amountG,
+  stockBeforeG,
+  stockAfterG,
+  lines,
+  comment,
+  cashier,
+  when,
+}) {
+  const linesOut = [
+    header('🍃 Табак · списание остатка', venueName, when),
+    '',
+    `Списано: <b>${escapeHtml(formatGrams(amountG))}</b>`,
+    `Остаток до: ${escapeHtml(formatGrams(stockBeforeG))} → после: <b>${escapeHtml(formatGrams(stockAfterG))}</b>`,
+    '',
+  ];
+  for (const line of lines || []) {
+    linesOut.push(
+      `• ${escapeHtml(line.itemName || 'Позиция')}: −${escapeHtml(formatGrams(line.amountG))}`
+    );
+  }
+  if (comment) linesOut.push('', `Комментарий: ${escapeHtml(comment)}`);
+  linesOut.push(`Кассир: ${escapeHtml(cashier || '—')}`);
+  return linesOut.join('\n');
+}
+
 export function buildPrecheckCancelMessage({
   venueName,
   comment,

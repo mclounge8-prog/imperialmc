@@ -6,10 +6,12 @@ import {
   fetchVenueTobaccoSettings,
   fetchVenueTobaccoTares,
   saveShiftTobaccoCount,
+  saveTobaccoStockWriteoff,
   saveTobaccoTareMovement,
   serializeTobaccoCountForTerminal,
 } from '../services/tobaccoAccounting.js';
 import {
+  buildTobaccoStockWriteoffMessage,
   buildTobaccoTareMovementMessage,
   fetchVenueName,
   notifyTelegramSafe,
@@ -120,6 +122,62 @@ apiTobacco.post('/tare-movements', async (c) => {
     const status = Number(err?.status) || 500;
     if (status >= 400 && status < 500) {
       return c.json({ error: err.message || 'Ошибка операции с тарой' }, status);
+    }
+    throw err;
+  }
+});
+
+/**
+ * Списание остатка табака (меласса) в граммах со склада точки.
+ * body: { venue_id, amount_g / amountG, comment? }
+ * Нельзя списать больше текущего суммарного остатка учитываемых позиций.
+ */
+apiTobacco.post('/stock-writeoffs', async (c) => {
+  const staff = c.get('staff');
+  const body = await c.req.json().catch(() => null);
+  const venueId = body?.venue_id != null ? Number(body.venue_id) : Number(body?.venueId);
+  const amountG = body?.amount_g != null ? Number(body.amount_g) : Number(body?.amountG);
+  if (!venueId) return c.json({ error: 'Не указано заведение' }, 400);
+
+  const venue = await fetchVenueTobaccoSettings(venueId);
+  if (!venue?.tobacco_accounting_enabled) {
+    return c.json({ error: 'Учёт табака выключен на заведении' }, 409);
+  }
+
+  const shift = await fetchOpenShift(venueId);
+
+  try {
+    const result = await saveTobaccoStockWriteoff({
+      venueId,
+      shiftId: shift?.id || null,
+      amountG,
+      staffId: staff.sub,
+      staffName: staff.name,
+      comment: body?.comment,
+    });
+
+    const venueName = venue.name || (await fetchVenueName(venueId));
+    notifyTelegramSafe(
+      buildTobaccoStockWriteoffMessage({
+        venueName,
+        amountG: result.writeoff.amountG,
+        stockBeforeG: result.audit.stockBeforeG,
+        stockAfterG: result.audit.stockAfterG,
+        lines: result.audit.lines,
+        comment: result.writeoff.comment,
+        cashier: staff.name,
+        when: result.writeoff.createdAt,
+      })
+    );
+
+    return c.json({ writeoff: result.writeoff });
+  } catch (err) {
+    const status = Number(err?.status) || 500;
+    if (status >= 400 && status < 500) {
+      return c.json(
+        { error: err.message || 'Ошибка списания остатка', code: err.code || undefined },
+        status
+      );
     }
     throw err;
   }
