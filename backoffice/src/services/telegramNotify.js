@@ -297,6 +297,52 @@ export function buildShiftCloseMessage({
     .join('\n');
 }
 
+function formatGrams(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return `${n.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} г`;
+}
+
+/** Алерт по учёту табака при закрытии смены — факт vs склад. */
+export function buildTobaccoCountMessage({
+  venueName,
+  cashier,
+  when,
+  skipped,
+  totalNetG,
+  totalExpectedG,
+  withinTolerance,
+  toleranceG,
+  lines,
+}) {
+  const linesOut = [
+    header(skipped ? '⚠️ Табак · учёт пропущен' : '🍃 Табак · учёт смены', venueName, when),
+    '',
+  ];
+  if (skipped) {
+    linesOut.push('Подсчёт табака при закрытии смены <b>не выполнен</b>.');
+    linesOut.push(`Кассир: ${escapeHtml(cashier || '—')}`);
+    return linesOut.join('\n');
+  }
+
+  const ok = withinTolerance ? 'в допуске' : 'вне допуска';
+  linesOut.push(
+    `Итого чистый вес: <b>${escapeHtml(formatGrams(totalNetG))}</b>`,
+    `Остаток по складу: <b>${escapeHtml(formatGrams(totalExpectedG))}</b>`,
+    `Разница: <b>${escapeHtml(formatGrams(Number(totalNetG) - Number(totalExpectedG)))}</b> (${ok}, допуск ±${escapeHtml(formatGrams(toleranceG))})`,
+    ''
+  );
+  for (const line of lines || []) {
+    linesOut.push(
+      `<b>${escapeHtml(line.tareLabel || line.brand || 'Тара')}</b> · банок ${escapeHtml(String(line.canQty ?? 0))}`,
+      `  взвешено: ${escapeHtml(formatGrams(line.grossWeightG))} (− тара ${escapeHtml(formatGrams(line.tareWeightG))} × ${escapeHtml(String(line.canQty ?? 0))})`,
+      `  чистое: ${escapeHtml(formatGrams(line.netWeightG))} · склад: ${escapeHtml(formatGrams(line.expectedStockG))} · Δ ${escapeHtml(formatGrams(line.deltaG))}`
+    );
+  }
+  linesOut.push(`Кассир: ${escapeHtml(cashier || '—')}`);
+  return linesOut.join('\n');
+}
+
 export function buildCashMovementMessage({ venueName, type, amount, comment, cashier, when }) {
   const isOut = type === 'withdrawal';
   const title = isOut ? '🏦 Инкассация' : '➕ Внесение наличности';

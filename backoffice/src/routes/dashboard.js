@@ -19,6 +19,7 @@ import { pool } from '../db.js';
 import { manifestForClient, publicBaseUrl, readManifest } from '../services/terminalUpdates.js';
 import { readTelegramSettings } from '../services/telegramNotify.js';
 import { renderTelegramSection } from '../views/telegramView.js';
+import { renderTobaccoTaresFragment } from './tobaccoTares.js';
 
 /**
  * Рендер HTML для конкретного раздела дэшборда по ключу.
@@ -38,7 +39,11 @@ export async function renderFragmentHtml(key, c) {
 
   if (key === 'venues') {
     const { rows: venueRows } = await pool.query(
-      'SELECT id, name, address, COALESCE(precheck_enabled, false) AS precheck_enabled FROM venues ORDER BY name'
+      `SELECT id, name, address,
+              COALESCE(precheck_enabled, false) AS precheck_enabled,
+              COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
+              COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g
+       FROM venues ORDER BY name`
     );
     const venueCards = [];
     for (const venue of venueRows) {
@@ -188,6 +193,10 @@ export async function renderFragmentHtml(key, c) {
   if (key === 'telegram') {
     const settings = await readTelegramSettings();
     return renderTelegramSection(settings);
+  }
+
+  if (key === 'tobacco-tares') {
+    return renderTobaccoTaresFragment();
   }
 
   if (key === 'reports') {

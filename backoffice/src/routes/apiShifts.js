@@ -6,10 +6,16 @@ import {
   buildCashMovementMessage,
   buildShiftCloseMessage,
   buildShiftOpenMessage,
+  buildTobaccoCountMessage,
   fetchPreviousShiftClosingCash,
   fetchVenueName,
   notifyTelegramSafe,
 } from '../services/telegramNotify.js';
+import {
+  fetchShiftTobaccoCount,
+  fetchVenueTobaccoSettings,
+  markTobaccoCountSkipped,
+} from '../services/tobaccoAccounting.js';
 
 const apiShifts = new Hono();
 apiShifts.use('*', requireStaffToken);
@@ -244,6 +250,10 @@ apiShifts.post('/close', async (c) => {
   const venueId = body && body.venue_id ? Number(body.venue_id) : null;
   const countedCash = parseMoney(body?.closing_cash ?? body?.closingCash ?? body?.counted_cash);
   const forcePin = body?.force_pin != null ? String(body.force_pin) : body?.forcePin != null ? String(body.forcePin) : null;
+  const skipTobacco =
+    body?.skip_tobacco_count === true ||
+    body?.skipTobaccoCount === true ||
+    body?.skip_tobacco === true;
 
   if (!venueId) {
     c.status(400);
@@ -300,6 +310,20 @@ apiShifts.post('/close', async (c) => {
     }
   }
 
+  const venueTobacco = await fetchVenueTobaccoSettings(venueId);
+  let tobaccoCount = null;
+  if (venueTobacco?.tobacco_accounting_enabled) {
+    tobaccoCount = await fetchShiftTobaccoCount(shift.id);
+    const hasRealCount = Boolean(tobaccoCount && !tobaccoCount.skipped);
+    if (!hasRealCount && !skipTobacco) {
+      c.status(409);
+      return c.json({
+        error: 'В смене не посчитана учитываемая номенклатура (табак). Перейдите в Учёт или закройте смену без подсчёта.',
+        code: 'TOBACCO_COUNT_REQUIRED',
+      });
+    }
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -329,6 +353,20 @@ apiShifts.post('/close', async (c) => {
     });
 
     await client.query('COMMIT');
+
+    if (venueTobacco?.tobacco_accounting_enabled) {
+      const hasRealCount = Boolean(tobaccoCount && !tobaccoCount.skipped);
+      if (!hasRealCount && skipTobacco) {
+        await markTobaccoCountSkipped({
+          shiftId: shift.id,
+          venueId,
+          staffId: staff.sub,
+          staffName: staff.name,
+        });
+        tobaccoCount = await fetchShiftTobaccoCount(shift.id);
+      }
+    }
+
     const closedStats = await fetchShiftStats(rows[0]);
     const venueName = await fetchVenueName(venueId);
     notifyTelegramSafe(
@@ -345,9 +383,24 @@ apiShifts.post('/close', async (c) => {
         cashier: staff.name,
       })
     );
+    if (venueTobacco?.tobacco_accounting_enabled && tobaccoCount) {
+      notifyTelegramSafe(
+        buildTobaccoCountMessage({
+          venueName,
+          cashier: staff.name,
+          skipped: !!tobaccoCount.skipped,
+          totalNetG: tobaccoCount.totalNetG,
+          totalExpectedG: tobaccoCount.totalExpectedG,
+          withinTolerance: tobaccoCount.withinTolerance,
+          toleranceG: Number(venueTobacco.tobacco_tolerance_g),
+          lines: tobaccoCount.lines || [],
+        })
+      );
+    }
     return c.json({
       shift: serializeShift(rows[0], closedStats),
       forcedClose: Boolean(mismatch && forcePin === FORCE_CLOSE_PIN),
+      tobaccoSkipped: Boolean(venueTobacco?.tobacco_accounting_enabled && tobaccoCount?.skipped),
     });
   } catch (err) {
     await client.query('ROLLBACK');

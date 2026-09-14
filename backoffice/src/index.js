@@ -16,12 +16,14 @@ import apiTerminalRoutes from './routes/apiTerminal.js';
 import apiOrdersRoutes from './routes/apiOrders.js';
 import apiDevicesRoutes from './routes/apiDevices.js';
 import apiShiftsRoutes from './routes/apiShifts.js';
+import apiTobaccoRoutes from './routes/apiTobacco.js';
 import apiReceiptsRoutes from './routes/apiReceipts.js';
 import apiFiscalRoutes from './routes/apiFiscal.js';
 import apiTerminalUpdatesRoutes from './routes/apiTerminalUpdates.js';
 import apiPwaStatsRoutes from './routes/apiPwaStats.js';
 import apiPwaReportsRoutes from './routes/apiPwaReports.js';
 import terminalUpdatesRoutes from './routes/terminalUpdates.js';
+import tobaccoTaresRoutes from './routes/tobaccoTares.js';
 import telegramRoutes from './routes/telegram.js';
 import reportsRoutes from './routes/reports.js';
 import statsRoutes from './routes/stats.js';
@@ -53,12 +55,14 @@ app.route('/tables', tablesRoutes); // CRUD столов (зоны + визуа�
 app.route('/venues', venuesRoutes); // CRUD заведений + назначение сотрудников
 app.route('/devices', devicesRoutes); // CRUD устройств: регистрация, заведение, активация
 app.route('/terminal-updates', terminalUpdatesRoutes); // загрузка APK / JS OTA
+app.route('/tobacco-tares', tobaccoTaresRoutes); // Каталог тар табака (вес банки)
 app.route('/telegram', telegramRoutes); // настройки Telegram-бота
 app.route('/api/staff', apiStaffAuthRoutes); // JSON API для Android-терминала: вход по PIN
 app.route('/api', apiTerminalRoutes); // JSON API для Android-терминала: /api/tables, /api/menu
 app.route('/api', apiOrdersRoutes); // JSON API заказов: открытие/позиции/оплата/закрытие
 app.route('/api/devices', apiDevicesRoutes); // JSON API устройств: регистрация по коду, статус
 app.route('/api/shifts', apiShiftsRoutes); // JSON API смен: открытие/закрытие, X-отчёт, чеки смены
+app.route('/api/tobacco', apiTobaccoRoutes); // JSON API учёта табака на терминале
 app.route('/api/receipts', apiReceiptsRoutes); // JSON API чеков: список оплаченных за сегодня + состав конкретного
 app.route('/api/fiscal', apiFiscalRoutes); // JSON API фискализации АТОЛ — очередь заданий, разбирает сам terminal-app
 app.route('/api', apiTerminalUpdatesRoutes); // манифест обновлений терминала

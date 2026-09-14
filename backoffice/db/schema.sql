@@ -601,3 +601,74 @@ CREATE TABLE IF NOT EXISTS telegram_settings (
 
 INSERT INTO telegram_settings (id, enabled) VALUES (1, false)
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- Учёт табака: тары (бренд + фасовка), привязка номенклатуры к заведению,
+-- кол-во банок на точке, сменный подсчёт чистого веса.
+-- ============================================================
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS tobacco_accounting_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS tobacco_tolerance_g NUMERIC(10,2) NOT NULL DEFAULT 100;
+
+CREATE TABLE IF NOT EXISTS tobacco_tares (
+  id             SERIAL PRIMARY KEY,
+  brand          VARCHAR(100) NOT NULL,
+  label          VARCHAR(150) NOT NULL,
+  net_content_g  NUMERIC(10,2),
+  tare_weight_g  NUMERIC(10,2) NOT NULL CHECK (tare_weight_g >= 0),
+  is_active      BOOLEAN NOT NULL DEFAULT true,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tobacco_tares_brand ON tobacco_tares(brand, label);
+
+-- Какие складские позиции учитываем на заведении и к какой таре они относятся.
+CREATE TABLE IF NOT EXISTS venue_tobacco_items (
+  venue_id           INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  warehouse_item_id  INT NOT NULL REFERENCES warehouse_items(id) ON DELETE CASCADE,
+  tobacco_tare_id    INT NOT NULL REFERENCES tobacco_tares(id) ON DELETE RESTRICT,
+  PRIMARY KEY (venue_id, warehouse_item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_venue_tobacco_items_tare
+  ON venue_tobacco_items(venue_id, tobacco_tare_id);
+
+-- Текущее кол-во тары (банок) на заведении — маркер для подсчёта.
+CREATE TABLE IF NOT EXISTS venue_tobacco_tare_stock (
+  venue_id         INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  tobacco_tare_id  INT NOT NULL REFERENCES tobacco_tares(id) ON DELETE CASCADE,
+  qty              INT NOT NULL DEFAULT 0 CHECK (qty >= 0),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (venue_id, tobacco_tare_id)
+);
+
+-- Факт сменного подсчёта (один актуальный на смену; повторный перезаписывает строки).
+CREATE TABLE IF NOT EXISTS shift_tobacco_counts (
+  id               SERIAL PRIMARY KEY,
+  shift_id         INT NOT NULL UNIQUE REFERENCES shifts(id) ON DELETE CASCADE,
+  venue_id         INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  counted_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  counted_by       INT REFERENCES staff(id) ON DELETE SET NULL,
+  counted_by_name  VARCHAR(100),
+  total_net_g      NUMERIC(12,3) NOT NULL DEFAULT 0,
+  total_expected_g NUMERIC(12,3) NOT NULL DEFAULT 0,
+  within_tolerance BOOLEAN NOT NULL DEFAULT false,
+  skipped          BOOLEAN NOT NULL DEFAULT false
+);
+
+CREATE TABLE IF NOT EXISTS shift_tobacco_count_lines (
+  id                 SERIAL PRIMARY KEY,
+  count_id           INT NOT NULL REFERENCES shift_tobacco_counts(id) ON DELETE CASCADE,
+  tobacco_tare_id    INT REFERENCES tobacco_tares(id) ON DELETE SET NULL,
+  tare_label         VARCHAR(150) NOT NULL,
+  brand              VARCHAR(100),
+  tare_weight_g      NUMERIC(10,2) NOT NULL,
+  can_qty            INT NOT NULL DEFAULT 0,
+  gross_weight_parts JSONB NOT NULL DEFAULT '[]'::jsonb,
+  gross_weight_g     NUMERIC(12,3) NOT NULL DEFAULT 0,
+  net_weight_g       NUMERIC(12,3) NOT NULL DEFAULT 0,
+  expected_stock_g   NUMERIC(12,3) NOT NULL DEFAULT 0,
+  delta_g            NUMERIC(12,3) NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_shift_tobacco_count_lines_count
+  ON shift_tobacco_count_lines(count_id);

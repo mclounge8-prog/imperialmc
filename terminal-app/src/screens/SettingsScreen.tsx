@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -6,11 +6,12 @@ import { colors } from '../theme/colors';
 import ShiftToggle from '../components/ShiftToggle';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import UpdateCheckRow from '../components/UpdateCheckRow';
+import { useDevice } from '../context/DeviceContext';
 import type { RootStackParamList } from '../../App';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-type SettingsTarget = 'XReport' | 'Cash' | 'ShiftReceipts';
+type SettingsTarget = 'XReport' | 'Cash' | 'ShiftReceipts' | 'TobaccoAccounting';
 
 type SettingsRow = {
   key: SettingsTarget;
@@ -19,7 +20,7 @@ type SettingsRow = {
   subtitle: string;
 };
 
-const ROWS: SettingsRow[] = [
+const BASE_ROWS: SettingsRow[] = [
   { key: 'XReport', icon: '📊', title: 'X-отчёт', subtitle: 'Сводка по текущей смене без закрытия' },
   { key: 'Cash', icon: '💵', title: 'Наличность', subtitle: 'Внесение, инкассация, остаток в кассе' },
   { key: 'ShiftReceipts', icon: '🧾', title: 'Чеки', subtitle: 'Чеки текущей смены' },
@@ -27,6 +28,21 @@ const ROWS: SettingsRow[] = [
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const { status } = useDevice();
+  const tobaccoEnabled = Boolean(status?.venue?.tobaccoAccountingEnabled);
+
+  const rows = useMemo(() => {
+    if (!tobaccoEnabled) return BASE_ROWS;
+    return [
+      ...BASE_ROWS,
+      {
+        key: 'TobaccoAccounting' as const,
+        icon: '🍃',
+        title: 'Учёт',
+        subtitle: 'Тара и подсчёт чистого табака по смене',
+      },
+    ];
+  }, [tobaccoEnabled]);
 
   return (
     <ScreenSwipeHost screen="Settings">
@@ -35,10 +51,10 @@ export default function SettingsScreen() {
 
         <Text style={styles.sectionLabel}>Отчёты по смене</Text>
         <View style={styles.card}>
-          {ROWS.map((row, idx) => (
+          {rows.map((row, idx) => (
             <Pressable
               key={row.key}
-              style={[styles.row, idx < ROWS.length - 1 && styles.rowBorder]}
+              style={[styles.row, idx < rows.length - 1 && styles.rowBorder]}
               onPress={() => navigation.navigate(row.key)}
             >
               <Text style={styles.rowIcon}>{row.icon}</Text>
