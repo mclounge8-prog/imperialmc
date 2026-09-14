@@ -527,7 +527,7 @@ export default function TobaccoAccountingScreen() {
         </View>
         <Keypad
           onKey={(key) =>
-            setStockWriteoffAmount((prev) => applyKeypadDigit(prev || '0', key, { decimals: 1 }))
+            setStockWriteoffAmount((prev) => applyKeypadDigit(prev || '0', key, { decimals: 3 }))
           }
         />
 

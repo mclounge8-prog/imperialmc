@@ -370,34 +370,39 @@ apiShifts.post('/close', async (c) => {
 
     const closedStats = await fetchShiftStats(rows[0]);
     const venueName = await fetchVenueName(venueId);
-    notifyTelegramSafe(
-      buildShiftCloseMessage({
-        venueName,
-        closingCash: countedCash,
-        expectedCash,
-        revenueTotal: stats.revenueTotal,
-        cashSales: stats.paymentBreakdown.cash,
-        cardSales: stats.paymentBreakdown.card + stats.paymentBreakdown.other,
-        receiptsCount: stats.receiptsCount,
-        deposits: stats.cash.deposits,
-        withdrawals: stats.cash.withdrawals,
-        cashier: staff.name,
-      })
-    );
-    if (venueTobacco?.tobacco_accounting_enabled && tobaccoCount) {
-      notifyTelegramSafe(
-        buildTobaccoCountMessage({
+    // Сначала отчёт по выручке/кассе, затем табак — последовательно,
+    // иначе при таймаутах Telegram часто «теряется» одно из двух параллельных сообщений.
+    notifyTelegramSafe(async () => {
+      await sendTelegramMessage(
+        buildShiftCloseMessage({
           venueName,
+          closingCash: countedCash,
+          expectedCash,
+          revenueTotal: stats.revenueTotal,
+          cashSales: stats.paymentBreakdown.cash,
+          cardSales: stats.paymentBreakdown.card + stats.paymentBreakdown.other,
+          receiptsCount: stats.receiptsCount,
+          deposits: stats.cash.deposits,
+          withdrawals: stats.cash.withdrawals,
           cashier: staff.name,
-          skipped: !!tobaccoCount.skipped,
-          totalNetG: tobaccoCount.totalNetG,
-          totalExpectedG: tobaccoCount.totalExpectedG,
-          withinTolerance: tobaccoCount.withinTolerance,
-          toleranceG: Number(venueTobacco.tobacco_tolerance_g),
-          lines: tobaccoCount.lines || [],
         })
       );
-    }
+      if (venueTobacco?.tobacco_accounting_enabled && tobaccoCount) {
+        await sendTelegramMessage(
+          buildTobaccoCountMessage({
+            venueName,
+            cashier: staff.name,
+            skipped: !!tobaccoCount.skipped,
+            totalNetG: tobaccoCount.totalNetG,
+            totalExpectedG: tobaccoCount.totalExpectedG,
+            withinTolerance: tobaccoCount.withinTolerance,
+            toleranceG: Number(venueTobacco.tobacco_tolerance_g),
+            lines: tobaccoCount.lines || [],
+          })
+        );
+      }
+      return null;
+    });
     return c.json({
       shift: serializeShift(rows[0], closedStats),
       forcedClose: Boolean(mismatch && forcePin === FORCE_CLOSE_PIN),
