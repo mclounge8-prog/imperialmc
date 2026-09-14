@@ -336,7 +336,7 @@ export function buildTobaccoCountMessage({
     linesOut.push(
       `<b>${escapeHtml(line.tareLabel || line.brand || 'Тара')}</b> · банок ${escapeHtml(String(line.canQty ?? 0))}`,
       `  взвешено: ${escapeHtml(formatGrams(line.grossWeightG))} (− тара ${escapeHtml(formatGrams(line.tareWeightG))} × ${escapeHtml(String(line.canQty ?? 0))})`,
-      `  чистое: ${escapeHtml(formatGrams(line.netWeightG))} · склад: ${escapeHtml(formatGrams(line.expectedStockG))} · Δ ${escapeHtml(formatGrams(line.deltaG))}`
+      `  чистое: ${escapeHtml(formatGrams(line.netWeightG))}`
     );
   }
   linesOut.push(`Кассир: ${escapeHtml(cashier || '—')}`);

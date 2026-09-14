@@ -309,27 +309,35 @@ async function buildVenueTobaccoPanel(venueId) {
   const venue = await fetchVenue(venueId);
   if (!venue) return null;
 
-  const [{ rows: warehouseItems }, { rows: tares }, { rows: selected }] = await Promise.all([
-    pool.query(
-      `SELECT wi.id, wi.name, wi.unit
-       FROM warehouse_items wi
-       ORDER BY wi.name`
-    ),
-    pool.query(
-      `SELECT id, brand, label, net_content_g, tare_weight_g, is_active
-       FROM tobacco_tares
-       ORDER BY brand, label`
-    ),
-    pool.query(
-      `SELECT warehouse_item_id, tobacco_tare_id
-       FROM venue_tobacco_items
-       WHERE venue_id = $1`,
-      [venueId]
-    ),
-  ]);
+  const [{ rows: warehouseItems }, { rows: tares }, { rows: selectedItems }, { rows: selectedTares }] =
+    await Promise.all([
+      pool.query(
+        `SELECT wi.id, wi.name, wi.unit
+         FROM warehouse_items wi
+         ORDER BY wi.name`
+      ),
+      pool.query(
+        `SELECT id, brand, label, net_content_g, tare_weight_g, is_active
+         FROM tobacco_tares
+         ORDER BY brand, label`
+      ),
+      pool.query(
+        `SELECT warehouse_item_id FROM venue_tobacco_items WHERE venue_id = $1`,
+        [venueId]
+      ),
+      pool.query(
+        `SELECT tobacco_tare_id FROM venue_tobacco_tares WHERE venue_id = $1`,
+        [venueId]
+      ),
+    ]);
 
-  const selectedMap = new Map(selected.map((r) => [r.warehouse_item_id, r]));
-  return renderVenueTobaccoPanel({ venue, warehouseItems, tares, selectedMap });
+  return renderVenueTobaccoPanel({
+    venue,
+    warehouseItems,
+    tares,
+    selectedItemIds: selectedItems.map((r) => r.warehouse_item_id),
+    selectedTareIds: selectedTares.map((r) => r.tobacco_tare_id),
+  });
 }
 
 venues.get('/:id/tobacco', async (c) => {
@@ -354,15 +362,17 @@ venues.post('/:id/tobacco-settings', async (c) => {
   const tolerance = Math.max(0, Number(body.tolerance_g));
   const safeTolerance = Number.isFinite(tolerance) ? tolerance : 100;
 
-  const { rows: items } = await pool.query('SELECT id FROM warehouse_items');
-  const links = [];
-  for (const item of items) {
-    const checked = body[`item_${item.id}`] === '1' || body[`item_${item.id}`] === 'on';
-    if (!checked) continue;
-    const tareId = Number(body[`tare_${item.id}`]);
-    if (!Number.isFinite(tareId) || tareId <= 0) continue;
-    links.push({ warehouseItemId: item.id, tobaccoTareId: tareId });
-  }
+  const [{ rows: items }, { rows: tares }] = await Promise.all([
+    pool.query('SELECT id FROM warehouse_items'),
+    pool.query('SELECT id FROM tobacco_tares WHERE is_active = true'),
+  ]);
+
+  const itemIds = items
+    .filter((item) => body[`item_${item.id}`] === '1' || body[`item_${item.id}`] === 'on')
+    .map((item) => item.id);
+  const tareIds = tares
+    .filter((tare) => body[`tare_${tare.id}`] === '1' || body[`tare_${tare.id}`] === 'on')
+    .map((tare) => tare.id);
 
   const client = await pool.connect();
   try {
@@ -374,19 +384,26 @@ venues.post('/:id/tobacco-settings', async (c) => {
       [venueId, enabled, safeTolerance]
     );
     await client.query('DELETE FROM venue_tobacco_items WHERE venue_id = $1', [venueId]);
-    for (const link of links) {
+    await client.query('DELETE FROM venue_tobacco_tares WHERE venue_id = $1', [venueId]);
+    for (const itemId of itemIds) {
       // eslint-disable-next-line no-await-in-loop
       await client.query(
-        `INSERT INTO venue_tobacco_items (venue_id, warehouse_item_id, tobacco_tare_id)
-         VALUES ($1, $2, $3)`,
-        [venueId, link.warehouseItemId, link.tobaccoTareId]
+        `INSERT INTO venue_tobacco_items (venue_id, warehouse_item_id) VALUES ($1, $2)`,
+        [venueId, itemId]
+      );
+    }
+    for (const tareId of tareIds) {
+      // eslint-disable-next-line no-await-in-loop
+      await client.query(
+        `INSERT INTO venue_tobacco_tares (venue_id, tobacco_tare_id) VALUES ($1, $2)`,
+        [venueId, tareId]
       );
       // eslint-disable-next-line no-await-in-loop
       await client.query(
         `INSERT INTO venue_tobacco_tare_stock (venue_id, tobacco_tare_id, qty)
          VALUES ($1, $2, 0)
          ON CONFLICT (venue_id, tobacco_tare_id) DO NOTHING`,
-        [venueId, link.tobaccoTareId]
+        [venueId, tareId]
       );
     }
     await client.query('COMMIT');

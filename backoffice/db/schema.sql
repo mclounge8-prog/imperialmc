@@ -621,16 +621,39 @@ CREATE TABLE IF NOT EXISTS tobacco_tares (
 
 CREATE INDEX IF NOT EXISTS idx_tobacco_tares_brand ON tobacco_tares(brand, label);
 
--- Какие складские позиции учитываем на заведении и к какой таре они относятся.
+-- Какие складские позиции учитываем на заведении (остатки).
+-- Тары выбираются отдельно — их много и у каждой свой вес банки.
 CREATE TABLE IF NOT EXISTS venue_tobacco_items (
   venue_id           INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
   warehouse_item_id  INT NOT NULL REFERENCES warehouse_items(id) ON DELETE CASCADE,
-  tobacco_tare_id    INT NOT NULL REFERENCES tobacco_tares(id) ON DELETE RESTRICT,
   PRIMARY KEY (venue_id, warehouse_item_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_venue_tobacco_items_tare
-  ON venue_tobacco_items(venue_id, tobacco_tare_id);
+-- Какие тары используются на заведении (MustHave 125, MustHave 250, …).
+CREATE TABLE IF NOT EXISTS venue_tobacco_tares (
+  venue_id         INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  tobacco_tare_id  INT NOT NULL REFERENCES tobacco_tares(id) ON DELETE CASCADE,
+  PRIMARY KEY (venue_id, tobacco_tare_id)
+);
+
+-- Миграция со старой схемы «1 тара на позицию склада».
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'venue_tobacco_items' AND column_name = 'tobacco_tare_id'
+  ) THEN
+    INSERT INTO venue_tobacco_tares (venue_id, tobacco_tare_id)
+    SELECT DISTINCT venue_id, tobacco_tare_id
+    FROM venue_tobacco_items
+    WHERE tobacco_tare_id IS NOT NULL
+    ON CONFLICT DO NOTHING;
+
+    ALTER TABLE venue_tobacco_items DROP COLUMN tobacco_tare_id;
+  END IF;
+END $$;
+
+DROP INDEX IF EXISTS idx_venue_tobacco_items_tare;
 
 -- Текущее кол-во тары (банок) на заведении — маркер для подсчёта.
 CREATE TABLE IF NOT EXISTS venue_tobacco_tare_stock (

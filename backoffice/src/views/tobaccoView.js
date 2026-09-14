@@ -41,7 +41,7 @@ export function renderTobaccoTaresSection({ tares = [], errorMsg = null } = {}) 
   return `
     <header>
       <h1>Тары табака</h1>
-      <p>Вес пустой банки по бренду и фасовке (MustHave 125, MustHave 250…). Нужен, чтобы на терминале вычитать тару из взвешивания.</p>
+      <p>Вес пустой банки по бренду и фасовке (MustHave 125, MustHave 250…). Нужен, чтобы на терминале вычитать тару из взвешивания. На каждое заведение можно подключить сразу много разных тар.</p>
     </header>
 
     <section class="subsection">
@@ -118,37 +118,34 @@ export function renderVenueTobaccoPanel({
   venue,
   warehouseItems,
   tares,
-  selectedMap,
+  selectedItemIds,
+  selectedTareIds,
 }) {
   const enabled = !!venue.tobacco_accounting_enabled;
   const tolerance = Number(venue.tobacco_tolerance_g ?? 100);
+  const selectedItems = new Set(selectedItemIds.map(String));
+  const selectedTares = new Set(selectedTareIds.map(String));
+
   const itemRows = warehouseItems
     .map((item) => {
-      const selected = selectedMap.get(item.id);
-      const checked = Boolean(selected);
-      const tareId = selected?.tobacco_tare_id ? String(selected.tobacco_tare_id) : '';
-      const options =
-        `<option value="">— тара —</option>` +
-        tares
-          .filter((t) => t.is_active)
-          .map((t) => {
-            const id = String(t.id);
-            return `<option value="${id}"${id === tareId ? ' selected' : ''}>${escapeHtml(t.label)} (${formatG(t.tare_weight_g)})</option>`;
-          })
-          .join('');
+      const checked = selectedItems.has(String(item.id));
       return `
-        <label class="tobacco-item-row">
-          <input
-            type="checkbox"
-            name="item_${item.id}"
-            value="1"
-            ${checked ? 'checked' : ''}
-            onchange="this.closest('.tobacco-item-row').querySelector('select').disabled=!this.checked"
-          >
-          <span class="tobacco-item-name">${escapeHtml(item.name)} <em>${escapeHtml(item.unit || '')}</em></span>
-          <select name="tare_${item.id}" ${checked ? '' : 'disabled'}>
-            ${options}
-          </select>
+        <label class="tobacco-check-row">
+          <input type="checkbox" name="item_${item.id}" value="1" ${checked ? 'checked' : ''}>
+          <span>${escapeHtml(item.name)} <em>${escapeHtml(item.unit || '')}</em></span>
+        </label>
+      `;
+    })
+    .join('');
+
+  const tareRows = tares
+    .filter((t) => t.is_active)
+    .map((t) => {
+      const checked = selectedTares.has(String(t.id));
+      return `
+        <label class="tobacco-check-row">
+          <input type="checkbox" name="tare_${t.id}" value="1" ${checked ? 'checked' : ''}>
+          <span>${escapeHtml(t.label)} <em>тара ${formatG(t.tare_weight_g)}</em></span>
         </label>
       `;
     })
@@ -174,15 +171,19 @@ export function renderVenueTobaccoPanel({
           <span>Допустимая погрешность, г</span>
           <input type="number" name="tolerance_g" value="${tolerance}" step="1" min="0" required>
         </label>
-        <p class="hint">Отметьте складские позиции (обычно в граммах) и укажите тару бренда. На терминале появятся раздел «Учёт» и проверка при закрытии смены.</p>
+
+        <h3 class="tobacco-subhead">1. Тары на точке</h3>
+        <p class="hint">Отметьте все виды банок, которыми пользуетесь (разный вес тары). На терминале по каждой будет своё кол-во и взвешивание.</p>
+        <div class="tobacco-item-list">
+          ${tareRows || '<p class="empty-hint">Сначала добавьте тары в разделе «Тары табака»</p>'}
+        </div>
+
+        <h3 class="tobacco-subhead">2. Складские позиции для сверки остатка</h3>
+        <p class="hint">Какие остатки табака сравнивать с суммарным чистым весом после подсчёта. Привязка «одна тара на позицию» не нужна.</p>
         <div class="tobacco-item-list">
           ${itemRows || '<p class="empty-hint">Сначала заведите номенклатуру на складе</p>'}
         </div>
-        ${
-          tares.length === 0
-            ? '<p class="field-error">Сначала добавьте тары в разделе «Тары табака»</p>'
-            : ''
-        }
+
         <div class="venue-actions">
           <button type="submit">Сохранить учёт табака</button>
         </div>

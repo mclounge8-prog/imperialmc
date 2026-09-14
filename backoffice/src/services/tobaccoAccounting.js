@@ -15,7 +15,7 @@ export async function fetchVenueTobaccoSettings(venueId) {
   return rows[0] || null;
 }
 
-/** Тары, задействованные на заведении (через выбранную номенклатуру) + текущее кол-во банок. */
+/** Тары, подключенные к заведению + кол-во банок. Ожидаемый остаток — общий по складу. */
 export async function fetchVenueTobaccoTares(venueId) {
   const { rows } = await pool.query(
     `SELECT
@@ -25,26 +25,13 @@ export async function fetchVenueTobaccoTares(venueId) {
        t.net_content_g,
        t.tare_weight_g,
        t.is_active,
-       COALESCE(s.qty, 0)::int AS qty,
-       COALESCE((
-         SELECT SUM(COALESCE(vws.stock_qty, 0))
-         FROM venue_tobacco_items vti
-         LEFT JOIN venue_warehouse_stock vws
-           ON vws.venue_id = vti.venue_id AND vws.warehouse_item_id = vti.warehouse_item_id
-         WHERE vti.venue_id = $1 AND vti.tobacco_tare_id = t.id
-       ), 0) AS expected_stock_g,
-       (
-         SELECT COUNT(*)::int FROM venue_tobacco_items vti
-         WHERE vti.venue_id = $1 AND vti.tobacco_tare_id = t.id
-       ) AS item_count
+       COALESCE(s.qty, 0)::int AS qty
      FROM tobacco_tares t
+     JOIN venue_tobacco_tares vt
+       ON vt.tobacco_tare_id = t.id AND vt.venue_id = $1
      LEFT JOIN venue_tobacco_tare_stock s
        ON s.venue_id = $1 AND s.tobacco_tare_id = t.id
      WHERE t.is_active = true
-       AND EXISTS (
-         SELECT 1 FROM venue_tobacco_items vti
-         WHERE vti.venue_id = $1 AND vti.tobacco_tare_id = t.id
-       )
      ORDER BY t.brand, t.label`,
     [venueId]
   );
@@ -55,9 +42,20 @@ export async function fetchVenueTobaccoTares(venueId) {
     netContentG: r.net_content_g != null ? Number(r.net_content_g) : null,
     tareWeightG: Number(r.tare_weight_g),
     qty: Number(r.qty),
-    expectedStockG: Number(r.expected_stock_g),
-    itemCount: Number(r.item_count),
   }));
+}
+
+/** Суммарный остаток учитываемой складской номенклатуры (граммы). */
+export async function fetchVenueTobaccoExpectedStockG(venueId) {
+  const { rows } = await pool.query(
+    `SELECT COALESCE(SUM(COALESCE(vws.stock_qty, 0)), 0) AS expected_stock_g
+     FROM venue_tobacco_items vti
+     LEFT JOIN venue_warehouse_stock vws
+       ON vws.venue_id = vti.venue_id AND vws.warehouse_item_id = vti.warehouse_item_id
+     WHERE vti.venue_id = $1`,
+    [venueId]
+  );
+  return Number(rows[0]?.expected_stock_g || 0);
 }
 
 export async function fetchShiftTobaccoCount(shiftId) {
@@ -115,6 +113,7 @@ export async function saveShiftTobaccoCount({
 }) {
   const tares = await fetchVenueTobaccoTares(venueId);
   const byId = new Map(tares.map((t) => [t.id, t]));
+  const totalExpected = roundGrams(await fetchVenueTobaccoExpectedStockG(venueId));
 
   const normalized = [];
   for (const raw of lines || []) {
@@ -129,8 +128,6 @@ export async function saveShiftTobaccoCount({
       : [];
     const gross = roundGrams(parts.reduce((s, v) => s + v, 0));
     const net = roundGrams(gross - tare.tareWeightG * canQty);
-    const expected = roundGrams(tare.expectedStockG);
-    const delta = roundGrams(net - expected);
     normalized.push({
       tobaccoTareId: tare.id,
       tareLabel: tare.label,
@@ -140,15 +137,21 @@ export async function saveShiftTobaccoCount({
       grossWeightParts: parts,
       grossWeightG: gross,
       netWeightG: net,
-      expectedStockG: expected,
-      deltaG: delta,
+      // Построчный «ожидаемый» не делим по тарам — сверка только итогом.
+      expectedStockG: 0,
+      deltaG: 0,
     });
   }
 
   const totalNet = roundGrams(normalized.reduce((s, l) => s + l.netWeightG, 0));
-  const totalExpected = roundGrams(normalized.reduce((s, l) => s + l.expectedStockG, 0));
   const tol = Number(toleranceG);
   const within = Math.abs(totalNet - totalExpected) <= (Number.isFinite(tol) ? tol : 100);
+  // На итоговую строку кладём общий остаток склада в delta первой линии для отчётов —
+  // а total_expected_g хранит полную сверку.
+  if (normalized.length) {
+    normalized[0].expectedStockG = totalExpected;
+    normalized[0].deltaG = roundGrams(totalNet - totalExpected);
+  }
 
   const client = await pool.connect();
   try {

@@ -76,7 +76,7 @@ tobaccoTares.delete('/:id', async (c) => {
   try {
     await pool.query('DELETE FROM tobacco_tares WHERE id = $1', [c.req.param('id')]);
   } catch (err) {
-    // Если тара привязана к venue_tobacco_items (RESTRICT) — мягко деактивируем.
+    // Если тара привязана к заведениям — мягко деактивируем.
     await pool.query('UPDATE tobacco_tares SET is_active = false WHERE id = $1', [c.req.param('id')]);
   }
   return c.body(null);
