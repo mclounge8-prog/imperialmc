@@ -9,6 +9,11 @@ import {
   saveTobaccoTareMovement,
   serializeTobaccoCountForTerminal,
 } from '../services/tobaccoAccounting.js';
+import {
+  buildTobaccoTareMovementMessage,
+  fetchVenueName,
+  notifyTelegramSafe,
+} from '../services/telegramNotify.js';
 
 const apiTobacco = new Hono();
 apiTobacco.use('*', requireStaffToken);
@@ -97,6 +102,19 @@ apiTobacco.post('/tare-movements', async (c) => {
       lines: body?.lines || [],
       comment: body?.comment,
     });
+
+    const venueName = venue.name || (await fetchVenueName(venueId));
+    notifyTelegramSafe(
+      buildTobaccoTareMovementMessage({
+        venueName,
+        type,
+        lines: result.movement?.lines || [],
+        comment: result.movement?.comment,
+        cashier: staff.name,
+        when: result.movement?.createdAt,
+      })
+    );
+
     return c.json(result);
   } catch (err) {
     const status = Number(err?.status) || 500;

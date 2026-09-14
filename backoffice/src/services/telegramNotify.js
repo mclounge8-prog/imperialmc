@@ -357,6 +357,35 @@ export function buildCashMovementMessage({ venueName, type, amount, comment, cas
     .join('\n');
 }
 
+/** Алерт по приходу / списанию тары на точке. */
+export function buildTobaccoTareMovementMessage({
+  venueName,
+  type,
+  lines,
+  comment,
+  cashier,
+  when,
+}) {
+  const isOut = type === 'writeoff';
+  const title = isOut ? '📦 Тара · списание' : '📦 Тара · приход';
+  const linesOut = [header(title, venueName, when), ''];
+  const items = Array.isArray(lines) ? lines : [];
+  if (!items.length) {
+    linesOut.push('Позиции: —');
+  } else {
+    for (const line of items) {
+      linesOut.push(
+        `• <b>${escapeHtml(line.tareLabel || 'Тара')}</b> — ${escapeHtml(String(line.qty ?? 0))} шт`
+      );
+    }
+    const totalQty = items.reduce((s, l) => s + (Number(l.qty) || 0), 0);
+    linesOut.push('', `Всего банок: <b>${escapeHtml(String(totalQty))}</b>`);
+  }
+  if (comment) linesOut.push(`Комментарий: ${escapeHtml(comment)}`);
+  linesOut.push(`Кассир: ${escapeHtml(cashier || '—')}`);
+  return linesOut.join('\n');
+}
+
 export function buildPrecheckCancelMessage({
   venueName,
   comment,
