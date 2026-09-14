@@ -231,3 +231,155 @@ export function serializeTobaccoCountForTerminal(count) {
     })),
   };
 }
+
+function mapTaresForTerminal(tares) {
+  return (tares || []).map((t) => ({
+    id: t.id,
+    brand: t.brand,
+    label: t.label,
+    netContentG: t.netContentG,
+    tareWeightG: t.tareWeightG,
+    qty: t.qty,
+  }));
+}
+
+/**
+ * Приход или списание тары несколькими позициями.
+ * type: 'receipt' | 'writeoff'
+ * lines: [{ tobaccoTareId, qty }]
+ */
+export async function saveTobaccoTareMovement({
+  venueId,
+  shiftId,
+  type,
+  staffId,
+  staffName,
+  lines,
+  comment,
+}) {
+  if (type !== 'receipt' && type !== 'writeoff') {
+    const err = new Error('type должен быть receipt или writeoff');
+    err.status = 400;
+    throw err;
+  }
+
+  const tares = await fetchVenueTobaccoTares(venueId);
+  const byId = new Map(tares.map((t) => [t.id, t]));
+
+  const normalized = [];
+  for (const raw of lines || []) {
+    const tareId = Number(raw.tobaccoTareId ?? raw.tobacco_tare_id);
+    const qty = Math.round(Number(raw.qty) || 0);
+    const tare = byId.get(tareId);
+    if (!tare) {
+      const err = new Error(`Тара #${tareId} не подключена к заведению`);
+      err.status = 400;
+      throw err;
+    }
+    if (!(qty > 0)) {
+      const err = new Error(`Укажите кол-во > 0 для «${tare.label}»`);
+      err.status = 400;
+      throw err;
+    }
+    normalized.push({
+      tobaccoTareId: tare.id,
+      tareLabel: tare.label,
+      qty,
+      currentQty: tare.qty,
+    });
+  }
+
+  if (!normalized.length) {
+    const err = new Error('Добавьте хотя бы одну позицию');
+    err.status = 400;
+    throw err;
+  }
+
+  // Схлопываем дубли одной тары в одну строку (несколько поставок одной банки).
+  const merged = new Map();
+  for (const line of normalized) {
+    const prev = merged.get(line.tobaccoTareId);
+    if (prev) {
+      prev.qty += line.qty;
+    } else {
+      merged.set(line.tobaccoTareId, { ...line });
+    }
+  }
+  const finalLines = [...merged.values()];
+
+  if (type === 'writeoff') {
+    for (const line of finalLines) {
+      if (line.qty > line.currentQty) {
+        const err = new Error(
+          `Нельзя списать ${line.qty} шт «${line.tareLabel}»: на точке ${line.currentQty} шт`
+        );
+        err.status = 400;
+        throw err;
+      }
+    }
+  }
+
+  const note =
+    typeof comment === 'string' && comment.trim()
+      ? comment.trim().slice(0, 500)
+      : null;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `INSERT INTO tobacco_tare_movements
+         (venue_id, shift_id, type, staff_id, staff_name, comment)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, created_at`,
+      [venueId, shiftId || null, type, staffId || null, staffName || null, note]
+    );
+    const movementId = rows[0].id;
+    const createdAt = rows[0].created_at;
+
+    for (const line of finalLines) {
+      const delta = type === 'receipt' ? line.qty : -line.qty;
+      // eslint-disable-next-line no-await-in-loop
+      await client.query(
+        `INSERT INTO tobacco_tare_movement_lines
+           (movement_id, tobacco_tare_id, tare_label, qty)
+         VALUES ($1, $2, $3, $4)`,
+        [movementId, line.tobaccoTareId, line.tareLabel, line.qty]
+      );
+      // eslint-disable-next-line no-await-in-loop
+      await client.query(
+        `INSERT INTO venue_tobacco_tare_stock (venue_id, tobacco_tare_id, qty, updated_at)
+         VALUES ($1, $2, GREATEST(0, $3), now())
+         ON CONFLICT (venue_id, tobacco_tare_id)
+         DO UPDATE SET
+           qty = GREATEST(0, venue_tobacco_tare_stock.qty + $3),
+           updated_at = now()`,
+        [venueId, line.tobaccoTareId, delta]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    const taresAfter = await fetchVenueTobaccoTares(venueId);
+    return {
+      movement: {
+        id: movementId,
+        type,
+        comment: note,
+        staffName: staffName || null,
+        createdAt,
+        lines: finalLines.map((l) => ({
+          tobaccoTareId: l.tobaccoTareId,
+          tareLabel: l.tareLabel,
+          qty: l.qty,
+        })),
+      },
+      tares: mapTaresForTerminal(taresAfter),
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}

@@ -939,9 +939,9 @@ input[type="radio"] {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 360px;
+  max-height: 280px;
   overflow: auto;
-  margin: 12px 0;
+  margin: 8px 0 16px;
   padding-right: 4px;
 }
 
@@ -953,10 +953,25 @@ input[type="radio"] {
   font-size: 13px;
 }
 
+.tobacco-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.tobacco-check-row em,
 .tobacco-item-name em {
   color: var(--text-muted);
   font-style: normal;
   margin-left: 6px;
+}
+
+.tobacco-subhead {
+  margin: 14px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .tobacco-tare-form {

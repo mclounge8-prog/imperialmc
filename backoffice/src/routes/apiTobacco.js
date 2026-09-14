@@ -6,6 +6,7 @@ import {
   fetchVenueTobaccoSettings,
   fetchVenueTobaccoTares,
   saveShiftTobaccoCount,
+  saveTobaccoTareMovement,
   serializeTobaccoCountForTerminal,
 } from '../services/tobaccoAccounting.js';
 
@@ -66,55 +67,44 @@ apiTobacco.get('/state', async (c) => {
   });
 });
 
-/** Изменить кол-во банок тары: delta (+/-) или абсолютный qty. */
-apiTobacco.post('/tare-qty', async (c) => {
+/**
+ * Приход / списание тары несколькими позициями (поставки приходят пачками).
+ * body: { venue_id, type: 'receipt'|'writeoff', lines: [{ tobaccoTareId, qty }], comment? }
+ */
+apiTobacco.post('/tare-movements', async (c) => {
   const staff = c.get('staff');
   const body = await c.req.json().catch(() => null);
   const venueId = body?.venue_id != null ? Number(body.venue_id) : Number(body?.venueId);
-  const tareId = body?.tobacco_tare_id != null ? Number(body.tobacco_tare_id) : Number(body?.tobaccoTareId);
-  if (!venueId || !tareId) return c.json({ error: 'Нужны venue_id и tobacco_tare_id' }, 400);
+  const type = body?.type === 'writeoff' || body?.type === 'receipt' ? body.type : null;
+  if (!venueId || !type) {
+    return c.json({ error: 'Нужны venue_id и type (receipt|writeoff)' }, 400);
+  }
 
   const venue = await fetchVenueTobaccoSettings(venueId);
   if (!venue?.tobacco_accounting_enabled) {
     return c.json({ error: 'Учёт табака выключен на заведении' }, 409);
   }
 
-  let nextQty;
-  if (body?.qty != null) {
-    nextQty = Math.max(0, Math.round(Number(body.qty) || 0));
-  } else {
-    const delta = Math.round(Number(body?.delta ?? 0) || 0);
-    const { rows } = await pool.query(
-      `SELECT COALESCE(qty, 0)::int AS qty FROM venue_tobacco_tare_stock
-       WHERE venue_id = $1 AND tobacco_tare_id = $2`,
-      [venueId, tareId]
-    );
-    nextQty = Math.max(0, Number(rows[0]?.qty || 0) + delta);
+  const shift = await fetchOpenShift(venueId);
+
+  try {
+    const result = await saveTobaccoTareMovement({
+      venueId,
+      shiftId: shift?.id || null,
+      type,
+      staffId: staff.sub,
+      staffName: staff.name,
+      lines: body?.lines || [],
+      comment: body?.comment,
+    });
+    return c.json(result);
+  } catch (err) {
+    const status = Number(err?.status) || 500;
+    if (status >= 400 && status < 500) {
+      return c.json({ error: err.message || 'Ошибка операции с тарой' }, status);
+    }
+    throw err;
   }
-
-  await pool.query(
-    `INSERT INTO venue_tobacco_tare_stock (venue_id, tobacco_tare_id, qty, updated_at)
-     VALUES ($1, $2, $3, now())
-     ON CONFLICT (venue_id, tobacco_tare_id)
-     DO UPDATE SET qty = EXCLUDED.qty, updated_at = now()`,
-    [venueId, tareId, nextQty]
-  );
-
-  // staff unused but available for future audit
-  void staff;
-
-  const taresRaw = await fetchVenueTobaccoTares(venueId);
-  return c.json({
-    qty: nextQty,
-    tares: taresRaw.map((t) => ({
-      id: t.id,
-      brand: t.brand,
-      label: t.label,
-      netContentG: t.netContentG,
-      tareWeightG: t.tareWeightG,
-      qty: t.qty,
-    })),
-  });
 });
 
 /** Сохранить подсчёт по открытой смене. */

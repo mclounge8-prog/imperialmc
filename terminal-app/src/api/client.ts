@@ -679,18 +679,40 @@ export async function fetchTobaccoState(venueId: number, token: string): Promise
   return authorizedRequest<TobaccoState>(`/api/tobacco/state?venueId=${venueId}`, token);
 }
 
-export async function updateTobaccoTareQty(
+export type TobaccoTareMovementType = 'receipt' | 'writeoff';
+
+export type TobaccoTareMovementLine = {
+  tobaccoTareId: number;
+  tareLabel: string;
+  qty: number;
+};
+
+export type TobaccoTareMovement = {
+  id: number;
+  type: TobaccoTareMovementType;
+  comment: string | null;
+  staffName: string | null;
+  createdAt: string;
+  lines: TobaccoTareMovementLine[];
+};
+
+/** Приход / списание тары несколькими позициями. */
+export async function createTobaccoTareMovement(
   venueId: number,
   token: string,
-  tobaccoTareId: number,
-  opts: { delta?: number; qty?: number }
-): Promise<{ qty: number; tares: TobaccoTare[] }> {
-  return authorizedRequest<{ qty: number; tares: TobaccoTare[] }>('/api/tobacco/tare-qty', token, {
+  payload: {
+    type: TobaccoTareMovementType;
+    lines: Array<{ tobaccoTareId: number; qty: number }>;
+    comment?: string;
+  }
+): Promise<{ movement: TobaccoTareMovement; tares: TobaccoTare[] }> {
+  return authorizedRequest('/api/tobacco/tare-movements', token, {
     method: 'POST',
     body: {
       venue_id: venueId,
-      tobacco_tare_id: tobaccoTareId,
-      ...(opts.qty != null ? { qty: opts.qty } : { delta: opts.delta ?? 0 }),
+      type: payload.type,
+      lines: payload.lines,
+      comment: payload.comment || null,
     },
   });
 }

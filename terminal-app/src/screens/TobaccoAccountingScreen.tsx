@@ -15,9 +15,10 @@ import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import { useDevice } from '../context/DeviceContext';
 import { useSession } from '../context/SessionContext';
 import {
+  createTobaccoTareMovement,
   fetchTobaccoState,
   saveTobaccoCount,
-  updateTobaccoTareQty,
+  type TobaccoTareMovementType,
 } from '../api/client';
 
 function formatG(value: number): string {
@@ -42,9 +43,23 @@ type CountDraft = {
   parts: string[];
 };
 
+type MovementLineDraft = {
+  key: string;
+  tobaccoTareId: number | null;
+  qty: string;
+};
+
 function netOf(draft: CountDraft): number {
   const gross = draft.parts.reduce((sum, p) => sum + (Number(p.replace(',', '.')) || 0), 0);
   return gross - draft.tareWeightG * draft.canQty;
+}
+
+function newMovementLine(): MovementLineDraft {
+  return {
+    key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    tobaccoTareId: null,
+    qty: '',
+  };
 }
 
 export default function TobaccoAccountingScreen() {
@@ -62,6 +77,10 @@ export default function TobaccoAccountingScreen() {
   const [lastWithin, setLastWithin] = useState<boolean | null>(null);
   const [countOpen, setCountOpen] = useState(false);
   const [drafts, setDrafts] = useState<CountDraft[]>([]);
+
+  const [movementType, setMovementType] = useState<TobaccoTareMovementType | null>(null);
+  const [movementLines, setMovementLines] = useState<MovementLineDraft[]>([newMovementLine()]);
+  const [movementComment, setMovementComment] = useState('');
 
   const load = useCallback(async () => {
     if (!venueId || !token) return;
@@ -89,13 +108,67 @@ export default function TobaccoAccountingScreen() {
     load();
   }, [load]);
 
-  const changeQty = async (tareId: number, delta: number) => {
-    if (!venueId || !token) return;
+  const openMovement = (type: TobaccoTareMovementType) => {
+    if (!tares.length) {
+      Alert.alert('Нет тары', 'Сначала привяжите тары к заведению в бэкофисе.');
+      return;
+    }
+    setMovementType(type);
+    setMovementLines([
+      {
+        ...newMovementLine(),
+        tobaccoTareId: tares[0]?.id ?? null,
+      },
+    ]);
+    setMovementComment('');
+  };
+
+  const closeMovement = () => {
+    setMovementType(null);
+    setMovementLines([newMovementLine()]);
+    setMovementComment('');
+  };
+
+  const submitMovement = async () => {
+    if (!venueId || !token || !movementType) return;
+
+    const parsed: Array<{ tobaccoTareId: number; qty: number }> = [];
+    for (const line of movementLines) {
+      if (line.tobaccoTareId == null) {
+        Alert.alert('Не хватает данных', 'Выберите тару в каждой строке.');
+        return;
+      }
+      const qty = Math.round(Number(String(line.qty).replace(',', '.')) || 0);
+      if (!(qty > 0)) {
+        Alert.alert('Не хватает данных', 'Укажите количество больше 0 в каждой строке.');
+        return;
+      }
+      parsed.push({ tobaccoTareId: line.tobaccoTareId, qty });
+    }
+
+    if (!parsed.length) {
+      Alert.alert('Пусто', 'Добавьте хотя бы одну позицию поставки.');
+      return;
+    }
+
+    setSaving(true);
     try {
-      const data = await updateTobaccoTareQty(venueId, token, tareId, { delta });
-      setTares(data.tares || []);
+      const result = await createTobaccoTareMovement(venueId, token, {
+        type: movementType,
+        lines: parsed,
+        comment: movementComment.trim() || undefined,
+      });
+      setTares(result.tares || []);
+      closeMovement();
+      const title = movementType === 'receipt' ? 'Приход сохранён' : 'Списание сохранено';
+      const summary = (result.movement.lines || [])
+        .map((l) => `• ${l.tareLabel}: ${l.qty} шт`)
+        .join('\n');
+      Alert.alert(title, summary || 'Готово');
     } catch (e) {
-      Alert.alert('Ошибка', e instanceof Error ? e.message : 'Не удалось изменить кол-во');
+      Alert.alert('Ошибка', e instanceof Error ? e.message : 'Не удалось сохранить');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -106,7 +179,7 @@ export default function TobaccoAccountingScreen() {
     }
     const withQty = tares.filter((t) => t.qty > 0);
     if (!withQty.length) {
-      Alert.alert('Нет тары', 'Сначала укажите количество банок по брендам.');
+      Alert.alert('Нет тары', 'Сначала оформите приход тары на точку.');
       return;
     }
     setDrafts(
@@ -169,12 +242,18 @@ export default function TobaccoAccountingScreen() {
     );
   }
 
+  const movementTitle = movementType === 'receipt' ? 'Приход тары' : 'Списание тары';
+  const movementHint =
+    movementType === 'receipt'
+      ? 'Добавьте позиции поставки: тара и количество. Можно несколько строк.'
+      : 'Укажите, какую тару и сколько банок списать с точки.';
+
   return (
     <ScreenSwipeHost screen="TobaccoAccounting">
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.hint}>
-          Укажите количество банок по тарам, затем нажмите «Подсчёт». Вес можно вводить частями через «+» —
-          программа вычтет вес тары × кол-во банок.
+          Остаток тары меняется через «Приход» и «Списание». Подсчёт — отдельно: взвесьте табак
+          частями через «+», программа вычтет вес тары × кол-во банок.
         </Text>
 
         {lastCountNet != null ? (
@@ -200,24 +279,127 @@ export default function TobaccoAccountingScreen() {
                   <Text style={styles.rowTitle}>{tare.label}</Text>
                   <Text style={styles.rowSub}>тара {formatG(tare.tareWeightG)}</Text>
                 </View>
-                <View style={styles.qtyBlock}>
-                  <Pressable style={styles.qtyBtn} onPress={() => changeQty(tare.id, -1)}>
-                    <Text style={styles.qtyBtnText}>−</Text>
-                  </Pressable>
-                  <Text style={styles.qtyValue}>{tare.qty}</Text>
-                  <Pressable style={styles.qtyBtn} onPress={() => changeQty(tare.id, 1)}>
-                    <Text style={styles.qtyBtnText}>+</Text>
-                  </Pressable>
-                </View>
+                <Text style={styles.qtyValue}>{tare.qty} шт</Text>
               </View>
             ))
           )}
+        </View>
+
+        <View style={styles.actionsRow}>
+          <Pressable style={[styles.actionBtn, styles.actionReceipt]} onPress={() => openMovement('receipt')}>
+            <Text style={styles.actionBtnText}>Приход</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionBtn, styles.actionWriteoff]}
+            onPress={() => openMovement('writeoff')}
+          >
+            <Text style={styles.actionBtnText}>Списание</Text>
+          </Pressable>
         </View>
 
         <Pressable style={styles.primaryBtn} onPress={openCount}>
           <Text style={styles.primaryBtnText}>Подсчёт</Text>
         </Pressable>
       </ScrollView>
+
+      <Modal visible={movementType != null} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <Text style={styles.modalTitle}>{movementTitle}</Text>
+            <Text style={styles.modalHint}>{movementHint}</Text>
+            <ScrollView style={styles.modalScroll} contentContainerStyle={{ gap: 12, paddingBottom: 12 }}>
+              {movementLines.map((line, lineIdx) => (
+                <View key={line.key} style={styles.draftCard}>
+                  <View style={styles.lineHeader}>
+                    <Text style={styles.draftTitle}>Позиция {lineIdx + 1}</Text>
+                    {movementLines.length > 1 ? (
+                      <Pressable
+                        onPress={() =>
+                          setMovementLines((prev) => prev.filter((l) => l.key !== line.key))
+                        }
+                      >
+                        <Text style={styles.removeLine}>Удалить</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+
+                  <Text style={styles.fieldLabel}>Тара</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tareChips}>
+                    {tares.map((tare) => {
+                      const selected = line.tobaccoTareId === tare.id;
+                      return (
+                        <Pressable
+                          key={tare.id}
+                          style={[styles.tareChip, selected && styles.tareChipActive]}
+                          onPress={() =>
+                            setMovementLines((prev) =>
+                              prev.map((l) =>
+                                l.key === line.key ? { ...l, tobaccoTareId: tare.id } : l
+                              )
+                            )
+                          }
+                        >
+                          <Text style={[styles.tareChipText, selected && styles.tareChipTextActive]}>
+                            {tare.label}
+                          </Text>
+                          {movementType === 'writeoff' ? (
+                            <Text style={[styles.tareChipMeta, selected && styles.tareChipTextActive]}>
+                              {tare.qty} шт
+                            </Text>
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+
+                  <Text style={styles.fieldLabel}>Количество, шт</Text>
+                  <TextInput
+                    style={styles.partInput}
+                    keyboardType="number-pad"
+                    value={line.qty}
+                    placeholder="0"
+                    placeholderTextColor={colors.textMuted}
+                    onChangeText={(text) =>
+                      setMovementLines((prev) =>
+                        prev.map((l) => (l.key === line.key ? { ...l, qty: text.replace(/[^\d]/g, '') } : l))
+                      )
+                    }
+                  />
+                </View>
+              ))}
+
+              <Pressable
+                style={styles.addLineBtn}
+                onPress={() =>
+                  setMovementLines((prev) => [
+                    ...prev,
+                    { ...newMovementLine(), tobaccoTareId: tares[0]?.id ?? null },
+                  ])
+                }
+              >
+                <Text style={styles.addLineText}>+ Ещё позиция</Text>
+              </Pressable>
+
+              <Text style={styles.fieldLabel}>Комментарий (необязательно)</Text>
+              <TextInput
+                style={styles.partInput}
+                value={movementComment}
+                placeholder="Например: поставка от 14.09"
+                placeholderTextColor={colors.textMuted}
+                onChangeText={setMovementComment}
+              />
+            </ScrollView>
+            <View style={styles.modalActions}>
+              <Pressable style={styles.secondaryBtn} onPress={closeMovement} disabled={saving}>
+                <Text style={styles.secondaryBtnText}>Отмена</Text>
+              </Pressable>
+              <Pressable style={styles.primaryBtn} onPress={submitMovement} disabled={saving}>
+                <Text style={styles.primaryBtnText}>{saving ? '…' : 'Сохранить'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={countOpen} animationType="slide" transparent>
         <View style={styles.modalBackdrop}>
@@ -321,19 +503,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   rowTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
   rowSub: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  qtyBlock: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  qtyBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors.surface2 || '#24242a',
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qtyBtnText: { color: colors.text, fontSize: 20, fontWeight: '600' },
-  qtyValue: { color: colors.text, fontSize: 18, fontWeight: '700', minWidth: 28, textAlign: 'center' },
+  qtyValue: { color: colors.text, fontSize: 18, fontWeight: '700' },
   empty: { color: colors.textMuted, padding: 16, fontSize: 13 },
   summaryCard: {
     backgroundColor: colors.surface,
@@ -345,7 +515,25 @@ const styles = StyleSheet.create({
   summaryLabel: { color: colors.textMuted, fontSize: 12 },
   summaryValue: { color: colors.text, fontSize: 28, fontWeight: '700', marginTop: 4 },
   summaryMeta: { color: colors.textMuted, fontSize: 12, marginTop: 6 },
+  actionsRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  actionBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  actionReceipt: {
+    backgroundColor: colors.surface,
+    borderColor: colors.accent,
+  },
+  actionWriteoff: {
+    backgroundColor: colors.surface,
+    borderColor: colors.danger || '#c44',
+  },
+  actionBtnText: { color: colors.text, fontSize: 15, fontWeight: '700' },
   primaryBtn: {
+    flex: 1,
     backgroundColor: colors.accent,
     borderRadius: 12,
     paddingVertical: 14,
@@ -368,7 +556,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalPanel: {
-    maxHeight: '90%',
+    maxHeight: '92%',
     backgroundColor: colors.bg,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
@@ -377,7 +565,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
   modalHint: { color: colors.textMuted, fontSize: 13 },
-  modalScroll: { maxHeight: 420 },
+  modalScroll: { maxHeight: 460 },
   draftCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -389,6 +577,35 @@ const styles = StyleSheet.create({
   draftTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
   draftSub: { color: colors.textMuted, fontSize: 12 },
   draftNet: { color: colors.text, fontSize: 14, fontWeight: '600', marginTop: 4 },
+  lineHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  removeLine: { color: colors.danger || '#c44', fontSize: 13, fontWeight: '600' },
+  fieldLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '600', marginTop: 4 },
+  tareChips: { flexGrow: 0 },
+  tareChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    backgroundColor: colors.bg,
+  },
+  tareChipActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
+  },
+  tareChipText: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  tareChipTextActive: { color: '#fff' },
+  tareChipMeta: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  addLineBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  addLineText: { color: colors.text, fontSize: 14, fontWeight: '600' },
   partRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   partInput: {
     flex: 1,
