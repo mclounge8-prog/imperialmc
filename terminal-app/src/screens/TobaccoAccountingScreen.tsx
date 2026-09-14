@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,6 +27,27 @@ import {
 function formatG(value: number): string {
   const n = Number(value) || 0;
   return `${Math.round(n).toLocaleString('ru-RU')} г`;
+}
+
+const KEY_ROWS = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['.', '0', '⌫'],
+];
+
+function applyKeypadDigit(prev: string, key: string, { decimals = 1 }: { decimals?: number } = {}): string {
+  if (key === '⌫') {
+    const next = prev.slice(0, -1);
+    return next === '' ? '0' : next;
+  }
+  if (key === '.') {
+    return prev.includes('.') ? prev : prev === '' ? '0.' : `${prev}.`;
+  }
+  const dotIndex = prev.indexOf('.');
+  if (dotIndex !== -1 && prev.length - dotIndex > decimals) return prev;
+  if (prev === '0') return key;
+  return prev + key;
 }
 
 type TareRow = {
@@ -61,6 +84,53 @@ function newMovementLine(): MovementLineDraft {
     tobaccoTareId: null,
     qty: '',
   };
+}
+
+function ModalShell({
+  visible,
+  onRequestClose,
+  children,
+}: {
+  visible: boolean;
+  onRequestClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onRequestClose}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
+      >
+        <Pressable style={styles.modalBackdropPress} onPress={onRequestClose} />
+        <View style={styles.modalCard}>{children}</View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function Keypad({
+  onKey,
+}: {
+  onKey: (key: string) => void;
+}) {
+  return (
+    <View style={styles.keypad}>
+      {KEY_ROWS.map((row, rowIndex) => (
+        <View key={rowIndex} style={styles.keypadRow}>
+          {row.map((key) => (
+            <Pressable
+              key={key}
+              style={({ pressed }) => [styles.key, pressed && styles.keyPressed]}
+              onPress={() => onKey(key)}
+            >
+              <Text style={styles.keyText}>{key}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
 }
 
 export default function TobaccoAccountingScreen() {
@@ -135,7 +205,7 @@ export default function TobaccoAccountingScreen() {
   };
 
   const openStockWriteoff = () => {
-    setStockWriteoffAmount('');
+    setStockWriteoffAmount('0');
     setStockWriteoffComment('');
     setStockWriteoffOpen(true);
   };
@@ -335,218 +405,223 @@ export default function TobaccoAccountingScreen() {
           <Text style={styles.actionBtnSub}>меласса, граммы</Text>
         </Pressable>
 
-        <Pressable style={styles.primaryBtn} onPress={openCount}>
+        <Pressable style={styles.screenPrimaryBtn} onPress={openCount}>
           <Text style={styles.primaryBtnText}>Подсчёт</Text>
         </Pressable>
       </ScrollView>
 
-      <Modal visible={movementType != null} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalPanel}>
-            <Text style={styles.modalTitle}>{movementTitle}</Text>
-            <Text style={styles.modalHint}>{movementHint}</Text>
-            <ScrollView style={styles.modalScroll} contentContainerStyle={{ gap: 12, paddingBottom: 12 }}>
-              {movementLines.map((line, lineIdx) => (
-                <View key={line.key} style={styles.draftCard}>
-                  <View style={styles.lineHeader}>
-                    <Text style={styles.draftTitle}>Позиция {lineIdx + 1}</Text>
-                    {movementLines.length > 1 ? (
-                      <Pressable
-                        onPress={() =>
-                          setMovementLines((prev) => prev.filter((l) => l.key !== line.key))
-                        }
-                      >
-                        <Text style={styles.removeLine}>Удалить</Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-
-                  <Text style={styles.fieldLabel}>Тара</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tareChips}>
-                    {tares.map((tare) => {
-                      const selected = line.tobaccoTareId === tare.id;
-                      return (
-                        <Pressable
-                          key={tare.id}
-                          style={[styles.tareChip, selected && styles.tareChipActive]}
-                          onPress={() =>
-                            setMovementLines((prev) =>
-                              prev.map((l) =>
-                                l.key === line.key ? { ...l, tobaccoTareId: tare.id } : l
-                              )
-                            )
-                          }
-                        >
-                          <Text style={[styles.tareChipText, selected && styles.tareChipTextActive]}>
-                            {tare.label}
-                          </Text>
-                          {movementType === 'writeoff' ? (
-                            <Text style={[styles.tareChipMeta, selected && styles.tareChipTextActive]}>
-                              {tare.qty} шт
-                            </Text>
-                          ) : null}
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-
-                  <Text style={styles.fieldLabel}>Количество, шт</Text>
-                  <TextInput
-                    style={styles.partInput}
-                    keyboardType="number-pad"
-                    value={line.qty}
-                    placeholder="0"
-                    placeholderTextColor={colors.textMuted}
-                    onChangeText={(text) =>
-                      setMovementLines((prev) =>
-                        prev.map((l) => (l.key === line.key ? { ...l, qty: text.replace(/[^\d]/g, '') } : l))
-                      )
+      <ModalShell visible={movementType != null} onRequestClose={closeMovement}>
+        <Text style={styles.modalTitle}>{movementTitle}</Text>
+        <Text style={styles.modalHint}>{movementHint}</Text>
+        <ScrollView
+          style={styles.modalScroll}
+          contentContainerStyle={styles.modalScrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {movementLines.map((line, lineIdx) => (
+            <View key={line.key} style={styles.draftCard}>
+              <View style={styles.lineHeader}>
+                <Text style={styles.draftTitle}>Позиция {lineIdx + 1}</Text>
+                {movementLines.length > 1 ? (
+                  <Pressable
+                    onPress={() =>
+                      setMovementLines((prev) => prev.filter((l) => l.key !== line.key))
                     }
-                  />
-                </View>
-              ))}
+                  >
+                    <Text style={styles.removeLine}>Удалить</Text>
+                  </Pressable>
+                ) : null}
+              </View>
 
-              <Pressable
-                style={styles.addLineBtn}
-                onPress={() =>
-                  setMovementLines((prev) => [
-                    ...prev,
-                    { ...newMovementLine(), tobaccoTareId: tares[0]?.id ?? null },
-                  ])
-                }
-              >
-                <Text style={styles.addLineText}>+ Ещё позиция</Text>
-              </Pressable>
+              <Text style={styles.fieldLabel}>Тара</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tareChips}>
+                {tares.map((tare) => {
+                  const selected = line.tobaccoTareId === tare.id;
+                  return (
+                    <Pressable
+                      key={tare.id}
+                      style={[styles.tareChip, selected && styles.tareChipActive]}
+                      onPress={() =>
+                        setMovementLines((prev) =>
+                          prev.map((l) =>
+                            l.key === line.key ? { ...l, tobaccoTareId: tare.id } : l
+                          )
+                        )
+                      }
+                    >
+                      <Text style={[styles.tareChipText, selected && styles.tareChipTextActive]}>
+                        {tare.label}
+                      </Text>
+                      {movementType === 'writeoff' ? (
+                        <Text style={[styles.tareChipMeta, selected && styles.tareChipTextActive]}>
+                          {tare.qty} шт
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
 
-              <Text style={styles.fieldLabel}>Комментарий (необязательно)</Text>
+              <Text style={styles.fieldLabel}>Количество, шт</Text>
               <TextInput
-                style={styles.partInput}
-                value={movementComment}
-                placeholder="Например: поставка от 14.09"
+                style={[styles.fieldInput, styles.fieldInputFull]}
+                keyboardType="number-pad"
+                value={line.qty}
+                placeholder="0"
                 placeholderTextColor={colors.textMuted}
-                onChangeText={setMovementComment}
+                onChangeText={(text) =>
+                  setMovementLines((prev) =>
+                    prev.map((l) =>
+                      l.key === line.key ? { ...l, qty: text.replace(/[^\d]/g, '') } : l
+                    )
+                  )
+                }
               />
-            </ScrollView>
-            <View style={styles.modalActions}>
-              <Pressable style={styles.secondaryBtn} onPress={closeMovement} disabled={saving}>
-                <Text style={styles.secondaryBtnText}>Отмена</Text>
-              </Pressable>
-              <Pressable style={styles.primaryBtn} onPress={submitMovement} disabled={saving}>
-                <Text style={styles.primaryBtnText}>{saving ? '…' : 'Сохранить'}</Text>
-              </Pressable>
             </View>
-          </View>
-        </View>
-      </Modal>
+          ))}
 
-      <Modal visible={stockWriteoffOpen} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalPanel}>
-            <Text style={styles.modalTitle}>Списание остатка</Text>
-            <Text style={styles.modalHint}>
-              Укажите, сколько грамм табака списать со склада точки (меласса / неприготавливаемый
-              продукт). Больше текущего остатка списать нельзя.
-            </Text>
-            <Text style={styles.fieldLabel}>Количество, г</Text>
-            <TextInput
-              style={styles.partInput}
-              keyboardType="decimal-pad"
-              value={stockWriteoffAmount}
-              placeholder="0"
-              placeholderTextColor={colors.textMuted}
-              onChangeText={setStockWriteoffAmount}
-            />
-            <Text style={styles.fieldLabel}>Комментарий (необязательно)</Text>
-            <TextInput
-              style={styles.partInput}
-              value={stockWriteoffComment}
-              placeholder="Например: меласса после переборки"
-              placeholderTextColor={colors.textMuted}
-              onChangeText={setStockWriteoffComment}
-            />
-            <View style={styles.modalActions}>
-              <Pressable
-                style={styles.secondaryBtn}
-                onPress={() => setStockWriteoffOpen(false)}
-                disabled={saving}
-              >
-                <Text style={styles.secondaryBtnText}>Отмена</Text>
-              </Pressable>
-              <Pressable style={styles.primaryBtn} onPress={submitStockWriteoff} disabled={saving}>
-                <Text style={styles.primaryBtnText}>{saving ? '…' : 'Списать'}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+          <Pressable
+            style={styles.addLineBtn}
+            onPress={() =>
+              setMovementLines((prev) => [
+                ...prev,
+                { ...newMovementLine(), tobaccoTareId: tares[0]?.id ?? null },
+              ])
+            }
+          >
+            <Text style={styles.addLineText}>+ Ещё позиция</Text>
+          </Pressable>
 
-      <Modal visible={countOpen} animationType="slide" transparent>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalPanel}>
-            <Text style={styles.modalTitle}>Подсчёт табака</Text>
-            <Text style={styles.modalHint}>Чистый вес сейчас: {formatG(totalNet)}</Text>
-            <ScrollView style={styles.modalScroll} contentContainerStyle={{ gap: 14, paddingBottom: 12 }}>
-              {drafts.map((draft, draftIdx) => (
-                <View key={draft.tobaccoTareId} style={styles.draftCard}>
-                  <Text style={styles.draftTitle}>
-                    {draft.label} · {draft.canQty} шт
-                  </Text>
-                  <Text style={styles.draftSub}>
-                    − тара {formatG(draft.tareWeightG)} × {draft.canQty} ={' '}
-                    {formatG(draft.tareWeightG * draft.canQty)}
-                  </Text>
-                  {draft.parts.map((part, partIdx) => (
-                    <View key={partIdx} style={styles.partRow}>
-                      <TextInput
-                        style={styles.partInput}
-                        keyboardType="decimal-pad"
-                        value={part}
-                        placeholder="Вес, г"
-                        placeholderTextColor={colors.textMuted}
-                        onChangeText={(text) => {
-                          setDrafts((prev) =>
-                            prev.map((d, i) => {
-                              if (i !== draftIdx) return d;
-                              const parts = d.parts.slice();
-                              parts[partIdx] = text;
-                              return { ...d, parts };
-                            })
-                          );
-                        }}
-                      />
-                      {partIdx === draft.parts.length - 1 ? (
-                        <Pressable
-                          style={styles.addPartBtn}
-                          onPress={() => {
-                            setDrafts((prev) =>
-                              prev.map((d, i) =>
-                                i === draftIdx ? { ...d, parts: [...d.parts, ''] } : d
-                              )
-                            );
-                          }}
-                        >
-                          <Text style={styles.addPartText}>+</Text>
-                        </Pressable>
-                      ) : (
-                        <View style={styles.addPartSpacer} />
-                      )}
-                    </View>
-                  ))}
-                  <Text style={styles.draftNet}>чистое: {formatG(netOf(draft))}</Text>
+          <Text style={styles.fieldLabel}>Комментарий (необязательно)</Text>
+          <TextInput
+            style={styles.commentInput}
+            value={movementComment}
+            placeholder="Например: поставка от 14.09"
+            placeholderTextColor={colors.textMuted}
+            multiline
+            onChangeText={setMovementComment}
+          />
+        </ScrollView>
+        <View style={styles.modalActions}>
+          <Pressable style={styles.secondaryBtn} onPress={closeMovement} disabled={saving}>
+            <Text style={styles.secondaryBtnText}>Отмена</Text>
+          </Pressable>
+          <Pressable style={styles.primaryBtn} onPress={submitMovement} disabled={saving}>
+            <Text style={styles.primaryBtnText}>{saving ? '…' : 'Сохранить'}</Text>
+          </Pressable>
+        </View>
+      </ModalShell>
+
+      <ModalShell
+        visible={stockWriteoffOpen}
+        onRequestClose={() => !saving && setStockWriteoffOpen(false)}
+      >
+        <Text style={styles.modalTitle}>Списание остатка</Text>
+        <Text style={styles.modalHint}>
+          Сколько грамм списать со склада точки. Больше текущего остатка нельзя. Ввод — номпадом,
+          без системной клавиатуры.
+        </Text>
+
+        <View style={styles.amountDisplay}>
+          <Text style={styles.amountDisplayText}>{stockWriteoffAmount || '0'} г</Text>
+        </View>
+        <Keypad
+          onKey={(key) =>
+            setStockWriteoffAmount((prev) => applyKeypadDigit(prev || '0', key, { decimals: 1 }))
+          }
+        />
+
+        <Text style={styles.fieldLabel}>Комментарий (необязательно)</Text>
+        <TextInput
+          style={styles.commentInput}
+          value={stockWriteoffComment}
+          placeholder="Например: меласса после переборки"
+          placeholderTextColor={colors.textMuted}
+          multiline
+          onChangeText={setStockWriteoffComment}
+        />
+
+        <View style={styles.modalActions}>
+          <Pressable
+            style={styles.secondaryBtn}
+            onPress={() => setStockWriteoffOpen(false)}
+            disabled={saving}
+          >
+            <Text style={styles.secondaryBtnText}>Отмена</Text>
+          </Pressable>
+          <Pressable style={styles.primaryBtn} onPress={submitStockWriteoff} disabled={saving}>
+            <Text style={styles.primaryBtnText}>{saving ? '…' : 'Списать'}</Text>
+          </Pressable>
+        </View>
+      </ModalShell>
+
+      <ModalShell visible={countOpen} onRequestClose={() => !saving && setCountOpen(false)}>
+        <Text style={styles.modalTitle}>Подсчёт табака</Text>
+        <Text style={styles.modalHint}>Чистый вес сейчас: {formatG(totalNet)}</Text>
+        <ScrollView
+          style={styles.modalScroll}
+          contentContainerStyle={styles.modalScrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {drafts.map((draft, draftIdx) => (
+            <View key={draft.tobaccoTareId} style={styles.draftCard}>
+              <Text style={styles.draftTitle}>
+                {draft.label} · {draft.canQty} шт
+              </Text>
+              <Text style={styles.draftSub}>
+                − тара {formatG(draft.tareWeightG)} × {draft.canQty} ={' '}
+                {formatG(draft.tareWeightG * draft.canQty)}
+              </Text>
+              {draft.parts.map((part, partIdx) => (
+                <View key={partIdx} style={styles.partRow}>
+                  <TextInput
+                    style={[styles.fieldInput, styles.fieldInputFlex]}
+                    keyboardType="decimal-pad"
+                    value={part}
+                    placeholder="Вес, г"
+                    placeholderTextColor={colors.textMuted}
+                    onChangeText={(text) => {
+                      setDrafts((prev) =>
+                        prev.map((d, i) => {
+                          if (i !== draftIdx) return d;
+                          const parts = d.parts.slice();
+                          parts[partIdx] = text;
+                          return { ...d, parts };
+                        })
+                      );
+                    }}
+                  />
+                  {partIdx === draft.parts.length - 1 ? (
+                    <Pressable
+                      style={styles.addPartBtn}
+                      onPress={() => {
+                        setDrafts((prev) =>
+                          prev.map((d, i) =>
+                            i === draftIdx ? { ...d, parts: [...d.parts, ''] } : d
+                          )
+                        );
+                      }}
+                    >
+                      <Text style={styles.addPartText}>+</Text>
+                    </Pressable>
+                  ) : (
+                    <View style={styles.addPartSpacer} />
+                  )}
                 </View>
               ))}
-            </ScrollView>
-            <View style={styles.modalActions}>
-              <Pressable style={styles.secondaryBtn} onPress={() => setCountOpen(false)} disabled={saving}>
-                <Text style={styles.secondaryBtnText}>Отмена</Text>
-              </Pressable>
-              <Pressable style={styles.primaryBtn} onPress={submitCount} disabled={saving}>
-                <Text style={styles.primaryBtnText}>{saving ? '…' : 'Сохранить'}</Text>
-              </Pressable>
+              <Text style={styles.draftNet}>чистое: {formatG(netOf(draft))}</Text>
             </View>
-          </View>
+          ))}
+        </ScrollView>
+        <View style={styles.modalActions}>
+          <Pressable style={styles.secondaryBtn} onPress={() => setCountOpen(false)} disabled={saving}>
+            <Text style={styles.secondaryBtnText}>Отмена</Text>
+          </Pressable>
+          <Pressable style={styles.primaryBtn} onPress={submitCount} disabled={saving}>
+            <Text style={styles.primaryBtnText}>{saving ? '…' : 'Сохранить'}</Text>
+          </Pressable>
         </View>
-      </Modal>
+      </ModalShell>
     </ScreenSwipeHost>
   );
 }
@@ -610,49 +685,72 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.danger || '#c44',
   },
-  actionStockWriteoff: {
+  stockWriteoffBtn: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    paddingVertical: 12,
-    flexGrow: 0,
-    flex: undefined as unknown as number,
   },
   actionBtnText: { color: colors.text, fontSize: 15, fontWeight: '700' },
   actionBtnSub: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  screenPrimaryBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+    marginTop: 4,
+  },
   primaryBtn: {
     flex: 1,
     backgroundColor: colors.accent,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'center',
+    minHeight: 48,
   },
   primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   secondaryBtn: {
+    flex: 1,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 18,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
   },
   secondaryBtnText: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  modalBackdrop: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 20,
   },
-  modalPanel: {
-    maxHeight: '92%',
+  modalBackdropPress: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  modalCard: {
     backgroundColor: colors.bg,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 16,
     gap: 10,
+    maxHeight: '90%',
+    zIndex: 1,
   },
   modalTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
-  modalHint: { color: colors.textMuted, fontSize: 13 },
-  modalScroll: { maxHeight: 460 },
+  modalHint: { color: colors.textMuted, fontSize: 13, lineHeight: 18 },
+  modalScroll: { flexGrow: 0, maxHeight: 360 },
+  modalScrollContent: { gap: 12, paddingBottom: 8 },
   draftCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -694,26 +792,72 @@ const styles = StyleSheet.create({
   },
   addLineText: { color: colors.text, fontSize: 14, fontWeight: '600' },
   partRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  partInput: {
-    flex: 1,
+  fieldInput: {
+    minHeight: 52,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     color: colors.text,
-    backgroundColor: colors.bg,
-    fontSize: 16,
+    backgroundColor: colors.surface,
+    fontSize: 20,
+    fontWeight: '600',
   },
+  fieldInputFull: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  fieldInputFlex: {
+    flex: 1,
+  },
+  commentInput: {
+    alignSelf: 'stretch',
+    width: '100%',
+    minHeight: 72,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: colors.text,
+    backgroundColor: colors.surface,
+    fontSize: 16,
+    textAlignVertical: 'top',
+  },
+  amountDisplay: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    alignItems: 'flex-end',
+  },
+  amountDisplayText: { color: colors.text, fontSize: 32, fontWeight: '700' },
+  keypad: { gap: 8 },
+  keypadRow: { flexDirection: 'row', gap: 8 },
+  key: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 12,
+    backgroundColor: colors.surface2 || '#24242a',
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  keyPressed: { opacity: 0.7, backgroundColor: colors.border },
+  keyText: { color: colors.text, fontSize: 22, fontWeight: '700' },
   addPartBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 48,
+    height: 52,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.accent,
   },
   addPartText: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  addPartSpacer: { width: 40 },
-  modalActions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  addPartSpacer: { width: 48 },
+  modalActions: { flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 4 },
 });
