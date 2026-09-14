@@ -25,9 +25,14 @@ export default function TerminalHeaderRight() {
   if (!session) return null;
 
   const showReferenceButton = route.name !== 'MenuReference';
-  const showSettingsButton = !['Settings', 'XReport', 'ShiftReceipts', 'AtolStatus', 'Cash'].includes(
-    route.name
-  );
+  const showSettingsButton = ![
+    'Settings',
+    'XReport',
+    'ShiftReceipts',
+    'AtolStatus',
+    'Cash',
+    'TobaccoAccounting',
+  ].includes(route.name);
   const onStatusScreen = route.name === 'AtolStatus';
 
   const serverOk = serverOnline !== false;

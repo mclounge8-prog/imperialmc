@@ -896,6 +896,111 @@ input[type="radio"] {
   margin-top: 12px;
 }
 
+.venue-flag-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.venue-tobacco-panel-host:not(:empty),
+.venue-tobacco-panel {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.venue-tobacco-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.venue-tobacco-form .field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  max-width: 240px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.venue-tobacco-form .field-block input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2, #24242a);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.tobacco-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+  margin: 8px 0 16px;
+  padding-right: 4px;
+}
+
+.tobacco-item-row {
+  display: grid;
+  grid-template-columns: auto 1fr minmax(160px, 220px);
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.tobacco-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.tobacco-check-row--suggest {
+  background: rgba(38, 71, 199, 0.08);
+  border-radius: 8px;
+  padding: 4px 6px;
+  margin: 0 -6px;
+}
+
+.tobacco-check-row em,
+.tobacco-item-name em {
+  color: var(--text-muted);
+  font-style: normal;
+  margin-left: 6px;
+}
+
+.tobacco-subhead {
+  margin: 14px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tobacco-tare-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.tobacco-tare-form input[type="text"],
+.tobacco-tare-form input[type="number"] {
+  min-width: 140px;
+}
+
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 .staff-checklist {
   display: flex;
   flex-wrap: wrap;

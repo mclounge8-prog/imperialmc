@@ -72,7 +72,7 @@ export async function loginWithPin(pin: string, deviceToken: string): Promise<St
 
 export type DeviceStatus = {
   active: boolean;
-  venue: { id: number; name: string; precheckEnabled?: boolean } | null;
+  venue: { id: number; name: string; precheckEnabled?: boolean; tobaccoAccountingEnabled?: boolean; tobaccoToleranceG?: number } | null;
 };
 
 export async function registerDevice(code: string): Promise<{ token: string }> {
@@ -622,7 +622,7 @@ export async function closeShift(
   venueId: number,
   token: string,
   closingCash: number,
-  options?: { forcePin?: string }
+  options?: { forcePin?: string; skipTobaccoCount?: boolean }
 ): Promise<Shift> {
   const { shift } = await authorizedRequest<{ shift: Shift }>('/api/shifts/close', token, {
     method: 'POST',
@@ -630,9 +630,131 @@ export async function closeShift(
       venue_id: venueId,
       closing_cash: closingCash,
       ...(options?.forcePin ? { force_pin: options.forcePin } : {}),
+      ...(options?.skipTobaccoCount ? { skip_tobacco_count: true } : {}),
     },
   });
   return shift;
+}
+
+export type TobaccoTare = {
+  id: number;
+  brand: string;
+  label: string;
+  netContentG: number | null;
+  tareWeightG: number;
+  qty: number;
+};
+
+export type TobaccoCountLine = {
+  tobaccoTareId: number | null;
+  tareLabel: string;
+  brand: string | null;
+  tareWeightG: number;
+  canQty: number;
+  grossWeightParts: number[];
+  grossWeightG: number;
+  netWeightG: number;
+};
+
+export type TobaccoCount = {
+  id: number;
+  shiftId: number;
+  countedAt: string;
+  countedByName: string | null;
+  totalNetG: number;
+  withinTolerance: boolean;
+  skipped: boolean;
+  lines: TobaccoCountLine[];
+};
+
+export type TobaccoState = {
+  enabled: boolean;
+  toleranceG: number;
+  shiftId: number | null;
+  tares: TobaccoTare[];
+  count: TobaccoCount | null;
+};
+
+export async function fetchTobaccoState(venueId: number, token: string): Promise<TobaccoState> {
+  return authorizedRequest<TobaccoState>(`/api/tobacco/state?venueId=${venueId}`, token);
+}
+
+export type TobaccoTareMovementType = 'receipt' | 'writeoff';
+
+export type TobaccoTareMovementLine = {
+  tobaccoTareId: number;
+  tareLabel: string;
+  qty: number;
+};
+
+export type TobaccoTareMovement = {
+  id: number;
+  type: TobaccoTareMovementType;
+  comment: string | null;
+  staffName: string | null;
+  createdAt: string;
+  lines: TobaccoTareMovementLine[];
+};
+
+/** Приход / списание тары несколькими позициями. */
+export async function createTobaccoTareMovement(
+  venueId: number,
+  token: string,
+  payload: {
+    type: TobaccoTareMovementType;
+    lines: Array<{ tobaccoTareId: number; qty: number }>;
+    comment?: string;
+  }
+): Promise<{ movement: TobaccoTareMovement; tares: TobaccoTare[] }> {
+  return authorizedRequest('/api/tobacco/tare-movements', token, {
+    method: 'POST',
+    body: {
+      venue_id: venueId,
+      type: payload.type,
+      lines: payload.lines,
+      comment: payload.comment || null,
+    },
+  });
+}
+
+export type TobaccoStockWriteoff = {
+  id: number;
+  amountG: number;
+  comment: string | null;
+  staffName: string | null;
+  createdAt: string;
+};
+
+/** Списание остатка табака (меласса) в граммах со склада точки. */
+export async function createTobaccoStockWriteoff(
+  venueId: number,
+  token: string,
+  payload: { amountG: number; comment?: string }
+): Promise<{ writeoff: TobaccoStockWriteoff }> {
+  return authorizedRequest('/api/tobacco/stock-writeoffs', token, {
+    method: 'POST',
+    body: {
+      venue_id: venueId,
+      amount_g: payload.amountG,
+      comment: payload.comment || null,
+    },
+  });
+}
+
+export async function saveTobaccoCount(
+  venueId: number,
+  token: string,
+  payload: {
+    lines: Array<{ tobaccoTareId: number; canQty: number; grossWeightParts: number[] }>;
+  }
+): Promise<{
+  count: TobaccoCount;
+  summary: { totalNetG: number; withinTolerance: boolean; toleranceG: number };
+}> {
+  return authorizedRequest('/api/tobacco/count', token, {
+    method: 'POST',
+    body: { venue_id: venueId, lines: payload.lines },
+  });
 }
 
 export type CashMovementType = 'deposit' | 'withdrawal';

@@ -601,3 +601,149 @@ CREATE TABLE IF NOT EXISTS telegram_settings (
 
 INSERT INTO telegram_settings (id, enabled) VALUES (1, false)
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- Учёт табака: тары (бренд + фасовка), привязка номенклатуры к заведению,
+-- кол-во банок на точке, сменный подсчёт чистого веса.
+-- ============================================================
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS tobacco_accounting_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS tobacco_tolerance_g NUMERIC(10,2) NOT NULL DEFAULT 100;
+
+CREATE TABLE IF NOT EXISTS tobacco_tares (
+  id             SERIAL PRIMARY KEY,
+  brand          VARCHAR(100) NOT NULL,
+  label          VARCHAR(150) NOT NULL,
+  net_content_g  NUMERIC(10,2),
+  tare_weight_g  NUMERIC(10,2) NOT NULL CHECK (tare_weight_g >= 0),
+  is_active      BOOLEAN NOT NULL DEFAULT true,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tobacco_tares_brand ON tobacco_tares(brand, label);
+
+-- Какие складские позиции учитываем на заведении (остатки).
+-- Тары выбираются отдельно — их много и у каждой свой вес банки.
+CREATE TABLE IF NOT EXISTS venue_tobacco_items (
+  venue_id           INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  warehouse_item_id  INT NOT NULL REFERENCES warehouse_items(id) ON DELETE CASCADE,
+  PRIMARY KEY (venue_id, warehouse_item_id)
+);
+
+-- Какие тары используются на заведении (MustHave 125, MustHave 250, …).
+CREATE TABLE IF NOT EXISTS venue_tobacco_tares (
+  venue_id         INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  tobacco_tare_id  INT NOT NULL REFERENCES tobacco_tares(id) ON DELETE CASCADE,
+  PRIMARY KEY (venue_id, tobacco_tare_id)
+);
+
+-- Миграция со старой схемы «1 тара на позицию склада».
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'venue_tobacco_items' AND column_name = 'tobacco_tare_id'
+  ) THEN
+    INSERT INTO venue_tobacco_tares (venue_id, tobacco_tare_id)
+    SELECT DISTINCT venue_id, tobacco_tare_id
+    FROM venue_tobacco_items
+    WHERE tobacco_tare_id IS NOT NULL
+    ON CONFLICT DO NOTHING;
+
+    ALTER TABLE venue_tobacco_items DROP COLUMN tobacco_tare_id;
+  END IF;
+END $$;
+
+DROP INDEX IF EXISTS idx_venue_tobacco_items_tare;
+
+-- Текущее кол-во тары (банок) на заведении — маркер для подсчёта.
+CREATE TABLE IF NOT EXISTS venue_tobacco_tare_stock (
+  venue_id         INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  tobacco_tare_id  INT NOT NULL REFERENCES tobacco_tares(id) ON DELETE CASCADE,
+  qty              INT NOT NULL DEFAULT 0 CHECK (qty >= 0),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (venue_id, tobacco_tare_id)
+);
+
+-- Факт сменного подсчёта (один актуальный на смену; повторный перезаписывает строки).
+CREATE TABLE IF NOT EXISTS shift_tobacco_counts (
+  id               SERIAL PRIMARY KEY,
+  shift_id         INT NOT NULL UNIQUE REFERENCES shifts(id) ON DELETE CASCADE,
+  venue_id         INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  counted_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  counted_by       INT REFERENCES staff(id) ON DELETE SET NULL,
+  counted_by_name  VARCHAR(100),
+  total_net_g      NUMERIC(12,3) NOT NULL DEFAULT 0,
+  total_expected_g NUMERIC(12,3) NOT NULL DEFAULT 0,
+  within_tolerance BOOLEAN NOT NULL DEFAULT false,
+  skipped          BOOLEAN NOT NULL DEFAULT false
+);
+
+CREATE TABLE IF NOT EXISTS shift_tobacco_count_lines (
+  id                 SERIAL PRIMARY KEY,
+  count_id           INT NOT NULL REFERENCES shift_tobacco_counts(id) ON DELETE CASCADE,
+  tobacco_tare_id    INT REFERENCES tobacco_tares(id) ON DELETE SET NULL,
+  tare_label         VARCHAR(150) NOT NULL,
+  brand              VARCHAR(100),
+  tare_weight_g      NUMERIC(10,2) NOT NULL,
+  can_qty            INT NOT NULL DEFAULT 0,
+  gross_weight_parts JSONB NOT NULL DEFAULT '[]'::jsonb,
+  gross_weight_g     NUMERIC(12,3) NOT NULL DEFAULT 0,
+  net_weight_g       NUMERIC(12,3) NOT NULL DEFAULT 0,
+  expected_stock_g   NUMERIC(12,3) NOT NULL DEFAULT 0,
+  delta_g            NUMERIC(12,3) NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_shift_tobacco_count_lines_count
+  ON shift_tobacco_count_lines(count_id);
+
+-- Журнал прихода/списания тары на точке (поставки несколькими позициями).
+CREATE TABLE IF NOT EXISTS tobacco_tare_movements (
+  id               SERIAL PRIMARY KEY,
+  venue_id         INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  shift_id         INT REFERENCES shifts(id) ON DELETE SET NULL,
+  type             VARCHAR(20) NOT NULL CHECK (type IN ('receipt', 'writeoff')),
+  staff_id         INT REFERENCES staff(id) ON DELETE SET NULL,
+  staff_name       VARCHAR(100),
+  comment          TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS tobacco_tare_movement_lines (
+  id               SERIAL PRIMARY KEY,
+  movement_id      INT NOT NULL REFERENCES tobacco_tare_movements(id) ON DELETE CASCADE,
+  tobacco_tare_id  INT NOT NULL REFERENCES tobacco_tares(id) ON DELETE RESTRICT,
+  tare_label       VARCHAR(150) NOT NULL,
+  qty              INT NOT NULL CHECK (qty > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tobacco_tare_movements_venue
+  ON tobacco_tare_movements(venue_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tobacco_tare_movement_lines_movement
+  ON tobacco_tare_movement_lines(movement_id);
+
+-- Списание остатка табака (меласса / неприготавливаемый продукт) в граммах со склада точки.
+CREATE TABLE IF NOT EXISTS tobacco_stock_writeoffs (
+  id               SERIAL PRIMARY KEY,
+  venue_id         INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  shift_id         INT REFERENCES shifts(id) ON DELETE SET NULL,
+  amount_g         NUMERIC(12,3) NOT NULL CHECK (amount_g > 0),
+  stock_before_g   NUMERIC(12,3) NOT NULL DEFAULT 0,
+  stock_after_g    NUMERIC(12,3) NOT NULL DEFAULT 0,
+  staff_id         INT REFERENCES staff(id) ON DELETE SET NULL,
+  staff_name       VARCHAR(100),
+  comment          TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS tobacco_stock_writeoff_lines (
+  id                 SERIAL PRIMARY KEY,
+  writeoff_id        INT NOT NULL REFERENCES tobacco_stock_writeoffs(id) ON DELETE CASCADE,
+  warehouse_item_id  INT NOT NULL REFERENCES warehouse_items(id) ON DELETE RESTRICT,
+  item_name          VARCHAR(200) NOT NULL,
+  amount_g           NUMERIC(12,3) NOT NULL CHECK (amount_g > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tobacco_stock_writeoffs_venue
+  ON tobacco_stock_writeoffs(venue_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tobacco_stock_writeoff_lines_writeoff
+  ON tobacco_stock_writeoff_lines(writeoff_id);

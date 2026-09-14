@@ -9,13 +9,18 @@ import {
   renderVenueAtolPanel,
   renderVenueAtolJobsRows,
 } from '../views/venuesView.js';
+import { renderVenueTobaccoPanel } from '../views/tobaccoView.js';
 
 const venues = new Hono();
 venues.use('*', requireAuthApi);
 
 async function fetchVenue(id) {
   const { rows } = await pool.query(
-    'SELECT id, name, address, COALESCE(precheck_enabled, false) AS precheck_enabled FROM venues WHERE id = $1',
+    `SELECT id, name, address,
+            COALESCE(precheck_enabled, false) AS precheck_enabled,
+            COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
+            COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g
+     FROM venues WHERE id = $1`,
     [id]
   );
   return rows[0] || null;
@@ -34,7 +39,11 @@ async function fetchAssignedStaffNames(venueId) {
 
 async function fetchAllVenueCards() {
   const { rows: venueRows } = await pool.query(
-    'SELECT id, name, address, COALESCE(precheck_enabled, false) AS precheck_enabled FROM venues ORDER BY name'
+    `SELECT id, name, address,
+            COALESCE(precheck_enabled, false) AS precheck_enabled,
+            COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
+            COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g
+     FROM venues ORDER BY name`
   );
   const cards = [];
   for (const venue of venueRows) {
@@ -294,6 +303,133 @@ venues.delete('/:id/atol/jobs/:jobId', async (c) => {
 
   const jobs = await fetchRecentFiscalJobs(venueId);
   return c.html(renderVenueAtolJobsRows(jobs, venueId));
+});
+
+async function buildVenueTobaccoPanel(venueId, { errorMsg = null } = {}) {
+  const venue = await fetchVenue(venueId);
+  if (!venue) return null;
+
+  const [{ rows: warehouseItems }, { rows: tares }, { rows: selectedItems }, { rows: selectedTares }] =
+    await Promise.all([
+      pool.query(
+        `SELECT wi.id, wi.name, wi.unit,
+                COALESCE(vws.stock_qty, 0) AS stock_qty
+         FROM warehouse_items wi
+         LEFT JOIN venue_warehouse_stock vws
+           ON vws.warehouse_item_id = wi.id AND vws.venue_id = $1
+         ORDER BY wi.name`,
+        [venueId]
+      ),
+      pool.query(
+        `SELECT id, brand, label, net_content_g, tare_weight_g, is_active
+         FROM tobacco_tares
+         ORDER BY brand, label`
+      ),
+      pool.query(
+        `SELECT warehouse_item_id FROM venue_tobacco_items WHERE venue_id = $1`,
+        [venueId]
+      ),
+      pool.query(
+        `SELECT tobacco_tare_id FROM venue_tobacco_tares WHERE venue_id = $1`,
+        [venueId]
+      ),
+    ]);
+
+  return renderVenueTobaccoPanel({
+    venue,
+    warehouseItems,
+    tares,
+    selectedItemIds: selectedItems.map((r) => r.warehouse_item_id),
+    selectedTareIds: selectedTares.map((r) => r.tobacco_tare_id),
+    errorMsg,
+  });
+}
+
+venues.get('/:id/tobacco', async (c) => {
+  const html = await buildVenueTobaccoPanel(c.req.param('id'));
+  if (!html) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+  return c.html(html);
+});
+
+venues.post('/:id/tobacco-settings', async (c) => {
+  const venueId = c.req.param('id');
+  const venue = await fetchVenue(venueId);
+  if (!venue) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+
+  const body = await c.req.parseBody();
+  const enabled = body.enabled === '1' || body.enabled === 'on';
+  const tolerance = Math.max(0, Number(body.tolerance_g));
+  const safeTolerance = Number.isFinite(tolerance) ? tolerance : 100;
+
+  const [{ rows: items }, { rows: tares }] = await Promise.all([
+    pool.query('SELECT id FROM warehouse_items'),
+    pool.query('SELECT id FROM tobacco_tares WHERE is_active = true'),
+  ]);
+
+  const itemIds = items
+    .filter((item) => body[`item_${item.id}`] === '1' || body[`item_${item.id}`] === 'on')
+    .map((item) => item.id);
+  const tareIds = tares
+    .filter((tare) => body[`tare_${tare.id}`] === '1' || body[`tare_${tare.id}`] === 'on')
+    .map((tare) => tare.id);
+
+  if (enabled && itemIds.length === 0) {
+    const html = await buildVenueTobaccoPanel(venueId, {
+      errorMsg:
+        'Чтобы включить учёт, отметьте хотя бы одну складскую позицию табака (блок 2). От них считается остаток и списывается меласса.',
+    });
+    c.status(400);
+    return c.html(html);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE venues
+       SET tobacco_accounting_enabled = $2, tobacco_tolerance_g = $3
+       WHERE id = $1`,
+      [venueId, enabled, safeTolerance]
+    );
+    await client.query('DELETE FROM venue_tobacco_items WHERE venue_id = $1', [venueId]);
+    await client.query('DELETE FROM venue_tobacco_tares WHERE venue_id = $1', [venueId]);
+    for (const itemId of itemIds) {
+      // eslint-disable-next-line no-await-in-loop
+      await client.query(
+        `INSERT INTO venue_tobacco_items (venue_id, warehouse_item_id) VALUES ($1, $2)`,
+        [venueId, itemId]
+      );
+    }
+    for (const tareId of tareIds) {
+      // eslint-disable-next-line no-await-in-loop
+      await client.query(
+        `INSERT INTO venue_tobacco_tares (venue_id, tobacco_tare_id) VALUES ($1, $2)`,
+        [venueId, tareId]
+      );
+      // eslint-disable-next-line no-await-in-loop
+      await client.query(
+        `INSERT INTO venue_tobacco_tare_stock (venue_id, tobacco_tare_id, qty)
+         VALUES ($1, $2, 0)
+         ON CONFLICT (venue_id, tobacco_tare_id) DO NOTHING`,
+        [venueId, tareId]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const html = await buildVenueTobaccoPanel(venueId);
+  return c.html(html);
 });
 
 export default venues;

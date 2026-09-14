@@ -7,6 +7,7 @@ export function renderVenueCard(venue, assignedNames) {
     ? assignedNames.map((n) => escapeHtml(n)).join(', ')
     : 'Сотрудники не назначены';
   const precheckOn = !!venue.precheck_enabled;
+  const tobaccoOn = !!venue.tobacco_accounting_enabled;
 
   return `
     <div class="venue-card" id="venue-card-${venue.id}">
@@ -24,17 +25,24 @@ export function renderVenueCard(venue, assignedNames) {
             >
             <span>Режим пречека${precheckOn ? ' · включён' : ''}</span>
           </label>
+          ${
+            tobaccoOn
+              ? `<div class="venue-flag-hint">Учёт табака · вкл · погрешность ${Number(venue.tobacco_tolerance_g ?? 100)} г</div>`
+              : ''
+          }
         </div>
         <div class="venue-staff-summary" id="venue-staff-summary-${venue.id}">${summaryText}</div>
         <div class="venue-actions">
           <button hx-get="/venues/${venue.id}/staff" hx-target="#venue-staff-panel-${venue.id}" hx-swap="innerHTML">Сотрудники</button>
           <button hx-get="/venues/${venue.id}/atol" hx-target="#venue-atol-panel-${venue.id}" hx-swap="innerHTML">Касса АТОЛ</button>
+          <button hx-get="/venues/${venue.id}/tobacco" hx-target="#venue-tobacco-panel-${venue.id}" hx-swap="innerHTML">Учёт табака</button>
           <button hx-get="/venues/${venue.id}/edit" hx-target="#venue-card-${venue.id}" hx-swap="outerHTML">Изменить</button>
           <button class="danger" hx-delete="/venues/${venue.id}" hx-target="#venue-card-${venue.id}" hx-swap="outerHTML" hx-confirm="Удалить заведение «${safeName}»? Это затронет всё, что к нему привязано.">Удалить</button>
         </div>
       </div>
       <div id="venue-staff-panel-${venue.id}" class="venue-staff-panel"></div>
       <div id="venue-atol-panel-${venue.id}" class="venue-atol-panel"></div>
+      <div id="venue-tobacco-panel-${venue.id}" class="venue-tobacco-panel-host"></div>
     </div>
   `;
 }

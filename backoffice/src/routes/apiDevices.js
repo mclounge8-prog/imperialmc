@@ -59,14 +59,21 @@ apiDevices.get('/me', requireDeviceToken, async (c) => {
 
   let venue = null;
   if (device.venue_id) {
-    const { rows } = await pool.query('SELECT id, name, COALESCE(precheck_enabled, false) AS precheck_enabled FROM venues WHERE id = $1', [
-      device.venue_id,
-    ]);
+    const { rows } = await pool.query(
+      `SELECT id, name,
+              COALESCE(precheck_enabled, false) AS precheck_enabled,
+              COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
+              COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g
+       FROM venues WHERE id = $1`,
+      [device.venue_id]
+    );
     venue = rows[0]
       ? {
           id: rows[0].id,
           name: rows[0].name,
           precheckEnabled: !!rows[0].precheck_enabled,
+          tobaccoAccountingEnabled: !!rows[0].tobacco_accounting_enabled,
+          tobaccoToleranceG: Number(rows[0].tobacco_tolerance_g),
         }
       : null;
   }

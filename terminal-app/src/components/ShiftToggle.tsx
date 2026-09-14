@@ -16,6 +16,9 @@ import { useSession } from '../context/SessionContext';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import AmountPromptModal from './AmountPromptModal';
 import PinPromptModal from './PinPromptModal';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../App';
 
 const KNOB_SIZE = 52;
 const TRACK_HEIGHT = 60;
@@ -32,6 +35,7 @@ function formatTime(value: string | null): string {
 export default function ShiftToggle() {
   const { session, venue, shift, setShift, loading, error, reload } = useCurrentShift();
   const { logout } = useSession();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [toggling, setToggling] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [trackWidth, setTrackWidth] = useState(0);
@@ -104,7 +108,11 @@ export default function ShiftToggle() {
     }
   };
 
-  const performClose = async (closingCash: number, forcePin?: string) => {
+  const performClose = async (
+    closingCash: number,
+    forcePin?: string,
+    skipTobaccoCount?: boolean
+  ) => {
     const { session: liveSession, venue: liveVenue, maxTravel: liveMaxTravel } = liveRef.current;
     if (!liveSession || !liveVenue) return;
     setToggling(true);
@@ -112,6 +120,7 @@ export default function ShiftToggle() {
     try {
       const closed = await closeShift(liveVenue.id, liveSession.token, closingCash, {
         forcePin,
+        skipTobaccoCount,
       });
       setForcePinVisible(false);
       setPendingCloseCash(null);
@@ -140,6 +149,30 @@ export default function ShiftToggle() {
         finishToPin();
       }
     } catch (e) {
+      if (e instanceof ApiRequestError && e.code === 'TOBACCO_COUNT_REQUIRED') {
+        setPrompt(null);
+        snapTo(liveMaxTravel);
+        Alert.alert(
+          'Учёт табака не выполнен',
+          'В смене не посчитана учитываемая номенклатура.',
+          [
+            {
+              text: 'Перейти в Учёт',
+              onPress: () => navigation.navigate('TobaccoAccounting'),
+            },
+            {
+              text: 'Всё равно закрыть смену',
+              style: 'destructive',
+              onPress: () => {
+                void performClose(closingCash, forcePin, true);
+              },
+            },
+            { text: 'Отмена', style: 'cancel' },
+          ],
+          { cancelable: true }
+        );
+        return;
+      }
       if (e instanceof ApiRequestError && e.code === 'CASH_MISMATCH') {
         const expected = e.expectedCash ?? 0;
         const counted = e.countedCash ?? closingCash;
