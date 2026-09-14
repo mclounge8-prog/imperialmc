@@ -305,16 +305,20 @@ venues.delete('/:id/atol/jobs/:jobId', async (c) => {
   return c.html(renderVenueAtolJobsRows(jobs, venueId));
 });
 
-async function buildVenueTobaccoPanel(venueId) {
+async function buildVenueTobaccoPanel(venueId, { errorMsg = null } = {}) {
   const venue = await fetchVenue(venueId);
   if (!venue) return null;
 
   const [{ rows: warehouseItems }, { rows: tares }, { rows: selectedItems }, { rows: selectedTares }] =
     await Promise.all([
       pool.query(
-        `SELECT wi.id, wi.name, wi.unit
+        `SELECT wi.id, wi.name, wi.unit,
+                COALESCE(vws.stock_qty, 0) AS stock_qty
          FROM warehouse_items wi
-         ORDER BY wi.name`
+         LEFT JOIN venue_warehouse_stock vws
+           ON vws.warehouse_item_id = wi.id AND vws.venue_id = $1
+         ORDER BY wi.name`,
+        [venueId]
       ),
       pool.query(
         `SELECT id, brand, label, net_content_g, tare_weight_g, is_active
@@ -337,6 +341,7 @@ async function buildVenueTobaccoPanel(venueId) {
     tares,
     selectedItemIds: selectedItems.map((r) => r.warehouse_item_id),
     selectedTareIds: selectedTares.map((r) => r.tobacco_tare_id),
+    errorMsg,
   });
 }
 
@@ -373,6 +378,15 @@ venues.post('/:id/tobacco-settings', async (c) => {
   const tareIds = tares
     .filter((tare) => body[`tare_${tare.id}`] === '1' || body[`tare_${tare.id}`] === 'on')
     .map((tare) => tare.id);
+
+  if (enabled && itemIds.length === 0) {
+    const html = await buildVenueTobaccoPanel(venueId, {
+      errorMsg:
+        'Чтобы включить учёт, отметьте хотя бы одну складскую позицию табака (блок 2). От них считается остаток и списывается меласса.',
+    });
+    c.status(400);
+    return c.html(html);
+  }
 
   const client = await pool.connect();
   try {

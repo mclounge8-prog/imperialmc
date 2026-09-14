@@ -961,6 +961,13 @@ input[type="radio"] {
   color: var(--text);
 }
 
+.tobacco-check-row--suggest {
+  background: rgba(38, 71, 199, 0.08);
+  border-radius: 8px;
+  padding: 4px 6px;
+  margin: 0 -6px;
+}
+
 .tobacco-check-row em,
 .tobacco-item-name em {
   color: var(--text-muted);

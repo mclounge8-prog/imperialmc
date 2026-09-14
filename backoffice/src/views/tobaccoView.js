@@ -120,19 +120,37 @@ export function renderVenueTobaccoPanel({
   tares,
   selectedItemIds,
   selectedTareIds,
+  errorMsg = null,
 }) {
   const enabled = !!venue.tobacco_accounting_enabled;
   const tolerance = Number(venue.tobacco_tolerance_g ?? 100);
   const selectedItems = new Set(selectedItemIds.map(String));
   const selectedTares = new Set(selectedTareIds.map(String));
+  const errorHtml = errorMsg
+    ? `<p class="field-error" style="margin:8px 0">${escapeHtml(errorMsg)}</p>`
+    : '';
 
-  const itemRows = warehouseItems
+  const sortedItems = [...warehouseItems].sort((a, b) => {
+    const aTobacco = /табак/i.test(a.name || '') ? 0 : 1;
+    const bTobacco = /табак/i.test(b.name || '') ? 0 : 1;
+    if (aTobacco !== bTobacco) return aTobacco - bTobacco;
+    return String(a.name).localeCompare(String(b.name), 'ru');
+  });
+
+  const itemRows = sortedItems
     .map((item) => {
-      const checked = selectedItems.has(String(item.id));
+      const checked =
+        selectedItems.has(String(item.id)) ||
+        (selectedItems.size === 0 && /табак/i.test(item.name || ''));
+      const stock =
+        item.stock_qty != null && Number.isFinite(Number(item.stock_qty))
+          ? ` · остаток ${Number(item.stock_qty).toLocaleString('ru-RU')} ${escapeHtml(item.unit || '')}`
+          : '';
+      const highlight = /табак/i.test(item.name || '') ? ' tobacco-check-row--suggest' : '';
       return `
-        <label class="tobacco-check-row">
+        <label class="tobacco-check-row${highlight}">
           <input type="checkbox" name="item_${item.id}" value="1" ${checked ? 'checked' : ''}>
-          <span>${escapeHtml(item.name)} <em>${escapeHtml(item.unit || '')}</em></span>
+          <span>${escapeHtml(item.name)} <em>${escapeHtml(item.unit || '')}${stock}</em></span>
         </label>
       `;
     })
@@ -163,6 +181,7 @@ export function renderVenueTobaccoPanel({
         hx-target="#venue-tobacco-panel-${venue.id}"
         hx-swap="outerHTML"
       >
+        ${errorHtml}
         <label class="venue-precheck-toggle">
           <input type="checkbox" name="enabled" value="1" ${enabled ? 'checked' : ''}>
           <span>Включить учёт табака на этом заведении</span>
@@ -178,8 +197,8 @@ export function renderVenueTobaccoPanel({
           ${tareRows || '<p class="empty-hint">Сначала добавьте тары в разделе «Тары табака»</p>'}
         </div>
 
-        <h3 class="tobacco-subhead">2. Складские позиции для сверки остатка</h3>
-        <p class="hint">Какие остатки табака сравнивать с суммарным чистым весом после подсчёта. Привязка «одна тара на позицию» не нужна.</p>
+        <h3 class="tobacco-subhead">2. Складские позиции для сверки и списания остатка</h3>
+        <p class="hint">Обязательно отметьте номенклатуру табака на складе (сверху подсказки с «Табак» в названии). От них считается остаток и списывается меласса.</p>
         <div class="tobacco-item-list">
           ${itemRows || '<p class="empty-hint">Сначала заведите номенклатуру на складе</p>'}
         </div>

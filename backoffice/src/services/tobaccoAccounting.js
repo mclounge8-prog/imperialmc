@@ -47,15 +47,8 @@ export async function fetchVenueTobaccoTares(venueId) {
 
 /** Суммарный остаток учитываемой складской номенклатуры (граммы). */
 export async function fetchVenueTobaccoExpectedStockG(venueId) {
-  const { rows } = await pool.query(
-    `SELECT COALESCE(SUM(COALESCE(vws.stock_qty, 0)), 0) AS expected_stock_g
-     FROM venue_tobacco_items vti
-     LEFT JOIN venue_warehouse_stock vws
-       ON vws.venue_id = vti.venue_id AND vws.warehouse_item_id = vti.warehouse_item_id
-     WHERE vti.venue_id = $1`,
-    [venueId]
-  );
-  return Number(rows[0]?.expected_stock_g || 0);
+  const stocks = await fetchVenueTobaccoWarehouseStocks(venueId);
+  return stocks.reduce((s, r) => s + (Number(r.stockQty) || 0), 0);
 }
 
 export async function fetchShiftTobaccoCount(shiftId) {
@@ -384,19 +377,38 @@ export async function saveTobaccoTareMovement({
   }
 }
 
-/** Позиции учитываемого табака на складе точки с остатками. */
+/** Позиции учитываемого табака на складе точки с остатками.
+ *  Если явный список venue_tobacco_items пуст — fallback на номенклатуру
+ *  с «табак» в названии (частый случай: в настройках отметили только тары).
+ */
 export async function fetchVenueTobaccoWarehouseStocks(venueId) {
   const { rows } = await pool.query(
-    `SELECT
-       wi.id AS warehouse_item_id,
-       wi.name AS item_name,
-       COALESCE(vws.stock_qty, 0)::numeric AS stock_qty
-     FROM venue_tobacco_items vti
-     JOIN warehouse_items wi ON wi.id = vti.warehouse_item_id
-     LEFT JOIN venue_warehouse_stock vws
-       ON vws.venue_id = vti.venue_id AND vws.warehouse_item_id = vti.warehouse_item_id
-     WHERE vti.venue_id = $1
-     ORDER BY COALESCE(vws.stock_qty, 0) DESC, wi.name`,
+    `WITH linked AS (
+       SELECT
+         wi.id AS warehouse_item_id,
+         wi.name AS item_name,
+         COALESCE(vws.stock_qty, 0)::numeric AS stock_qty
+       FROM venue_tobacco_items vti
+       JOIN warehouse_items wi ON wi.id = vti.warehouse_item_id
+       LEFT JOIN venue_warehouse_stock vws
+         ON vws.venue_id = vti.venue_id AND vws.warehouse_item_id = vti.warehouse_item_id
+       WHERE vti.venue_id = $1
+     ),
+     fallback AS (
+       SELECT
+         wi.id AS warehouse_item_id,
+         wi.name AS item_name,
+         COALESCE(vws.stock_qty, 0)::numeric AS stock_qty
+       FROM warehouse_items wi
+       LEFT JOIN venue_warehouse_stock vws
+         ON vws.warehouse_item_id = wi.id AND vws.venue_id = $1
+       WHERE NOT EXISTS (SELECT 1 FROM linked)
+         AND wi.name ILIKE '%табак%'
+     )
+     SELECT warehouse_item_id, item_name, stock_qty FROM linked
+     UNION ALL
+     SELECT warehouse_item_id, item_name, stock_qty FROM fallback
+     ORDER BY stock_qty DESC, item_name`,
     [venueId]
   );
   return rows.map((r) => ({
@@ -428,7 +440,9 @@ export async function saveTobaccoStockWriteoff({
 
   const stocks = await fetchVenueTobaccoWarehouseStocks(venueId);
   if (!stocks.length) {
-    const err = new Error('На заведении не выбраны складские позиции для учёта табака');
+    const err = new Error(
+      'Не найден остаток табака на складе точки. В карточке заведения отметьте складские позиции (раздел «Учёт табака» → позиции с «Табак» в названии).'
+    );
     err.status = 409;
     throw err;
   }
