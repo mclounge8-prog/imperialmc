@@ -147,6 +147,28 @@ export async function listTelegramChannels() {
   return rows.map(mapChannelRow);
 }
 
+/** Каналы с названиями привязанных заведений — для экрана бэкофиса. */
+export async function listTelegramChannelsWithVenues() {
+  const channels = await listTelegramChannels();
+  const { rows } = await pool.query(
+    `SELECT cv.channel_id, v.id AS venue_id, v.name AS venue_name
+     FROM telegram_channel_venues cv
+     JOIN venues v ON v.id = cv.venue_id
+     ORDER BY v.id`
+  );
+  const byChannel = new Map();
+  for (const row of rows) {
+    if (!byChannel.has(row.channel_id)) byChannel.set(row.channel_id, []);
+    byChannel.get(row.channel_id).push({ id: row.venue_id, name: row.venue_name });
+  }
+  return channels.map((ch) => ({
+    ...ch,
+    venues: byChannel.get(ch.id) || [],
+    hasToken: Boolean(ch.botToken),
+    hasChatId: Boolean(ch.chatId),
+  }));
+}
+
 /** Канал для заведения; если не привязан — MC Lounge / legacy. */
 export async function resolveTelegramChannel({ venueId = null, channelKey = null } = {}) {
   await ensureTelegramChannels();

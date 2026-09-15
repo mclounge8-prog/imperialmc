@@ -3,6 +3,7 @@ import { requireAuthApi } from '../middleware/auth.js';
 import { renderTelegramSection } from '../views/telegramView.js';
 import {
   listTelegramChannels,
+  listTelegramChannelsWithVenues,
   readTelegramSettings,
   sendTelegramMessage,
   writeTelegramSettings,
@@ -13,8 +14,11 @@ const routes = new Hono();
 routes.use('*', requireAuthApi);
 
 async function renderPage(flash = null) {
-  const settings = await readTelegramSettings();
-  return renderTelegramSection(settings, flash);
+  const [settings, channels] = await Promise.all([
+    readTelegramSettings(),
+    listTelegramChannelsWithVenues(),
+  ]);
+  return renderTelegramSection(settings, flash, channels);
 }
 
 routes.post('/settings', async (c) => {
@@ -42,7 +46,6 @@ routes.post('/settings', async (c) => {
 
 routes.post('/test', async (c) => {
   try {
-    const { listTelegramChannels } = await import('../services/telegramNotify.js');
     const channels = await listTelegramChannels();
     const results = [];
     for (const ch of channels) {
