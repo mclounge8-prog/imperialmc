@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { requireAuthApi } from '../middleware/auth.js';
 import { renderTelegramSection } from '../views/telegramView.js';
 import {
+  listTelegramChannels,
   readTelegramSettings,
   sendTelegramMessage,
   writeTelegramSettings,
@@ -41,11 +42,26 @@ routes.post('/settings', async (c) => {
 
 routes.post('/test', async (c) => {
   try {
-    const result = await sendTelegramMessage(
-      `<b>Imperial MC — тест</b>\n🕒 ${formatDateTime()}\nЕсли вы это видите, бот настроен верно.`,
-      { force: true }
-    );
-    if (result?.skipped) {
+    const { listTelegramChannels } = await import('../services/telegramNotify.js');
+    const channels = await listTelegramChannels();
+    const results = [];
+    for (const ch of channels) {
+      if (!ch.botToken || !ch.chatId) {
+        results.push(`${ch.name}: не настроен`);
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const result = await sendTelegramMessage(
+        `<b>Imperial MC — тест</b>\nКанал: ${ch.name}\n🕒 ${formatDateTime()}\nЕсли вы это видите, бот настроен верно.`,
+        { force: true, channelKey: ch.key }
+      );
+      results.push(
+        result?.skipped
+          ? `${ch.name}: пропуск (${result.reason || 'disabled'})`
+          : `${ch.name}: ок`
+      );
+    }
+    if (!results.length) {
       return c.html(
         await renderPage({
           ok: false,
@@ -53,7 +69,7 @@ routes.post('/test', async (c) => {
         })
       );
     }
-    return c.html(await renderPage({ ok: true, text: 'Тестовое сообщение отправлено' }));
+    return c.html(await renderPage({ ok: true, text: results.join('; ') }));
   } catch (err) {
     return c.html(
       await renderPage({
