@@ -114,7 +114,8 @@ apiTobacco.post('/tare-movements', async (c) => {
         comment: result.movement?.comment,
         cashier: staff.name,
         when: result.movement?.createdAt,
-      })
+      }),
+      { venueId }
     );
 
     return c.json(result);
@@ -167,7 +168,8 @@ apiTobacco.post('/stock-writeoffs', async (c) => {
         comment: result.writeoff.comment,
         cashier: staff.name,
         when: result.writeoff.createdAt,
-      })
+      }),
+      { venueId }
     );
 
     return c.json({ writeoff: result.writeoff });

@@ -588,7 +588,8 @@ CREATE INDEX IF NOT EXISTS idx_receipts_cancelled_precheck
   WHERE status = 'cancelled' AND precheck_was_printed = true;
 
 -- ============================================================
--- Telegram-уведомления (один глобальный бот на бэкофис).
+-- Telegram-уведомления.
+-- telegram_settings — legacy/дефолт (MC Lounge), дублируется в telegram_channels.
 -- Токен/chat_id можно задать здесь или через TELEGRAM_* в .env.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS telegram_settings (
@@ -601,6 +602,26 @@ CREATE TABLE IF NOT EXISTS telegram_settings (
 
 INSERT INTO telegram_settings (id, enabled) VALUES (1, false)
 ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS telegram_channels (
+  id           SERIAL PRIMARY KEY,
+  key          VARCHAR(50) NOT NULL UNIQUE,
+  name         VARCHAR(100) NOT NULL,
+  enabled      BOOLEAN NOT NULL DEFAULT true,
+  bot_token    TEXT,
+  chat_id      TEXT,
+  bot_username VARCHAR(100),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS telegram_channel_venues (
+  channel_id  INT NOT NULL REFERENCES telegram_channels(id) ON DELETE CASCADE,
+  venue_id    INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  PRIMARY KEY (channel_id, venue_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_telegram_channel_venues_venue
+  ON telegram_channel_venues(venue_id);
 
 -- ============================================================
 -- Учёт табака: тары (бренд + фасовка), привязка номенклатуры к заведению,

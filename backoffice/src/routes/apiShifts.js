@@ -234,7 +234,8 @@ apiShifts.post('/open', async (c) => {
         openingCash,
         previousClosingCash,
         cashier: staff.name,
-      })
+      }),
+      { venueId }
     );
     return c.json({ shift: serializeShift(shift, stats) });
   } catch (err) {
@@ -385,7 +386,8 @@ apiShifts.post('/close', async (c) => {
           deposits: stats.cash.deposits,
           withdrawals: stats.cash.withdrawals,
           cashier: staff.name,
-        })
+        }),
+        { venueId }
       );
       if (venueTobacco?.tobacco_accounting_enabled && tobaccoCount) {
         await sendTelegramMessage(
@@ -398,11 +400,12 @@ apiShifts.post('/close', async (c) => {
             withinTolerance: tobaccoCount.withinTolerance,
             toleranceG: Number(venueTobacco.tobacco_tolerance_g),
             lines: tobaccoCount.lines || [],
-          })
+          }),
+          { venueId }
         );
       }
       return null;
-    });
+    }, { venueId });
     return c.json({
       shift: serializeShift(rows[0], closedStats),
       forcedClose: Boolean(mismatch && forcePin === FORCE_CLOSE_PIN),
@@ -474,7 +477,8 @@ apiShifts.post('/cash-movements', async (c) => {
         amount,
         comment,
         cashier: staff.name,
-      })
+      }),
+      { venueId }
     );
 
     const refreshed = await fetchOpenShift(venueId);

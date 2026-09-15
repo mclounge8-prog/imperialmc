@@ -615,7 +615,8 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
           cashier: paidNotify.cashier,
           tableName: paidNotify.tableName,
           guestLabel: paidNotify.guestLabel,
-        })
+        }),
+        { venueId: paidNotify.venueId }
       );
     } else if (paidNotify.cashAmount > 0.009) {
       notifyTelegramSafe(
@@ -625,7 +626,8 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
           cashier: paidNotify.cashier,
           tableName: paidNotify.tableName,
           guestLabel: paidNotify.guestLabel,
-        })
+        }),
+        { venueId: paidNotify.venueId }
       );
     }
   }
@@ -715,7 +717,8 @@ apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, asy
           tableName: notifyPayload.tableName,
           guestLabel: notifyPayload.guestLabel,
           total: notifyPayload.subtotal,
-        })
+        }),
+        { venueId: notifyPayload.venueId }
       );
     } else if (notifyPayload.subtotal <= 0.009) {
       notifyTelegramSafe(
@@ -724,7 +727,8 @@ apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, asy
           cashier: notifyPayload.cashier,
           tableName: notifyPayload.tableName,
           guestLabel: notifyPayload.guestLabel,
-        })
+        }),
+        { venueId: notifyPayload.venueId }
       );
     }
   }
@@ -1231,7 +1235,8 @@ apiOrders.delete('/orders/:orderId/items/:itemId', requireStaffToken, async (c) 
         cashier: deleteNotify.cashier,
         tableName: deleteNotify.tableName,
         fullDelete: deleteNotify.fullDelete,
-      })
+      }),
+      { venueId: deleteNotify.venueId }
     );
   }
 
@@ -1313,7 +1318,8 @@ apiOrders.delete('/orders/:orderId/items/:itemId/full', requireStaffToken, async
         cashier: deleteNotify.cashier,
         tableName: deleteNotify.tableName,
         fullDelete: true,
-      })
+      }),
+      { venueId: deleteNotify.venueId }
     );
   }
 

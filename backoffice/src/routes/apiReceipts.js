@@ -465,7 +465,7 @@ apiReceipts.post('/:id/refund', async (c) => {
         tableName: refundNotify.tableName,
         guestLabel: refundNotify.guestLabel,
       });
-    });
+    }, { venueId: refundNotify.venueId });
   }
 
   const detail = await loadReceiptDetail(id);
