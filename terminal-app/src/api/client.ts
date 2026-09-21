@@ -352,6 +352,20 @@ export async function addOrderItem(
   return order;
 }
 
+export async function updateOrderItemModifiers(
+  orderId: number,
+  itemId: number,
+  modifierIds: number[],
+  token: string
+): Promise<Order> {
+  const { order } = await authorizedRequest<OrderEnvelope>(
+    `/api/orders/${orderId}/items/${itemId}/modifiers`,
+    token,
+    { method: 'PUT', body: { modifier_ids: modifierIds } }
+  );
+  return order;
+}
+
 export async function moveOrderItem(
   orderId: number,
   itemId: number,
