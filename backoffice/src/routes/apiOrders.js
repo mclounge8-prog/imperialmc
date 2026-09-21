@@ -941,6 +941,72 @@ async function returnModifiersStock(client, venueId, modifierSnapshots, multipli
   }
 }
 
+async function insertOrderItemModifiers(client, orderItemId, selectedAttachments) {
+  for (const a of selectedAttachments) {
+    // eslint-disable-next-line no-await-in-loop
+    await client.query(
+      `INSERT INTO order_item_modifiers (order_item_id, modifier_id, name, price, warehouse_item_id, qty)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [orderItemId, a.modifier_id, a.name, a.price, a.warehouse_item_id, a.qty]
+    );
+  }
+}
+
+function httpError(message, status, code) {
+  const err = new Error(message);
+  err.status = status;
+  err.code = code;
+  return err;
+}
+
+// Проверяет, что выбранные id принадлежат позиции и укладываются в min/max групп.
+// Возвращает строки вложений в порядке выбора — из них потом цена и списание.
+function assertValidModifierSelection(attachments, selectedModifierIds) {
+  const attachmentByModifierId = new Map(attachments.map((a) => [a.modifier_id, a]));
+  const hasInvalid = selectedModifierIds.some((id) => !attachmentByModifierId.has(id));
+  if (hasInvalid) {
+    throw httpError('Выбран модификатор, не относящийся к этой позиции', 400, 'INVALID_MODIFIER');
+  }
+
+  const countsByGroup = new Map();
+  for (const modId of selectedModifierIds) {
+    const groupId = attachmentByModifierId.get(modId).group_id;
+    if (!groupId) continue;
+    countsByGroup.set(groupId, (countsByGroup.get(groupId) || 0) + 1);
+  }
+  const groupsInvolved = new Map();
+  const optionsPerGroup = new Map();
+  for (const a of attachments) {
+    if (!a.group_id) continue;
+    optionsPerGroup.set(a.group_id, (optionsPerGroup.get(a.group_id) || 0) + 1);
+    if (!groupsInvolved.has(a.group_id)) {
+      groupsInvolved.set(a.group_id, { name: a.group_name, min: a.min_select, max: a.max_select });
+    }
+  }
+  for (const [groupId, info] of groupsInvolved) {
+    const count = countsByGroup.get(groupId) || 0;
+    const optionCount = optionsPerGroup.get(groupId) || 0;
+    const effectiveMax = info.max == null ? null : Math.min(info.max, optionCount);
+    const effectiveMin = Math.min(Math.max(info.min, 0), optionCount);
+    if (effectiveMax != null && count > effectiveMax) {
+      throw httpError(
+        `В группе «${info.name}» можно выбрать не больше ${effectiveMax}`,
+        400,
+        'MODIFIER_GROUP_LIMIT'
+      );
+    }
+    if (effectiveMin > 0 && count < effectiveMin) {
+      throw httpError(
+        `В группе «${info.name}» нужно выбрать хотя бы ${effectiveMin}`,
+        400,
+        'MODIFIER_GROUP_LIMIT'
+      );
+    }
+  }
+
+  return selectedModifierIds.map((id) => attachmentByModifierId.get(id));
+}
+
 // Добавить позицию конкретному гостю. Принимает необязательный modifier_ids —
 // список выбранных на терминале модификаторов (id из каталога modifiers).
 // Если не передан — берутся модификаторы "по умолчанию" этой позиции (как
@@ -954,7 +1020,7 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
   const guestId = body && body.guest_id ? Number(body.guest_id) : null;
   const requestedModifierIds =
     body && Array.isArray(body.modifier_ids)
-      ? body.modifier_ids.map(Number).filter((n) => Number.isFinite(n))
+      ? [...new Set(body.modifier_ids.map(Number).filter((n) => Number.isFinite(n)))]
       : null;
 
   if (!menuItemId || !guestId) {
@@ -991,55 +1057,10 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
     const menuItem = menuRows[0];
 
     const attachments = await fetchMenuItemAttachmentsForOrder(client, menuItemId);
-    const attachmentByModifierId = new Map(attachments.map((a) => [a.modifier_id, a]));
-
-    let selectedModifierIds;
-    if (requestedModifierIds) {
-      const hasInvalid = requestedModifierIds.some((id) => !attachmentByModifierId.has(id));
-      if (hasInvalid) {
-        await client.query('ROLLBACK');
-        c.status(400);
-        return c.json({ error: 'Выбран модификатор, не относящийся к этой позиции' });
-      }
-      selectedModifierIds = requestedModifierIds;
-    } else {
-      selectedModifierIds = attachments.filter((a) => a.is_default).map((a) => a.modifier_id);
-    }
-
-    // Ограничения групп (напр. "Лаваш" — ровно 1 вариант, "Соусы" — не больше 2)
-    const countsByGroup = new Map();
-    for (const modId of selectedModifierIds) {
-      const groupId = attachmentByModifierId.get(modId).group_id;
-      if (!groupId) continue;
-      countsByGroup.set(groupId, (countsByGroup.get(groupId) || 0) + 1);
-    }
-    const groupsInvolved = new Map();
-    const optionsPerGroup = new Map();
-    for (const a of attachments) {
-      if (!a.group_id) continue;
-      optionsPerGroup.set(a.group_id, (optionsPerGroup.get(a.group_id) || 0) + 1);
-      if (!groupsInvolved.has(a.group_id)) {
-        groupsInvolved.set(a.group_id, { name: a.group_name, min: a.min_select, max: a.max_select });
-      }
-    }
-    for (const [groupId, info] of groupsInvolved) {
-      const count = countsByGroup.get(groupId) || 0;
-      const optionCount = optionsPerGroup.get(groupId) || 0;
-      const effectiveMax = info.max == null ? null : Math.min(info.max, optionCount);
-      const effectiveMin = Math.min(Math.max(info.min, 0), optionCount);
-      if (effectiveMax != null && count > effectiveMax) {
-        await client.query('ROLLBACK');
-        c.status(400);
-        return c.json({ error: `В группе «${info.name}» можно выбрать не больше ${effectiveMax}` });
-      }
-      if (effectiveMin > 0 && count < effectiveMin) {
-        await client.query('ROLLBACK');
-        c.status(400);
-        return c.json({ error: `В группе «${info.name}» нужно выбрать хотя бы ${effectiveMin}` });
-      }
-    }
-
-    const selectedAttachments = selectedModifierIds.map((id) => attachmentByModifierId.get(id));
+    const selectedModifierIds = requestedModifierIds
+      ? requestedModifierIds
+      : attachments.filter((a) => a.is_default).map((a) => a.modifier_id);
+    const selectedAttachments = assertValidModifierSelection(attachments, selectedModifierIds);
     const extraPrice = selectedAttachments.reduce((sum, a) => sum + Number(a.price), 0);
     const unitPrice = Number(menuItem.price) + extraPrice;
 
@@ -1065,14 +1086,7 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
         [orderId, guestId, menuItemId, menuItem.name, unitPrice]
       );
       const newItemId = inserted[0].id;
-      for (const a of selectedAttachments) {
-        // eslint-disable-next-line no-await-in-loop
-        await client.query(
-          `INSERT INTO order_item_modifiers (order_item_id, modifier_id, name, price, warehouse_item_id, qty)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [newItemId, a.modifier_id, a.name, a.price, a.warehouse_item_id, a.qty]
-        );
-      }
+      await insertOrderItemModifiers(client, newItemId, selectedAttachments);
     }
 
     if (venueId) {
@@ -1082,8 +1096,126 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
-    if (err && err.code === 'PRECHECK_LOCKED') {
-      c.status(err.status || 409);
+    if (err && err.status) {
+      c.status(err.status);
+      return c.json({ error: err.message, code: err.code });
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const order = await fetchOrderDetail(orderId);
+  return c.json({ order });
+});
+
+// Заменить состав уже лежащей в чеке позиции. Работает только до пречека
+// (assertGuestEditable). Возвращает старое списание на склад и списывает новое
+// × текущее qty. Если у того же гостя уже есть такая же позиция с новым
+// составом — строки сливаются, чтобы не плодить дубли.
+apiOrders.put('/orders/:orderId/items/:itemId/modifiers', requireStaffToken, async (c) => {
+  const { orderId, itemId } = c.req.param();
+  const body = await c.req.json().catch(() => null);
+  if (!body || !Array.isArray(body.modifier_ids)) {
+    c.status(400);
+    return c.json({ error: 'Не указан список модификаторов' });
+  }
+  const selectedModifierIds = [
+    ...new Set(body.modifier_ids.map(Number).filter((n) => Number.isFinite(n))),
+  ];
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: orderRows } = await client.query(
+      'SELECT id, status, venue_id FROM orders WHERE id = $1 FOR UPDATE',
+      [orderId]
+    );
+    if (!orderRows[0] || orderRows[0].status !== 'open') {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({ error: 'Заказ уже закрыт' });
+    }
+    const venueId = orderRows[0].venue_id;
+
+    const { rows: itemRows } = await client.query(
+      'SELECT id, menu_item_id, qty, guest_id FROM order_items WHERE id = $1 AND order_id = $2 FOR UPDATE',
+      [itemId, orderId]
+    );
+    const item = itemRows[0];
+    if (!item) {
+      await client.query('ROLLBACK');
+      c.status(404);
+      return c.json({ error: 'Позиция не найдена в заказе' });
+    }
+    if (!item.menu_item_id) {
+      await client.query('ROLLBACK');
+      c.status(400);
+      return c.json({ error: 'У этой позиции нет состава для изменения' });
+    }
+
+    await assertGuestEditable(client, item.guest_id);
+
+    const currentIds = await fetchOrderItemModifierIds(client, item.id);
+    if (!sameModifierSet(currentIds, selectedModifierIds)) {
+      const { rows: menuRows } = await client.query(
+        'SELECT id, name, price FROM menu_items WHERE id = $1',
+        [item.menu_item_id]
+      );
+      if (!menuRows[0]) {
+        await client.query('ROLLBACK');
+        c.status(404);
+        return c.json({ error: 'Позиция меню не найдена' });
+      }
+      const menuItem = menuRows[0];
+
+      const attachments = await fetchMenuItemAttachmentsForOrder(client, item.menu_item_id);
+      const selectedAttachments = assertValidModifierSelection(attachments, selectedModifierIds);
+      const extraPrice = selectedAttachments.reduce((sum, a) => sum + Number(a.price), 0);
+      const unitPrice = Number(menuItem.price) + extraPrice;
+
+      const oldSnapshots = await fetchOrderItemModifierSnapshots(client, item.id);
+      if (venueId) {
+        await returnModifiersStock(client, venueId, oldSnapshots, item.qty);
+      }
+
+      const { rows: candidateItems } = await client.query(
+        'SELECT id FROM order_items WHERE order_id = $1 AND guest_id = $2 AND menu_item_id = $3 AND id != $4',
+        [orderId, item.guest_id, item.menu_item_id, item.id]
+      );
+      let matchedItemId = null;
+      for (const candidate of candidateItems) {
+        // eslint-disable-next-line no-await-in-loop
+        const existingIds = await fetchOrderItemModifierIds(client, candidate.id);
+        if (sameModifierSet(existingIds, selectedModifierIds)) {
+          matchedItemId = candidate.id;
+          break;
+        }
+      }
+
+      if (matchedItemId) {
+        await client.query('UPDATE order_items SET qty = qty + $1 WHERE id = $2', [
+          item.qty,
+          matchedItemId,
+        ]);
+        await client.query('DELETE FROM order_items WHERE id = $1', [item.id]);
+      } else {
+        await client.query('DELETE FROM order_item_modifiers WHERE order_item_id = $1', [item.id]);
+        await insertOrderItemModifiers(client, item.id, selectedAttachments);
+        await client.query('UPDATE order_items SET price = $1 WHERE id = $2', [unitPrice, item.id]);
+      }
+
+      if (venueId) {
+        await deductModifiersStock(client, venueId, selectedAttachments, item.qty);
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err && err.status) {
+      c.status(err.status);
       return c.json({ error: err.message, code: err.code });
     }
     throw err;

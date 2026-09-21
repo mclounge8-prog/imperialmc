@@ -27,6 +27,7 @@ import {
   createQuickOrder,
   addGuest,
   addOrderItem,
+  updateOrderItemModifiers,
   removeOrderItem,
   deleteOrderItemFully,
   moveOrderItem,
@@ -48,6 +49,13 @@ type MoveTarget = {
   itemId: number;
   itemName: string;
   currentGuestId: number;
+};
+
+type CustomizeTarget = {
+  menuItem: MenuItem;
+  /** null — добавляем новую позицию; число — правим состав уже лежащей в чеке */
+  orderItemId: number | null;
+  initialModifierIds: number[] | null;
 };
 
 type AlertButton = {
@@ -107,7 +115,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   const [discountDraft, setDiscountDraft] = useState<DiscountPercent>(0);
   const [discountBusy, setDiscountBusy] = useState(false);
   const [compositionTarget, setCompositionTarget] = useState<CompositionTarget>(null);
-  const [customizeTarget, setCustomizeTarget] = useState<MenuItem | null>(null);
+  const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
   const [cancelCommentGuest, setCancelCommentGuest] = useState<OrderGuest | null>(null);
 
   const showAlert = useCallback((title: string, message: string, buttons?: AlertButton[]) => {
@@ -205,17 +213,71 @@ export default function OrderScreen({ route, navigation }: Props) {
   // можно было снять/добавить прямо сейчас, а не создавать отдельную позицию
   // меню под каждое сочетание. Если модификаторов нет вообще — добавляем
   // сразу, без лишнего экрана.
+  const findMenuItemById = (menuItemId: number | null): MenuItem | undefined => {
+    if (!menu || menuItemId == null) return undefined;
+    const flattenCats = (cats: MenuResponse['categories']): MenuItem[] =>
+      cats.flatMap((c) => [...c.items, ...flattenCats(c.children || [])]);
+    return [...flattenCats(menu.categories), ...menu.uncategorized].find((mi) => mi.id === menuItemId);
+  };
+
   const handleMenuItemPress = (item: MenuItem) => {
     if (item.modifierGroups.length === 0) {
       handleAddItem(item.id);
       return;
     }
-    setCustomizeTarget(item);
+    setCustomizeTarget({ menuItem: item, orderItemId: null, initialModifierIds: null });
+  };
+
+  const handleOrderItemPress = (item: OrderItem) => {
+    const guest = order?.guests.find((g) => g.id === selectedGuestId);
+    if (guest?.precheckPrintedAt) {
+      showAlert(
+        'Пречек напечатан',
+        'Состав чека зафиксирован. Можно только оплатить или отменить с комментарием.'
+      );
+      return;
+    }
+    const menuItem = findMenuItemById(item.menuItemId);
+    if (!menuItem || menuItem.modifierGroups.length === 0) return;
+    const initialModifierIds = item.modifiers
+      .map((m) => m.modifierId)
+      .filter((id): id is number => id !== null);
+    setCustomizeTarget({
+      menuItem,
+      orderItemId: item.id,
+      initialModifierIds,
+    });
+  };
+
+  const handleUpdateItemModifiers = async (itemId: number, modifierIds: number[]) => {
+    if (!session || !order || busy) return;
+    const guest = order.guests.find((g) => g.id === selectedGuestId);
+    if (guest?.precheckPrintedAt) {
+      showAlert(
+        'Пречек напечатан',
+        'Состав чека зафиксирован. Можно только оплатить или отменить с комментарием.'
+      );
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await updateOrderItemModifiers(order.id, itemId, modifierIds, session.token);
+      setOrder(updated);
+      setCustomizeTarget(null);
+    } catch (e) {
+      showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось изменить состав');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleConfirmCustomize = (modifierIds: number[]) => {
     if (!customizeTarget) return;
-    handleAddItem(customizeTarget.id, undefined, modifierIds);
+    if (customizeTarget.orderItemId != null) {
+      void handleUpdateItemModifiers(customizeTarget.orderItemId, modifierIds);
+      return;
+    }
+    handleAddItem(customizeTarget.menuItem.id, undefined, modifierIds);
     setCustomizeTarget(null);
   };
 
@@ -233,11 +295,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   // ингредиенты сняты, какие платные добавки включены. Именно это решает
   // задачу "шаурма без огурцов + картофель фри" без создания отдельной позиции.
   const buildModifierSummary = (item: OrderItem): string => {
-    const flattenCats = (cats: NonNullable<typeof menu>['categories']): MenuItem[] =>
-      cats.flatMap((c) => [...c.items, ...flattenCats(c.children || [])]);
-    const menuItem = menu
-      ? [...flattenCats(menu.categories), ...menu.uncategorized].find((mi) => mi.id === item.menuItemId)
-      : undefined;
+    const menuItem = findMenuItemById(item.menuItemId);
     if (!menuItem) {
       return item.modifiers.map((m) => m.name).join(', ');
     }
@@ -666,19 +724,28 @@ export default function OrderScreen({ route, navigation }: Props) {
           </View>
         ) : (
           <ScrollView style={styles.orderList}>
-            {selectedGuest.items.map((item) => (
+            {selectedGuest.items.map((item) => {
+              const menuItem = findMenuItemById(item.menuItemId);
+              const canEditModifiers =
+                Boolean(menuItem && menuItem.modifierGroups.length > 0) && !precheckLocked;
+              const summary = buildModifierSummary(item);
+              return (
               <View key={item.id} style={styles.orderItemRow}>
-                <View style={styles.orderItemInfo}>
+                <Pressable
+                  style={styles.orderItemInfo}
+                  disabled={!canEditModifiers}
+                  onPress={() => handleOrderItemPress(item)}
+                >
                   <Text style={styles.orderItemName}>{item.name}</Text>
-                  {(() => {
-                    const summary = buildModifierSummary(item);
-                    return summary ? (
-                      <Text style={styles.modifierSummary} numberOfLines={2}>
-                        {summary}
-                      </Text>
-                    ) : null;
-                  })()}
-                </View>
+                  {summary ? (
+                    <Text style={styles.modifierSummary} numberOfLines={2}>
+                      {summary}
+                    </Text>
+                  ) : null}
+                  {canEditModifiers ? (
+                    <Text style={styles.compositionLink}>изменить состав</Text>
+                  ) : null}
+                </Pressable>
                 <Text style={styles.orderItemPrice}>{item.lineTotal.toFixed(2)} ₽</Text>
                 <View style={styles.qtyStepper}>
                   <Pressable
@@ -718,7 +785,8 @@ export default function OrderScreen({ route, navigation }: Props) {
                   <Text style={styles.deleteItemButtonText}>🗑</Text>
                 </Pressable>
               </View>
-            ))}
+              );
+            })}
           </ScrollView>
         )}
 
@@ -1073,10 +1141,17 @@ export default function OrderScreen({ route, navigation }: Props) {
           при 6-7 ингредиентах инлайн не помещается и выглядит громоздко */}
       <CompositionModal target={compositionTarget} onClose={() => setCompositionTarget(null)} />
 
-      {/* Настройка состава при добавлении позиции — снять дефолтные ингредиенты,
-          докупить платные модификаторы, до того, как позиция попадёт в чек */}
+      {/* Настройка состава: и при добавлении, и при правке уже лежащей в чеке позиции */}
       <ItemCustomizeModal
-        item={customizeTarget}
+        key={
+          customizeTarget
+            ? `${customizeTarget.orderItemId ?? 'new'}-${customizeTarget.menuItem.id}`
+            : 'closed'
+        }
+        item={customizeTarget?.menuItem ?? null}
+        mode={customizeTarget?.orderItemId != null ? 'edit' : 'add'}
+        initialSelectedIds={customizeTarget?.initialModifierIds}
+        confirmDisabled={busy}
         onClose={() => setCustomizeTarget(null)}
         onConfirm={handleConfirmCustomize}
       />

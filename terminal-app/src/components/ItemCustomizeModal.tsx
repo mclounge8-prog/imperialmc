@@ -70,6 +70,10 @@ const OptionRow = React.memo(function OptionRow({
 
 type Props = {
   item: MenuItem | null;
+  /** add — позиция ещё не в чеке (дефолтный состав). edit — уже выбранные модификаторы строки чека. */
+  mode?: 'add' | 'edit';
+  initialSelectedIds?: number[] | null;
+  confirmDisabled?: boolean;
   onClose: () => void;
   onConfirm: (modifierIds: number[]) => void;
 };
@@ -79,11 +83,28 @@ type Props = {
 // добавка). Дефолтные ингредиенты уже отмечены — их можно снять ("без
 // огурцов"), остальное можно докупить ("+ картофель фри"), без создания
 // отдельной позиции меню и без набора состава руками с нуля.
-export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) {
+// В режиме edit те же галочки, но стартуем с уже выбранного состава строки чека
+// и закрываем окно только кнопками «Сохранить» / «Отмена» — тап по фону не сбрасывает правку.
+export default function ItemCustomizeModal({
+  item,
+  mode = 'add',
+  initialSelectedIds,
+  confirmDisabled = false,
+  onClose,
+  onConfirm,
+}: Props) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const isEdit = mode === 'edit';
 
   useEffect(() => {
     if (!item) return;
+    const validIds = new Set(
+      item.modifierGroups.flatMap((g) => g.options.map((o) => o.modifierId))
+    );
+    if (isEdit && initialSelectedIds) {
+      setSelected(new Set(initialSelectedIds.filter((id) => validIds.has(id))));
+      return;
+    }
     const defaults = new Set<number>();
     for (const group of item.modifierGroups) {
       for (const opt of group.options) {
@@ -91,7 +112,7 @@ export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) 
       }
     }
     setSelected(defaults);
-  }, [item]);
+  }, [item, isEdit, initialSelectedIds]);
 
   const groups = useMemo(() => {
     const list = item?.modifierGroups ?? [];
@@ -160,13 +181,20 @@ export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) 
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       {/* Backdrop и карточка — siblings. Раньше ScrollView сидел внутри Pressable
           (stopPropagation), из‑за этого Android то отдавал жест скроллу, то
-          родителю → «свайп иногда игнорируется». */}
+          родителю → «свайп иногда игнорируется».
+          В режиме правки состава тап по фону окно не закрывает — только «Сохранить» / «Отмена». */}
       <View style={styles.modalBackdrop}>
-        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+        <Pressable
+          style={StyleSheet.absoluteFillObject}
+          onPress={isEdit ? undefined : onClose}
+        />
         <View style={styles.modalBox}>
           <Text style={styles.title} numberOfLines={2}>
             {item.name}
           </Text>
+          {isEdit ? (
+            <Text style={styles.editHint}>Изменение состава позиции в чеке</Text>
+          ) : null}
 
           <ScrollView
             style={styles.groupsScroll}
@@ -231,11 +259,14 @@ export default function ItemCustomizeModal({ item, onClose, onConfirm }: Props) 
                 <Text style={styles.cancelButtonText}>Отмена</Text>
               </Pressable>
               <Pressable
-                style={[styles.confirmButton, !canConfirm && styles.confirmButtonDisabled]}
-                disabled={!canConfirm}
+                style={[
+                  styles.confirmButton,
+                  (!canConfirm || confirmDisabled) && styles.confirmButtonDisabled,
+                ]}
+                disabled={!canConfirm || confirmDisabled}
                 onPress={() => onConfirm([...selected])}
               >
-                <Text style={styles.confirmButtonText}>Добавить</Text>
+                <Text style={styles.confirmButtonText}>{isEdit ? 'Сохранить' : 'Добавить'}</Text>
               </Pressable>
             </View>
           </View>
@@ -267,6 +298,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   title: { color: colors.text, fontSize: 17, fontWeight: '700', marginBottom: 8 },
+  editHint: { color: colors.textMuted, fontSize: 12, marginBottom: 10 },
   groupsScroll: { flexGrow: 0, flexShrink: 1, marginBottom: 8 },
   groupsScrollContent: { paddingBottom: 4 },
   groupBlock: { marginBottom: 14 },
