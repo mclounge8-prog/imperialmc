@@ -505,7 +505,7 @@ CREATE TABLE IF NOT EXISTS fiscal_jobs (
   receipt_id        INT REFERENCES receipts(id) ON DELETE SET NULL,
   shift_id          INT REFERENCES shifts(id) ON DELETE SET NULL,
   payload           JSONB NOT NULL,       -- готовое JSON-задание для драйвера (processJson)
-  status            VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, in_progress, done, error
+  status            VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, in_progress, done, error, cancelled
   attempts          INT NOT NULL DEFAULT 0,
   last_error        TEXT,
   fiscal_doc_number INT,       -- номер фискального документа из ответа кассы

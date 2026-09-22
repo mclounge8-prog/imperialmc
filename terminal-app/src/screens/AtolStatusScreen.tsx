@@ -41,6 +41,7 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress: 'Выполняется',
   done: 'Готово',
   error: 'Ошибка',
+  cancelled: 'Отменено',
 };
 
 function formatWhen(value: string | null | undefined): string {
@@ -61,6 +62,7 @@ function formatWhen(value: string | null | undefined): string {
 function statusColor(status: string): string {
   if (status === 'error') return colors.danger;
   if (status === 'done') return OK_GREEN;
+  if (status === 'cancelled') return colors.textMuted;
   if (status === 'in_progress') return colors.accent2;
   return colors.textMuted;
 }

@@ -8,6 +8,11 @@
 import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
+import {
+  cancelIfSuperseded,
+  cancelSupersededShiftJobs,
+  reclaimStuckInProgress,
+} from '../services/fiscalJobGuards.js';
 
 const apiFiscal = new Hono();
 apiFiscal.use('*', requireStaffToken);
@@ -55,16 +60,28 @@ apiFiscal.get('/jobs/next', async (c) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rows } = await client.query(
-      `SELECT id, type, receipt_id, shift_id, payload, attempts
-       FROM fiscal_jobs
-       WHERE venue_id = $1 AND status = 'pending'
-       ORDER BY id ASC
-       LIMIT 1
-       FOR UPDATE SKIP LOCKED`,
-      [venueId]
-    );
-    const job = rows[0];
+    await reclaimStuckInProgress(client, Number(venueId));
+
+    let job = null;
+    for (let i = 0; i < 15; i += 1) {
+      const { rows } = await client.query(
+        `SELECT id, venue_id, type, receipt_id, shift_id, payload, attempts
+         FROM fiscal_jobs
+         WHERE venue_id = $1 AND status = 'pending'
+         ORDER BY id ASC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED`,
+        [venueId]
+      );
+      const candidate = rows[0];
+      if (!candidate) break;
+      if (await cancelIfSuperseded(client, candidate)) {
+        continue;
+      }
+      job = candidate;
+      break;
+    }
+
     if (!job) {
       await client.query('COMMIT');
       return c.json({ job: null });
@@ -154,6 +171,7 @@ apiFiscal.post('/jobs/retry-all', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const includeStuck = Boolean(body?.includeStuck);
 
+  await cancelSupersededShiftJobs(pool, Number(venueId));
   const { rowCount } = await pool.query(
     `UPDATE fiscal_jobs
      SET status = 'pending', last_error = NULL, updated_at = now()
@@ -164,6 +182,23 @@ apiFiscal.post('/jobs/retry-all', async (c) => {
            $2::boolean
            AND status = 'in_progress'
            AND updated_at < now() - interval '2 minutes'
+         )
+       )
+       AND NOT (
+         type = 'close_shift'
+         AND EXISTS (
+           SELECT 1 FROM fiscal_jobs o
+           WHERE o.venue_id = fiscal_jobs.venue_id
+             AND o.type = 'open_shift'
+             AND o.status = 'done'
+             AND o.shift_id > fiscal_jobs.shift_id
+         )
+       )
+       AND NOT (
+         type = 'open_shift'
+         AND EXISTS (
+           SELECT 1 FROM shifts s
+           WHERE s.venue_id = fiscal_jobs.venue_id AND s.id > fiscal_jobs.shift_id
          )
        )`,
     [venueId, includeStuck]
@@ -179,6 +214,22 @@ apiFiscal.post('/jobs/:id/retry', async (c) => {
   if (!venueId) {
     c.status(400);
     return c.json({ error: 'Не указано заведение' });
+  }
+
+  const { rows } = await pool.query(
+    `SELECT id, venue_id, type, shift_id, status FROM fiscal_jobs WHERE id = $1 AND venue_id = $2`,
+    [jobId, venueId]
+  );
+  const job = rows[0];
+  if (!job || (job.status !== 'error' && job.status !== 'in_progress')) {
+    c.status(404);
+    return c.json({ error: 'Задание не найдено или его нельзя повторить' });
+  }
+  if (await cancelIfSuperseded(pool, job)) {
+    c.status(409);
+    return c.json({
+      error: 'Это задание закрытия/открытия уже неактуально — следующая смена уже открыта на кассе',
+    });
   }
 
   const { rowCount } = await pool.query(
