@@ -10,6 +10,7 @@ import {
   renderVenueAtolJobsRows,
 } from '../views/venuesView.js';
 import { renderVenueTobaccoPanel } from '../views/tobaccoView.js';
+import { cancelIfSuperseded } from '../services/fiscalJobGuards.js';
 
 const venues = new Hono();
 venues.use('*', requireAuthApi);
@@ -264,10 +265,19 @@ venues.get('/:id/atol/jobs', async (c) => {
 // terminal-app подхватит его при следующем опросе.
 venues.post('/:id/atol/jobs/:jobId/retry', async (c) => {
   const { id: venueId, jobId } = c.req.param();
-  await pool.query(
-    "UPDATE fiscal_jobs SET status = 'pending', last_error = NULL, updated_at = now() WHERE id = $1 AND venue_id = $2 AND status IN ('error', 'in_progress')",
+  const { rows } = await pool.query(
+    `SELECT id, venue_id, type, shift_id, status FROM fiscal_jobs WHERE id = $1 AND venue_id = $2`,
     [jobId, venueId]
   );
+  if (rows[0]) {
+    const cancelled = await cancelIfSuperseded(pool, rows[0]);
+    if (!cancelled) {
+      await pool.query(
+        "UPDATE fiscal_jobs SET status = 'pending', last_error = NULL, updated_at = now() WHERE id = $1 AND venue_id = $2 AND status IN ('error', 'in_progress')",
+        [jobId, venueId]
+      );
+    }
+  }
 
   const jobs = await fetchRecentFiscalJobs(venueId);
   return c.html(renderVenueAtolJobsRows(jobs, venueId));

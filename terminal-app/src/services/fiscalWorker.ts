@@ -88,6 +88,8 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
       if (!job) break;
 
       try {
+        // Сервер не отдаёт просроченный close_shift (уже открыта следующая
+        // смена): closeShift на ККТ закрыл бы текущую фискальную смену.
         const task = typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
         const response = await runAtolTask(
           { ipAddress: settings.ipAddress, ipPort: settings.ipPort ?? 5555, model: settings.model },

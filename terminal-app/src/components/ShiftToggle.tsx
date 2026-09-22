@@ -127,8 +127,9 @@ export default function ShiftToggle() {
       setMismatchHint(null);
       setPrompt(null);
       setShift(null);
-      // Фискальные задания ещё с токеном текущей сессии — потом разлогин на PIN.
-      runPendingFiscalJobs(liveVenue.id, liveSession.token);
+      // Дождаться Z-отчёта, пока PIN-сессия ещё жива. Иначе close_shift
+      // зависает in_progress, а утром доезжает уже в чужую смену на кассе.
+      await runPendingFiscalJobs(liveVenue.id, liveSession.token);
       const finishToPin = () => {
         logout();
       };

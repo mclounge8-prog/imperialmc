@@ -128,6 +128,7 @@ const FISCAL_JOB_STATUS_LABELS = {
   in_progress: 'Выполняется',
   done: 'Готово',
   error: 'Ошибка',
+  cancelled: 'Отменено',
 };
 
 function formatDateTime(value) {
