@@ -12,12 +12,14 @@ type Props = {
 };
 
 const CAT_COLORS = [
-  { bg: '#3a2a0c', text: '#f3d36b' },
-  { bg: '#4a1216', text: '#fecaca' },
-  { bg: '#2a210c', text: '#fde68a' },
-  { bg: '#3f2610', text: '#fdba74' },
-  { bg: '#1c1814', text: '#f6f0e6' },
-  { bg: '#5a1a12', text: '#fca5a5' },
+  { bg: '#1d3b66', text: '#bfdbfe', accent: '#3b82f6' },
+  { bg: '#3d2a10', text: '#fcd34d', accent: '#f59e0b' },
+  { bg: '#134032', text: '#86efac', accent: '#22c55e' },
+  { bg: '#4a1630', text: '#f9a8d4', accent: '#ec4899' },
+  { bg: '#2d2154', text: '#ddd6fe', accent: '#8b5cf6' },
+  { bg: '#3f2610', text: '#fdba74', accent: '#f97316' },
+  { bg: '#123044', text: '#67e8f9', accent: '#06b6d4' },
+  { bg: '#4a1c14', text: '#fca5a5', accent: '#ef4444' },
 ];
 
 function catColor(name: string) {
@@ -133,13 +135,18 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
                 key={opt.modifierId}
                 style={[
                   styles.tile,
-                  { width: tileSize, height: tileSize },
+                  {
+                    width: tileSize,
+                    height: tileSize,
+                    borderColor: on ? kk.gold : tint.accent,
+                  },
                   on && styles.tileOn,
                   !on && opt.isDefault && styles.tileOff,
                 ]}
                 onPress={() => toggle(group, opt.modifierId)}
               >
                 <View style={[styles.catBar, { backgroundColor: tint.bg }]}>
+                  <View style={[styles.catDot, { backgroundColor: tint.accent }]} />
                   <Text style={[styles.catBarText, { color: tint.text }]} numberOfLines={2}>
                     {group.name}
                   </Text>
@@ -207,6 +214,7 @@ const styles = StyleSheet.create({
   },
   tileOn: { borderColor: kk.gold, backgroundColor: '#2a210c' },
   tileOff: { opacity: 0.72 },
+  catDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   catBar: {
     flexDirection: 'row',
     alignItems: 'center',

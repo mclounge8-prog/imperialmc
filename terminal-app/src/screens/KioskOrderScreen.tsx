@@ -246,12 +246,15 @@ export default function KioskOrderScreen() {
   const total = cart.reduce((sum, l) => sum + l.unitPrice * l.qty, 0);
   const cartCount = cart.reduce((sum, l) => sum + l.qty, 0);
   const landscape = width >= height;
-  const catRail = landscape ? 168 : 148;
-  const catTile = catRail - 20;
-  const cols = width - catRail >= 1100 ? 4 : width - catRail >= 720 ? 3 : 2;
+  const catRail = landscape ? 196 : 176;
+  const catTile = catRail - 24;
   const gridPad = 16;
   const gap = 14;
-  const tileW = Math.max(150, Math.floor((width - catRail - gridPad * 2 - gap * (cols - 1)) / cols));
+  const minTile = 168;
+  const gridInner = Math.max(minTile, width - catRail - gridPad * 2);
+  const cols =
+    gridInner >= minTile * 4 + gap * 3 ? 4 : gridInner >= minTile * 3 + gap * 2 ? 3 : 2;
+  const tileW = Math.floor((gridInner - gap * (cols - 1)) / cols);
   const venueName = boot?.venue?.name || status?.venue?.name || 'Киоск';
   const visibleTickets = tickets.filter((t) => t.status !== 'cancelled');
   const discountPct = Number(boot?.venue?.cashlessDiscountPercent ?? 12);
@@ -268,7 +271,7 @@ export default function KioskOrderScreen() {
 
   if (!boot?.ready) {
     return (
-      <View style={styles.root}>
+      <ImageBackground source={kioskAssets.menuBg} style={styles.root} imageStyle={styles.homeBgImg} resizeMode="cover">
         {header}
         <View style={styles.centerBody}>
           <BrandMark size="lg" />
@@ -280,37 +283,26 @@ export default function KioskOrderScreen() {
           </Pressable>
         </View>
         <KioskReadyBanner tickets={tickets} />
-      </View>
+      </ImageBackground>
     );
   }
 
   if (!ordering) {
-    return (
-      <View style={styles.root}>
-        <ImageBackground source={kioskAssets.shawarma} style={styles.homeHero} imageStyle={styles.homeHeroImg}>
-          <LinearGradient colors={['rgba(7,7,7,0.28)', 'rgba(7,7,7,0.88)', kk.bg]} style={styles.homeHeroShade}>
-            <View style={[styles.homeTop, { paddingTop: insets.top + 10 }]}>
-              <BrandMark venueName={venueName} size="lg" />
-            </View>
-            <View style={styles.ribbon}>
-              <Text style={styles.ribbonText}>Всегда голодный — всегда рядом</Text>
-            </View>
-            <Text style={styles.homeLead}>Собери заказ. Оплату подтвердит сотрудник на стойке.</Text>
-            <Pressable
-              style={styles.makeOrder}
-              onPress={() => {
-                bumpActivity();
-                setOrdering(true);
-              }}
-            >
-              <Text style={styles.makeOrderText}>Сделать заказ</Text>
-            </Pressable>
-            {flash ? <Text style={styles.flash}>{flash}</Text> : null}
-          </LinearGradient>
-        </ImageBackground>
-
-        <ScrollView contentContainerStyle={styles.homeBody} showsVerticalScrollIndicator={false}>
-          <Text style={styles.section}>Статусы заказов</Text>
+    const orderBtn = (
+      <Pressable
+        style={styles.makeOrder}
+        onPress={() => {
+          bumpActivity();
+          setOrdering(true);
+        }}
+      >
+        <Text style={styles.makeOrderText}>Сделать заказ</Text>
+      </Pressable>
+    );
+    const statusPane = (
+      <View style={styles.statusWindow}>
+        <Text style={styles.section}>Статусы заказов</Text>
+        <ScrollView contentContainerStyle={styles.statusList} showsVerticalScrollIndicator={false}>
           {!visibleTickets.length ? (
             <Text style={styles.empty}>Пока нет заказов с этого киоска</Text>
           ) : (
@@ -325,8 +317,30 @@ export default function KioskOrderScreen() {
             ))
           )}
         </ScrollView>
-        <KioskReadyBanner tickets={tickets} />
       </View>
+    );
+
+    return (
+      <ImageBackground source={kioskAssets.menuBg} style={styles.root} imageStyle={styles.homeBgImg} resizeMode="cover">
+        {landscape ? (
+          <View style={[styles.homeTopRow, { paddingTop: insets.top + 10 }]}>
+            <BrandMark venueName={venueName} size="md" />
+            <View style={styles.homeTopActions}>
+              {orderBtn}
+              {flash ? <Text style={styles.flash}>{flash}</Text> : null}
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.homeHeader, { paddingTop: insets.top + 8 }]}>
+            <BrandMark venueName={venueName} size="lg" />
+            <Text style={styles.homeTag}>Всегда голодный — всегда рядом</Text>
+            {orderBtn}
+            {flash ? <Text style={styles.flash}>{flash}</Text> : null}
+          </View>
+        )}
+        <View style={{ flex: 1, paddingBottom: insets.bottom + 8 }}>{statusPane}</View>
+        <KioskReadyBanner tickets={tickets} />
+      </ImageBackground>
     );
   }
 
@@ -361,7 +375,7 @@ export default function KioskOrderScreen() {
 
       <View style={styles.menuShell}>
         <ScrollView
-          style={[styles.catCol, { width: catRail }]}
+          style={[styles.catCol, { width: catRail, minWidth: catRail, maxWidth: catRail }]}
           contentContainerStyle={styles.catColInner}
           showsVerticalScrollIndicator={false}
         >
@@ -370,6 +384,7 @@ export default function KioskOrderScreen() {
         </ScrollView>
 
         <FlatList
+          style={styles.menuMain}
           data={items}
           key={`${cols}-${tileW}`}
           numColumns={cols}
@@ -377,8 +392,18 @@ export default function KioskOrderScreen() {
           contentContainerStyle={styles.grid}
           columnWrapperStyle={cols > 1 ? [styles.gridRow, { gap }] : undefined}
           ListHeaderComponent={
-            <ImageBackground source={kioskAssets.board} style={styles.menuBanner} imageStyle={styles.menuBannerImg}>
-              <LinearGradient colors={['rgba(7,7,7,0.15)', kk.bg]} style={styles.menuBannerShade}>
+            <ImageBackground
+              source={kioskAssets.menuStrip}
+              style={styles.menuBanner}
+              imageStyle={styles.menuBannerImg}
+              resizeMode="cover"
+            >
+              <LinearGradient
+                colors={['rgba(10,8,6,0.72)', 'rgba(10,8,6,0.22)', 'rgba(10,8,6,0)']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 0.72, y: 0.5 }}
+                style={styles.menuBannerShade}
+              >
                 <Text style={styles.menuHeading} numberOfLines={1}>
                   {currentCatName}
                 </Text>
@@ -619,27 +644,42 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: kk.border,
   },
-  homeHero: { minHeight: 420 },
-  homeHeroImg: { opacity: 0.92 },
-  homeHeroShade: { paddingHorizontal: 24, paddingBottom: 28, gap: 16, alignItems: 'center' },
-  homeTop: { alignItems: 'center', marginBottom: 8 },
-  ribbon: {
-    backgroundColor: kk.gold,
-    paddingHorizontal: 22,
-    paddingVertical: 10,
-    borderRadius: 6,
-    transform: [{ rotate: '-1deg' }],
+  homeBgImg: { opacity: 0.94, resizeMode: 'cover' },
+  homeHeader: { alignItems: 'center', paddingHorizontal: 24, paddingBottom: 12, gap: 12 },
+  homeTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingBottom: 8,
+    gap: 16,
   },
-  ribbonText: {
-    color: kk.ink,
-    fontSize: 20,
+  homeTopActions: { alignItems: 'flex-end', gap: 8, flexShrink: 1 },
+  homeTag: {
+    color: kk.gold,
+    fontSize: 15,
     fontWeight: '800',
-    letterSpacing: 0.4,
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
   homeLead: { color: kk.cream, fontSize: 18, textAlign: 'center', maxWidth: 520, lineHeight: 26 },
-  homeBody: { padding: 24, alignItems: 'center', gap: 12, paddingBottom: 40 },
+  statusWindow: {
+    flex: 1,
+    marginHorizontal: 24,
+    marginTop: 20,
+    marginBottom: 24,
+    backgroundColor: 'rgba(20, 18, 16, 0.88)',
+    borderWidth: 1,
+    borderColor: kk.border,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+    minHeight: 220,
+  },
+  statusList: { gap: 12, paddingBottom: 16, paddingTop: 8 },
   makeOrder: {
+    alignSelf: 'center',
     backgroundColor: kk.gold,
     borderRadius: 8,
     minHeight: 84,
@@ -695,9 +735,16 @@ const styles = StyleSheet.create({
     backgroundColor: kk.surface,
   },
   backText: { color: kk.cream, fontSize: 16, fontWeight: '800' },
-  menuShell: { flex: 1, flexDirection: 'row' },
-  catCol: { borderRightWidth: 1, borderRightColor: kk.border, backgroundColor: kk.surface },
-  catColInner: { padding: 10, gap: 10, alignItems: 'center', paddingBottom: 24 },
+  menuShell: { flex: 1, flexDirection: 'row', minWidth: 0 },
+  catCol: {
+    borderRightWidth: 1,
+    borderRightColor: kk.border,
+    backgroundColor: kk.surface,
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  catColInner: { padding: 12, gap: 10, alignItems: 'center', paddingBottom: 24 },
+  menuMain: { flex: 1, minWidth: 0 },
   catTile: {
     borderWidth: 2,
     borderColor: kk.border,
@@ -713,9 +760,9 @@ const styles = StyleSheet.create({
   catMarkOn: { color: kk.ink },
   catName: { color: kk.cream, fontWeight: '800', fontSize: 15, textAlign: 'center' },
   catNameOn: { color: kk.ink },
-  menuBanner: { height: 132, marginBottom: 14, borderRadius: 18, overflow: 'hidden' },
-  menuBannerImg: { opacity: 0.55 },
-  menuBannerShade: { flex: 1, justifyContent: 'flex-end', padding: 14 },
+  menuBanner: { height: 176, marginBottom: 14, borderRadius: 18, overflow: 'hidden', backgroundColor: kk.bg },
+  menuBannerImg: { resizeMode: 'cover' },
+  menuBannerShade: { flex: 1, justifyContent: 'flex-end', padding: 16 },
   menuHeading: {
     color: kk.gold,
     fontSize: 26,

@@ -1,6 +1,6 @@
 export const kk = {
-  bg: '#070707',
-  bg2: '#0d0d0d',
+  bg: '#0a0806',
+  bg2: '#100c08',
   surface: '#141210',
   surface2: '#1c1814',
   gold: '#d4af37',
@@ -16,6 +16,8 @@ export const kk = {
 
 export const kioskAssets = {
   logo: require('../assets/kiosk/logo.png'),
+  menuBg: require('../assets/kiosk/banner-menu-bg.jpg'),
+  menuStrip: require('../assets/kiosk/banner-menu-strip.jpg'),
   shawarma: require('../assets/kiosk/banner-shawarma.jpg'),
   board: require('../assets/kiosk/banner-board.jpg'),
   king: require('../assets/kiosk/banner-king.jpg'),
