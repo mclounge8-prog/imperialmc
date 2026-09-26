@@ -66,6 +66,7 @@ export default function TablesScreen() {
   const [selectedKioskId, setSelectedKioskId] = useState<number | null>(null);
   const [kioskBusy, setKioskBusy] = useState(false);
   const [payTicket, setPayTicket] = useState<KioskTicket | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
@@ -204,6 +205,18 @@ export default function TablesScreen() {
       tableId: order.tableId,
       tableName: order.tableName ?? `Быстрый заказ №${order.id}`,
     });
+  };
+
+  const beginPay = (ticket: KioskTicket) => {
+    if (!session) return;
+    setPayError(null);
+    setPayTicket(ticket);
+    setSelectedKioskId(null);
+    if (ticket.paymentStatus !== 'paid' && ticket.status !== 'payment') {
+      void setKioskTicketStatus(ticket.id, 'payment', session.token)
+        .then(() => load({ silent: true }))
+        .catch(() => undefined);
+    }
   };
 
   if (loading) {
@@ -418,41 +431,61 @@ export default function TablesScreen() {
           try {
             await setKioskTicketStatus(selectedKioskId, next, session.token);
             await load({ silent: true });
+          } catch (e) {
+            setError(e instanceof Error ? e.message : 'Не удалось сменить статус');
           } finally {
             setKioskBusy(false);
           }
         }}
+        onPay={() => {
+          const ticket = kioskTickets.find((t) => t.id === selectedKioskId);
+          if (ticket) beginPay(ticket);
+        }}
         onReadyClose={() => {
           const ticket = kioskTickets.find((t) => t.id === selectedKioskId);
           if (!ticket || !session) return;
-          if (ticket.paymentStatus !== 'paid' && (ticket.paymentMethod === 'cash' || ticket.paymentMethod === 'card')) {
-            setPayTicket(ticket);
+          if (ticket.paymentStatus !== 'paid') {
+            beginPay(ticket);
             return;
           }
           setKioskBusy(true);
           void closeKioskTicket(ticket.id, session.token)
-            .then(() => load({ silent: true }))
+            .then(() => {
+              setSelectedKioskId(null);
+              return load({ silent: true });
+            })
+            .catch((e) => setError(e instanceof Error ? e.message : 'Не удалось закрыть заказ'))
             .finally(() => setKioskBusy(false));
         }}
       />
       <StaffPaymentModal
         visible={payTicket != null}
-        method={payTicket?.paymentMethod === 'card' ? 'card' : 'cash'}
         amount={payTicket?.total ?? 0}
         subtotal={payTicket?.subtotal}
         discountPercent={payTicket?.discountPercent}
+        suggestedMethod={payTicket?.paymentMethod}
         busy={kioskBusy}
-        onClose={() => setPayTicket(null)}
+        error={payError}
+        onClose={() => {
+          setPayTicket(null);
+          setPayError(null);
+        }}
         onConfirm={async (method) => {
-          if (!session || !payTicket?.orderId || !payTicket.guestId || !venue) return;
+          if (!session || !payTicket || !venue) return;
+          if (!payTicket.orderId || !payTicket.guestId) {
+            setPayError('У заявки нет чека — обновите терминал и попробуйте снова');
+            return;
+          }
           setKioskBusy(true);
+          setPayError(null);
           try {
             await payGuest(payTicket.orderId, payTicket.guestId, method, payTicket.total, session.token);
-            await closeKioskTicket(payTicket.id, session.token);
+            await setKioskTicketStatus(payTicket.id, 'cooking', session.token);
             runPendingFiscalJobs(venue.id, session.token);
             setPayTicket(null);
-            setSelectedKioskId(null);
             await load({ silent: true });
+          } catch (e) {
+            setPayError(e instanceof Error ? e.message : 'Не удалось провести оплату');
           } finally {
             setKioskBusy(false);
           }

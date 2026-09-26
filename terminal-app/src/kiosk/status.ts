@@ -8,6 +8,7 @@ export const UNIT_LABELS: Record<string, string> = {
 
 export const GUEST_STATUS: Record<string, { label: string; tint: string }> = {
   new: { label: 'Оформлен', tint: '#8aa4ff' },
+  payment: { label: 'Оплата', tint: '#fb923c' },
   cooking: { label: 'Изготавливается', tint: '#f0c14b' },
   ready: { label: 'Готов', tint: '#3ee08a' },
   issued: { label: 'Готов', tint: '#3ee08a' },
@@ -16,6 +17,7 @@ export const GUEST_STATUS: Record<string, { label: string; tint: string }> = {
 
 export const STAFF_FLOW: { key: KioskTicketStatus; label: string }[] = [
   { key: 'new', label: 'Оформлен' },
+  { key: 'payment', label: 'Оплата' },
   { key: 'cooking', label: 'Изготавливается' },
   { key: 'ready', label: 'Готов' },
 ];
@@ -36,7 +38,7 @@ export function formatModifierLine(mod: KioskTicketModifier): string {
 }
 
 export function isActiveKioskStatus(status: string): boolean {
-  return status === 'new' || status === 'cooking' || status === 'ready';
+  return status === 'new' || status === 'payment' || status === 'cooking' || status === 'ready';
 }
 
 export function paymentMethodLabel(method?: string | null): string {

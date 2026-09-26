@@ -946,7 +946,7 @@ export async function deleteFiscalJob(jobId: number, venueId: number, token: str
   });
 }
 
-export type KioskTicketStatus = 'new' | 'cooking' | 'ready' | 'issued' | 'cancelled';
+export type KioskTicketStatus = 'new' | 'payment' | 'cooking' | 'ready' | 'issued' | 'cancelled';
 
 export type KioskTicketModifier = {
   name: string;

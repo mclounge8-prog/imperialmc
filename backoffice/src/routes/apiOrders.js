@@ -582,9 +582,11 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
     await client.query("UPDATE order_guests SET status = 'paid' WHERE id = $1", [guestId]);
     await client.query(
       `UPDATE kiosk_tickets
-       SET payment_status = 'paid', receipt_id = $2
+       SET payment_status = 'paid',
+           receipt_id = $2,
+           payment_method = COALESCE($3, payment_method)
        WHERE order_id = $1`,
-      [orderId, receiptMeta.receiptId]
+      [orderId, receiptMeta.receiptId, normalizedPayments[0]?.method || null]
     );
 
     await client.query('COMMIT');

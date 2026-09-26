@@ -10,8 +10,9 @@ const apiKiosk = new Hono();
 const UNIT_LABELS = { g: 'г', ml: 'мл', pcs: 'шт' };
 
 const ALLOWED_NEXT = {
-  new: ['cooking', 'ready', 'issued', 'cancelled'],
-  cooking: ['new', 'ready', 'issued', 'cancelled'],
+  new: ['payment', 'cooking', 'ready', 'issued', 'cancelled'],
+  payment: ['new', 'cooking', 'ready', 'issued', 'cancelled'],
+  cooking: ['new', 'payment', 'ready', 'issued', 'cancelled'],
   ready: ['new', 'cooking', 'issued'],
   issued: [],
   cancelled: [],
@@ -607,6 +608,13 @@ apiKiosk.post('/tickets/:id/status', requireStaffToken, async (c) => {
       throw httpError(`Нельзя сменить статус «${ticket.status}» на «${nextStatus}»`, 409, 'BAD_TRANSITION');
     }
 
+    if (
+      ['cooking', 'ready', 'issued'].includes(nextStatus) &&
+      ticket.payment_status !== 'paid'
+    ) {
+      throw httpError('Сначала примите оплату', 409, 'NEED_PAYMENT');
+    }
+
     const extraStamp =
       nextStatus === 'issued'
         ? ', ready_at = COALESCE(ready_at, now()), issued_at = now()'
@@ -622,10 +630,6 @@ apiKiosk.post('/tickets/:id/status', requireStaffToken, async (c) => {
       ticketId,
       nextStatus,
     ]);
-
-    if (nextStatus === 'issued' && ticket.payment_method && ticket.payment_status !== 'paid') {
-      throw httpError('Сначала проведите оплату', 409, 'NEED_PAYMENT');
-    }
 
     if (nextStatus === 'cancelled') {
       const { rows: itemRows } = await client.query(

@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
-import { fetchKioskTickets, setKioskTicketStatus, closeKioskTicket, payGuest } from '../api/client';
+import { fetchKioskTickets, setKioskTicketStatus, payGuest } from '../api/client';
 import type { KioskTicket, KioskTicketStatus } from '../api/client';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import KioskTicketDetailModal from '../components/KioskTicketDetailModal';
@@ -14,6 +14,7 @@ import { runPendingFiscalJobs } from '../services/fiscalWorker';
 
 const COLUMNS: { key: KioskTicketStatus; title: string; tint: string }[] = [
   { key: 'new', title: 'Оформлен', tint: '#8aa4ff' },
+  { key: 'payment', title: 'Оплата', tint: '#fb923c' },
   { key: 'cooking', title: 'Изготавливается', tint: '#f0c14b' },
   { key: 'ready', title: 'Готов', tint: '#6ee7a8' },
 ];
@@ -33,6 +34,7 @@ export default function KioskKitchenScreen() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
   const [payTicket, setPayTicket] = useState<KioskTicket | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!session || !venueId) return;
@@ -67,6 +69,18 @@ export default function KioskKitchenScreen() {
     }
   };
 
+  const beginPay = (ticket: KioskTicket) => {
+    if (!session) return;
+    setPayError(null);
+    setPayTicket(ticket);
+    setOpenId(null);
+    if (ticket.paymentStatus !== 'paid' && ticket.status !== 'payment') {
+      void setKioskTicketStatus(ticket.id, 'payment', session.token)
+        .then(() => load())
+        .catch(() => undefined);
+    }
+  };
+
   const openTicket = tickets.find((t) => t.id === openId) ?? null;
 
   return (
@@ -87,7 +101,11 @@ export default function KioskKitchenScreen() {
                 </View>
                 <ScrollView contentContainerStyle={styles.colList}>
                   {list.map((ticket) => (
-                    <Pressable key={ticket.id} style={styles.card} onPress={() => setOpenId(ticket.id)}>
+                    <Pressable
+                      key={ticket.id}
+                      style={[styles.card, ticket.paymentStatus !== 'paid' && styles.cardUnpaid]}
+                      onPress={() => setOpenId(ticket.id)}
+                    >
                         <View style={styles.cardTop}>
                           <Text style={styles.number}>№ {ticket.number}</Text>
                           <Text style={styles.time}>{formatTime(ticket.createdAt)}</Text>
@@ -127,13 +145,13 @@ export default function KioskKitchenScreen() {
           onStatus={(next) => {
             if (openTicket) void changeStatus(openTicket, next);
           }}
+          onPay={() => {
+            if (openTicket) beginPay(openTicket);
+          }}
           onReadyClose={() => {
             if (!openTicket || !session) return;
-            if (
-              openTicket.paymentStatus !== 'paid' &&
-              (openTicket.paymentMethod === 'cash' || openTicket.paymentMethod === 'card')
-            ) {
-              setPayTicket(openTicket);
+            if (openTicket.paymentStatus !== 'paid') {
+              beginPay(openTicket);
               return;
             }
             void changeStatus(openTicket, 'issued');
@@ -141,22 +159,32 @@ export default function KioskKitchenScreen() {
         />
         <StaffPaymentModal
           visible={payTicket != null}
-          method={payTicket?.paymentMethod === 'card' ? 'card' : 'cash'}
           amount={payTicket?.total ?? 0}
           subtotal={payTicket?.subtotal}
           discountPercent={payTicket?.discountPercent}
+          suggestedMethod={payTicket?.paymentMethod}
           busy={busyId === payTicket?.id}
-          onClose={() => setPayTicket(null)}
+          error={payError}
+          onClose={() => {
+            setPayTicket(null);
+            setPayError(null);
+          }}
           onConfirm={async (method) => {
-            if (!session || !payTicket?.orderId || !payTicket.guestId || !venueId) return;
+            if (!session || !payTicket || !venueId) return;
+            if (!payTicket.orderId || !payTicket.guestId) {
+              setPayError('У заявки нет чека — обновите терминал и попробуйте снова');
+              return;
+            }
             setBusyId(payTicket.id);
+            setPayError(null);
             try {
               await payGuest(payTicket.orderId, payTicket.guestId, method, payTicket.total, session.token);
-              await closeKioskTicket(payTicket.id, session.token);
+              await setKioskTicketStatus(payTicket.id, 'cooking', session.token);
               runPendingFiscalJobs(venueId, session.token);
               setPayTicket(null);
-              setOpenId(null);
               await load();
+            } catch (e) {
+              setPayError(e instanceof Error ? e.message : 'Не удалось провести оплату');
             } finally {
               setBusyId(null);
             }
@@ -203,6 +231,7 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 4,
   },
+  cardUnpaid: { borderWidth: 2, borderColor: '#fb923c' },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   number: { color: colors.text, fontSize: 20, fontWeight: '800' },
   time: { color: colors.textMuted, fontSize: 12 },

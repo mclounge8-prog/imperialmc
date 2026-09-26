@@ -15,18 +15,35 @@ type Props = {
   busy?: boolean;
   onClose: () => void;
   onStatus: (status: KioskTicketStatus) => void;
+  onPay: () => void;
   onReadyClose: () => void;
 };
 
-export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus, onReadyClose }: Props) {
+export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus, onPay, onReadyClose }: Props) {
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const [confirmReady, setConfirmReady] = useState(false);
 
   if (!ticket) return null;
 
-  const canCancel = ticket.status === 'new' || ticket.status === 'cooking';
+  const canCancel = ticket.status === 'new' || ticket.status === 'payment' || ticket.status === 'cooking';
   const unpaid = ticket.paymentStatus !== 'paid';
   const payLabel = paymentMethodLabel(ticket.paymentMethod);
+
+  const onFlow = (step: KioskTicketStatus) => {
+    if (step === 'payment') {
+      if (unpaid) onPay();
+      return;
+    }
+    if (step === 'cooking' && unpaid) {
+      onPay();
+      return;
+    }
+    if (step === 'ready') {
+      if (unpaid) onPay();
+      else onReadyClose();
+      return;
+    }
+    onStatus(step);
+  };
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -45,9 +62,7 @@ export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus
             </View>
           </View>
           {unpaid ? (
-            <Text style={styles.unpaid}>
-              {ticket.paymentMethod === 'cash' ? 'Расчёт за наличные — оплата до выдачи' : 'Ожидает оплату'}
-            </Text>
+            <Text style={styles.unpaid}>Ждёт оплату по факту — нал или безнал в этом окне</Text>
           ) : (
             <Text style={styles.paid}>Оплачено{payLabel ? ` · ${payLabel}` : ''}</Text>
           )}
@@ -79,43 +94,33 @@ export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus
               ? `Итого ${Math.round(ticket.total)} ₽ · скидка ${ticket.discountPercent}%`
               : `Итого ${Math.round(ticket.total)} ₽`}
           </Text>
+
+          {unpaid ? (
+            <Pressable style={styles.payCta} disabled={busy} onPress={onPay}>
+              <Text style={styles.payCtaText}>Принять оплату</Text>
+              <Text style={styles.payCtaSub}>
+                {payLabel ? `${payLabel} · ` : ''}
+                {Math.round(ticket.total)} ₽
+              </Text>
+            </Pressable>
+          ) : null}
+
           <Text style={styles.flowLabel}>Статус</Text>
           <View style={styles.flow}>
             {STAFF_FLOW.map((step) => {
               const active = ticket.status === step.key || (step.key === 'ready' && ticket.status === 'issued');
-              const isReady = step.key === 'ready';
               return (
                 <Pressable
                   key={step.key}
-                  style={[styles.flowBtn, active && styles.flowBtnOn]}
-                  disabled={busy || (active && !isReady)}
-                  onPress={() => {
-                    if (isReady) setConfirmReady(true);
-                    else onStatus(step.key);
-                  }}
+                  style={[styles.flowBtn, active && styles.flowBtnOn, step.key === 'payment' && unpaid && styles.flowBtnPay]}
+                  disabled={busy || (active && step.key !== 'ready' && step.key !== 'payment')}
+                  onPress={() => onFlow(step.key)}
                 >
                   <Text style={[styles.flowText, active && styles.flowTextOn]}>{step.label}</Text>
                 </Pressable>
               );
             })}
           </View>
-
-          {confirmReady ? (
-            <Pressable
-              style={styles.readySure}
-              disabled={busy}
-              onPress={() => {
-                setConfirmReady(false);
-                onReadyClose();
-              }}
-            >
-              <Text style={styles.readySureText}>
-                {unpaid
-                  ? 'Подтвердить готовность — сначала оплата, затем выдача'
-                  : 'Подтвердить готовность и выдачу, закрыть заказ'}
-              </Text>
-            </Pressable>
-          ) : null}
 
           {canCancel ? (
             confirmCancel ? (
@@ -155,7 +160,7 @@ const styles = StyleSheet.create({
   },
   box: {
     width: '100%',
-    maxWidth: 520,
+    maxWidth: 560,
     maxHeight: '92%',
     backgroundColor: colors.surface,
     borderRadius: 18,
@@ -180,7 +185,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   badgeText: { fontWeight: '800', fontSize: 13 },
-  unpaid: { color: '#f0c14b', fontWeight: '800', marginTop: 8 },
+  unpaid: { color: '#fb923c', fontWeight: '800', marginTop: 8 },
   paid: { color: '#86efac', fontWeight: '700', marginTop: 8 },
   list: { marginTop: 14, flexGrow: 0 },
   listInner: { gap: 10, paddingBottom: 8 },
@@ -195,6 +200,17 @@ const styles = StyleSheet.create({
   mod: { color: colors.text, fontSize: 14, lineHeight: 20 },
   modMuted: { color: colors.textMuted, fontSize: 13, marginTop: 6 },
   total: { color: colors.text, fontSize: 20, fontWeight: '800', marginTop: 12 },
+  payCta: {
+    marginTop: 14,
+    backgroundColor: colors.accent2,
+    borderRadius: 16,
+    minHeight: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  payCtaText: { color: '#fff', fontSize: 22, fontWeight: '800' },
+  payCtaSub: { color: '#dbe4ff', fontWeight: '700', marginTop: 2 },
   flowLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700', marginTop: 14, marginBottom: 8 },
   flow: { flexDirection: 'row', gap: 8 },
   flowBtn: {
@@ -205,19 +221,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
   },
   flowBtnOn: { backgroundColor: colors.accent2, borderColor: colors.accent2 },
-  flowText: { color: colors.text, fontWeight: '800', fontSize: 12, textAlign: 'center' },
+  flowBtnPay: { borderColor: '#fb923c', backgroundColor: '#3b2610' },
+  flowText: { color: colors.text, fontWeight: '800', fontSize: 11, textAlign: 'center' },
   flowTextOn: { color: '#fff' },
-  readySure: {
-    marginTop: 10,
-    backgroundColor: '#14532d',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  readySureText: { color: '#bbf7d0', fontWeight: '800', textAlign: 'center', paddingHorizontal: 8 },
   cancel: { marginTop: 10, alignItems: 'center', paddingVertical: 10 },
   cancelText: { color: colors.danger, fontWeight: '700' },
   cancelSure: {
