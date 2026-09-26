@@ -6,6 +6,7 @@ import {
   guestStatusLabel,
   guestStatusTint,
   paymentMethodLabel,
+  paymentMethodTint,
   STAFF_FLOW,
 } from '../kiosk/status';
 import type { KioskTicket, KioskTicketStatus } from '../api/client';
@@ -38,8 +39,8 @@ export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus
       return;
     }
     if (step === 'ready') {
-      if (unpaid) onPay();
-      else onReadyClose();
+      if (unpaid) return;
+      onReadyClose();
       return;
     }
     onStatus(step);
@@ -52,7 +53,7 @@ export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus
         <View style={styles.box}>
           <View style={styles.top}>
             <View>
-              <Text style={styles.kicker}>Самообслуживание{payLabel ? ` · ${payLabel}` : ''}</Text>
+              <Text style={styles.kicker}>Самообслуживание</Text>
               <Text style={styles.number}>Заказ № {ticket.number}</Text>
             </View>
             <View style={[styles.badge, { borderColor: guestStatusTint(ticket.status) }]}>
@@ -61,10 +62,17 @@ export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus
               </Text>
             </View>
           </View>
+          {payLabel ? (
+            <View style={[styles.methodBadge, { borderColor: paymentMethodTint(ticket.paymentMethod) }]}>
+              <Text style={[styles.methodBadgeText, { color: paymentMethodTint(ticket.paymentMethod) }]}>
+                {payLabel}
+              </Text>
+            </View>
+          ) : null}
           {unpaid ? (
-            <Text style={styles.unpaid}>Ждёт оплату по факту — нал или безнал в этом окне</Text>
+            <Text style={styles.unpaid}>Ждёт оплату · {payLabel || 'способ выбран на киоске'}</Text>
           ) : (
-            <Text style={styles.paid}>Оплачено{payLabel ? ` · ${payLabel}` : ''}</Text>
+            <Text style={styles.paid}>Оплачено · {payLabel} · тип больше не меняется</Text>
           )}
 
           <ScrollView style={styles.list} contentContainerStyle={styles.listInner}>
@@ -112,8 +120,17 @@ export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus
               return (
                 <Pressable
                   key={step.key}
-                  style={[styles.flowBtn, active && styles.flowBtnOn, step.key === 'payment' && unpaid && styles.flowBtnPay]}
-                  disabled={busy || (active && step.key !== 'ready' && step.key !== 'payment')}
+                  style={[
+                    styles.flowBtn,
+                    active && styles.flowBtnOn,
+                    step.key === 'payment' && unpaid && styles.flowBtnPay,
+                    step.key === 'ready' && unpaid && styles.flowBtnOff,
+                  ]}
+                  disabled={
+                    busy ||
+                    (step.key === 'ready' && unpaid) ||
+                    (active && step.key !== 'ready' && step.key !== 'payment')
+                  }
                   onPress={() => onFlow(step.key)}
                 >
                   <Text style={[styles.flowText, active && styles.flowTextOn]}>{step.label}</Text>
@@ -185,8 +202,19 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   badgeText: { fontWeight: '800', fontSize: 13 },
+  methodBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.surface2,
+  },
+  methodBadgeText: { fontWeight: '800', fontSize: 16 },
   unpaid: { color: '#fb923c', fontWeight: '800', marginTop: 8 },
   paid: { color: '#86efac', fontWeight: '700', marginTop: 8 },
+  flowBtnOff: { opacity: 0.35 },
   list: { marginTop: 14, flexGrow: 0 },
   listInner: { gap: 10, paddingBottom: 8 },
   item: {

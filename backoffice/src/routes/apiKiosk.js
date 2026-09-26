@@ -129,6 +129,18 @@ function roundMoney(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
+async function closeLinkedKioskOrder(client, ticket) {
+  if (!ticket?.order_id) return;
+  if (ticket.guest_id) {
+    await client.query("UPDATE order_guests SET status = 'paid' WHERE id = $1 AND status = 'open'", [
+      ticket.guest_id,
+    ]);
+  }
+  await client.query("UPDATE orders SET status = 'paid', closed_at = COALESCE(closed_at, now()) WHERE id = $1 AND status = 'open'", [
+    ticket.order_id,
+  ]);
+}
+
 function serializeTicket(ticket, items) {
   return {
     id: ticket.id,
@@ -345,13 +357,14 @@ apiKiosk.post('/tickets', requireDeviceToken, async (c) => {
       prepared.push({ menuItem, qty, selected, unitPrice });
     }
 
-    const cashless = paymentMethod === 'card' || paymentMethod === 'qr';
-    const discountPercent = cashless
-      ? Math.max(0, Math.min(100, Number(venue.kiosk_cashless_discount_percent || 12)))
-      : 0;
+    const discountPercent =
+      paymentMethod === 'qr'
+        ? Math.max(0, Math.min(100, Number(venue.kiosk_cashless_discount_percent || 12)))
+        : 0;
     const discount = roundMoney((total * discountPercent) / 100);
     const payable = roundMoney(total - discount);
     const paymentStatus = paymentMethod === 'qr' ? 'paid' : 'unpaid';
+    const initialStatus = paymentMethod === 'qr' ? 'cooking' : 'new';
 
     const { rows: orderRows } = await client.query(
       "INSERT INTO orders (table_id, venue_id, status, opened_by, source) VALUES (NULL, $1, 'open', NULL, 'kiosk') RETURNING id",
@@ -367,14 +380,17 @@ apiKiosk.post('/tickets', requireDeviceToken, async (c) => {
     const { rows: ticketRows } = await client.query(
       `INSERT INTO kiosk_tickets
          (venue_id, device_id, shift_id, number, status, guest_name, comment, total,
-          payment_method, payment_status, discount_percent, subtotal, order_id, guest_id)
-       VALUES ($1, $2, $3, $4, 'new', $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          payment_method, payment_status, discount_percent, subtotal, order_id, guest_id,
+          cooking_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+          CASE WHEN $5 = 'cooking' THEN now() ELSE NULL END)
        RETURNING *`,
       [
         venue.id,
         device.id,
         shift.id,
         number,
+        initialStatus,
         guestName || null,
         comment || null,
         payable,
@@ -488,7 +504,6 @@ apiKiosk.post('/tickets', requireDeviceToken, async (c) => {
         payable,
       ]);
       await client.query("UPDATE order_guests SET status = 'paid' WHERE id = $1", [guestId]);
-      await client.query("UPDATE orders SET status = 'paid', closed_at = now() WHERE id = $1", [orderId]);
       await client.query('UPDATE kiosk_tickets SET receipt_id = $2, payment_status = $3 WHERE id = $1', [
         ticket.id,
         receiptId,
@@ -631,6 +646,10 @@ apiKiosk.post('/tickets/:id/status', requireStaffToken, async (c) => {
       nextStatus,
     ]);
 
+    if (nextStatus === 'issued') {
+      await closeLinkedKioskOrder(client, ticket);
+    }
+
     if (nextStatus === 'cancelled') {
       const { rows: itemRows } = await client.query(
         'SELECT id, qty FROM kiosk_ticket_items WHERE ticket_id = $1',
@@ -700,6 +719,7 @@ apiKiosk.post('/tickets/:id/close', requireStaffToken, async (c) => {
        WHERE id = $1`,
       [ticketId]
     );
+    await closeLinkedKioskOrder(client, ticket);
     await client.query('COMMIT');
     return c.json({ ticket: await fetchTicketDetail(ticketId) });
   } catch (err) {

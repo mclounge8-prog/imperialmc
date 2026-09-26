@@ -44,6 +44,13 @@ export function isActiveKioskStatus(status: string): boolean {
 export function paymentMethodLabel(method?: string | null): string {
   if (method === 'cash') return 'Наличные';
   if (method === 'card') return 'Карта';
-  if (method === 'qr') return 'QR';
+  if (method === 'qr') return 'Карта — QR-код';
   return '';
+}
+
+export function paymentMethodTint(method?: string | null): string {
+  if (method === 'cash') return '#86efac';
+  if (method === 'card') return '#93c5fd';
+  if (method === 'qr') return '#fbbf24';
+  return '#98979f';
 }

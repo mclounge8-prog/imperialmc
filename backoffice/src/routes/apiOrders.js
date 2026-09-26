@@ -190,6 +190,9 @@ async function createDefaultGuest(orderId) {
 // весь заказ (и стол, если был) закрывается сам. paid, если хотя бы один гость
 // реально оплатил, иначе cancelled (все ушли без оплаты).
 async function maybeCloseOrderIfAllGuestsSettled(orderId) {
+  const { rows: sourceRows } = await pool.query('SELECT source FROM orders WHERE id = $1', [orderId]);
+  if (sourceRows[0]?.source === 'kiosk') return;
+
   const { rows: openGuests } = await pool.query(
     "SELECT id FROM order_guests WHERE order_id = $1 AND status = 'open'",
     [orderId]
@@ -518,6 +521,16 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       return c.json({ error: 'Гость не найден или уже закрыт' });
     }
 
+    const { rows: kioskPaidRows } = await client.query(
+      'SELECT id, payment_status, payment_method FROM kiosk_tickets WHERE order_id = $1 FOR UPDATE',
+      [orderId]
+    );
+    if (kioskPaidRows[0]?.payment_status === 'paid') {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({ error: 'Оплата уже проведена, тип оплаты менять нельзя', code: 'ALREADY_PAID' });
+    }
+
     // Скидка уже назначена на гостя (отдельное меню), не в момент оплаты.
     const discountPercent = clampDiscountPercent(guest.discount_percent);
 
@@ -559,6 +572,18 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
         }
       }
       normalizedPayments = payments;
+      const lockedMethod = kioskPaidRows[0]?.payment_method;
+      if (lockedMethod === 'cash' || lockedMethod === 'card') {
+        const other = normalizedPayments.find((p) => p.method !== lockedMethod);
+        if (other) {
+          await client.query('ROLLBACK');
+          c.status(409);
+          return c.json({
+            error: 'Тип оплаты уже выбран на киоске, менять нельзя',
+            code: 'PAYMENT_METHOD_LOCKED',
+          });
+        }
+      }
       const paymentsTotal = roundMoney(normalizedPayments.reduce((sum, p) => sum + p.amount, 0));
       if (Math.abs(paymentsTotal - payable) > 0.01) {
         await client.query('ROLLBACK');
@@ -580,14 +605,17 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       discountPercent,
     });
     await client.query("UPDATE order_guests SET status = 'paid' WHERE id = $1", [guestId]);
-    await client.query(
-      `UPDATE kiosk_tickets
-       SET payment_status = 'paid',
-           receipt_id = $2,
-           payment_method = COALESCE($3, payment_method)
-       WHERE order_id = $1`,
-      [orderId, receiptMeta.receiptId, normalizedPayments[0]?.method || null]
-    );
+    if (kioskPaidRows[0]) {
+      await client.query(
+        `UPDATE kiosk_tickets
+         SET payment_status = 'paid',
+             receipt_id = $2,
+             status = CASE WHEN status IN ('new', 'payment') THEN 'cooking' ELSE status END,
+             cooking_at = COALESCE(cooking_at, now())
+         WHERE id = $1`,
+        [kioskPaidRows[0].id, receiptMeta.receiptId]
+      );
+    }
 
     await client.query('COMMIT');
     paidNotify = {

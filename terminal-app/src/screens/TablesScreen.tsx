@@ -28,7 +28,7 @@ import type { KioskTicket, KioskTicketStatus, OpenOrderSummary, PaidReceiptSumma
 import PaidReceiptDetailModal from '../components/PaidReceiptDetailModal';
 import KioskTicketDetailModal from '../components/KioskTicketDetailModal';
 import StaffPaymentModal from '../components/StaffPaymentModal';
-import { guestStatusLabel, isActiveKioskStatus, paymentMethodLabel } from '../kiosk/status';
+import { guestStatusLabel, isActiveKioskStatus, paymentMethodLabel, paymentMethodTint } from '../kiosk/status';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import { layoutSizeForTable, layoutTablesOnViewport, normalizeTableSize, snapToGrid } from '../utils/tableLayout';
@@ -208,7 +208,7 @@ export default function TablesScreen() {
   };
 
   const beginPay = (ticket: KioskTicket) => {
-    if (!session) return;
+    if (!session || ticket.paymentStatus === 'paid') return;
     setPayError(null);
     setPayTicket(ticket);
     setSelectedKioskId(null);
@@ -480,7 +480,6 @@ export default function TablesScreen() {
           setPayError(null);
           try {
             await payGuest(payTicket.orderId, payTicket.guestId, method, payTicket.total, session.token);
-            await setKioskTicketStatus(payTicket.id, 'cooking', session.token);
             runPendingFiscalJobs(venue.id, session.token);
             setPayTicket(null);
             await load({ silent: true });
@@ -514,16 +513,17 @@ function KioskPulseRow({ ticket, onPress }: { ticket: KioskTicket; onPress: () =
     <Pressable onPress={onPress} style={styles.kioskRow}>
       <Animated.View style={[styles.kioskPulse, { opacity: pulse }]} />
       <View style={styles.kioskInfo}>
-        <Text style={styles.kioskBadge}>
-          Самообслуживание{paymentMethodLabel(ticket.paymentMethod) ? ` · ${paymentMethodLabel(ticket.paymentMethod)}` : ''}
-        </Text>
+        <Text style={styles.kioskBadge}>Самообслуживание</Text>
+        {ticket.paymentMethod ? (
+          <Text style={[styles.kioskPay, { color: paymentMethodTint(ticket.paymentMethod) }]}>
+            {paymentMethodLabel(ticket.paymentMethod)}
+            {ticket.paymentStatus !== 'paid' ? ' · ждёт оплату' : ' · оплачено'}
+          </Text>
+        ) : null}
         <Text style={styles.openOrderName} numberOfLines={1}>
           Заказ № {ticket.number}
         </Text>
-        <Text style={styles.kioskStatus}>
-          {guestStatusLabel(ticket.status)}
-          {ticket.paymentStatus !== 'paid' ? ' · ждёт оплату' : ''}
-        </Text>
+        <Text style={styles.kioskStatus}>{guestStatusLabel(ticket.status)}</Text>
       </View>
       <Text style={styles.openOrderTotal}>{Math.round(ticket.total)} ₽</Text>
     </Pressable>
@@ -682,6 +682,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
+  kioskPay: { fontSize: 14, fontWeight: '800' },
   kioskStatus: { color: '#fde68a', fontSize: 12, fontWeight: '700' },
 
   headerAppTitle: { color: colors.text, fontSize: 14, fontWeight: '700', marginLeft: 12 },

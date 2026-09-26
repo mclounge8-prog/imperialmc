@@ -9,7 +9,7 @@ import type { KioskTicket, KioskTicketStatus } from '../api/client';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import KioskTicketDetailModal from '../components/KioskTicketDetailModal';
 import StaffPaymentModal from '../components/StaffPaymentModal';
-import { formatModifierLine, paymentMethodLabel } from '../kiosk/status';
+import { formatModifierLine, paymentMethodLabel, paymentMethodTint } from '../kiosk/status';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 
 const COLUMNS: { key: KioskTicketStatus; title: string; tint: string }[] = [
@@ -70,7 +70,7 @@ export default function KioskKitchenScreen() {
   };
 
   const beginPay = (ticket: KioskTicket) => {
-    if (!session) return;
+    if (!session || ticket.paymentStatus === 'paid') return;
     setPayError(null);
     setPayTicket(ticket);
     setOpenId(null);
@@ -111,9 +111,9 @@ export default function KioskKitchenScreen() {
                           <Text style={styles.time}>{formatTime(ticket.createdAt)}</Text>
                         </View>
                         {ticket.paymentMethod ? (
-                          <Text style={styles.payHint}>
+                          <Text style={[styles.payHint, { color: paymentMethodTint(ticket.paymentMethod) }]}>
                             {paymentMethodLabel(ticket.paymentMethod)}
-                            {ticket.paymentStatus !== 'paid' ? ' · ждёт оплату' : ''}
+                            {ticket.paymentStatus !== 'paid' ? ' · ждёт оплату' : ' · оплачено'}
                           </Text>
                         ) : null}
                       {ticket.items.map((item) => (
@@ -179,7 +179,6 @@ export default function KioskKitchenScreen() {
             setPayError(null);
             try {
               await payGuest(payTicket.orderId, payTicket.guestId, method, payTicket.total, session.token);
-              await setKioskTicketStatus(payTicket.id, 'cooking', session.token);
               runPendingFiscalJobs(venueId, session.token);
               setPayTicket(null);
               await load();

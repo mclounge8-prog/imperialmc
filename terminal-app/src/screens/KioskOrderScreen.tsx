@@ -520,7 +520,7 @@ export default function KioskOrderScreen() {
                 >
                   <Text style={styles.payEmoji}>💳</Text>
                   <Text style={styles.payTileTitle}>Безналичные</Text>
-                  <Text style={styles.payTileSub}>Скидка {discountPct}%</Text>
+                  <Text style={styles.payTileSub}>Карта или QR-код</Text>
                 </Pressable>
               </View>
             </>
@@ -528,12 +528,12 @@ export default function KioskOrderScreen() {
 
           {payStep === 'cashless' ? (
             <>
-              <Text style={styles.overlayTitle}>Безнал · скидка {discountPct}%</Text>
+              <Text style={styles.overlayTitle}>Безнал</Text>
               <View style={styles.payTiles}>
                 <Pressable style={styles.payTile} disabled={busy} onPress={() => void submit('card')}>
                   <Text style={styles.payEmoji}>💳</Text>
                   <Text style={styles.payTileTitle}>Карта</Text>
-                  <Text style={styles.payTileSub}>Оплата у сотрудника</Text>
+                  <Text style={styles.payTileSub}>Оплата у сотрудника · без скидки</Text>
                 </Pressable>
                 <Pressable
                   style={styles.payTile}
@@ -544,7 +544,7 @@ export default function KioskOrderScreen() {
                   }}
                 >
                   <Text style={styles.payEmoji}>▣</Text>
-                  <Text style={styles.payTileTitle}>QR-код</Text>
+                  <Text style={styles.payTileTitle}>Карта — QR-код</Text>
                   <Text style={styles.payTileSub}>Скидка {discountPct}%</Text>
                 </Pressable>
               </View>
@@ -553,7 +553,7 @@ export default function KioskOrderScreen() {
 
           {payStep === 'qr' ? (
             <>
-              <Text style={styles.overlayTitle}>Оплата по QR</Text>
+              <Text style={styles.overlayTitle}>Карта — QR-код · скидка {discountPct}%</Text>
               {qrUrl ? (
                 <FastImage source={{ uri: qrUrl }} style={styles.qr} resizeMode={FastImage.resizeMode.contain} />
               ) : (

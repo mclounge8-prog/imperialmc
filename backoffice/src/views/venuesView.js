@@ -73,7 +73,7 @@ export function renderVenueKioskPayPanel(venue, errorMsg = null) {
   return `
     <div class="venue-kiosk-pay-panel" id="venue-kiosk-pay-panel-${venue.id}">
       <div class="venue-tobacco-head">
-        <strong>Киоск: безнал и QR</strong>
+        <strong>Киоск: оплата</strong>
       </div>
       <form
         class="venue-tobacco-form"
@@ -84,7 +84,7 @@ export function renderVenueKioskPayPanel(venue, errorMsg = null) {
       >
         ${errorHtml}
         <label class="field-block">
-          <span>Скидка на безнал (карта и QR), %</span>
+          <span>Скидка только на QR-код, %</span>
           <input type="number" name="discount_percent" value="${discount}" min="0" max="100" step="1" required>
         </label>
         <label class="field-block">
