@@ -307,6 +307,13 @@ function renderCashDayRow(day) {
 function renderCashShiftRow(shift) {
   const statusLabel = shift.status === 'open' ? 'Открыта' : 'Закрыта';
   const statusClass = shift.status === 'open' ? 'badge-active' : 'badge-inactive';
+  const tgBtn =
+    shift.status === 'closed'
+      ? `<form hx-post="/telegram/resend-shift?snippet=1" hx-target="#tg-resend-flash" hx-swap="innerHTML">
+          <input type="hidden" name="shift_id" value="${shift.id}" />
+          <button type="submit" class="btn-secondary">В Telegram</button>
+        </form>`
+      : '—';
   return `
     <tr>
       <td>${formatDay(shift.day)}</td>
@@ -327,6 +334,7 @@ function renderCashShiftRow(shift) {
       <td>${shift.countedCash != null ? formatMoney(shift.countedCash) : '—'}</td>
       <td>${shift.difference != null ? formatMoney(shift.difference) : '—'}</td>
       <td>${formatMoney(shift.revenueTotal)}</td>
+      <td>${tgBtn}</td>
     </tr>
   `;
 }
@@ -359,7 +367,9 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
       ])}
       <p class="hint">
         Период считается по дате открытия смены. «По дням» — сумма всех смен заведения за календарный день.
+        У закрытой смены кнопка «В Telegram» повторно шлёт отчёт о закрытии (касса + табак).
       </p>
+      <div id="tg-resend-flash" style="min-height:1.2em;margin-top:.4rem;"></div>
     </div>
 
     <div class="subsection report-summary">
@@ -433,9 +443,10 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
             <th>Факт</th>
             <th>Разница</th>
             <th>Выручка</th>
+            <th>Telegram</th>
           </tr>
         </thead>
-        <tbody>${shiftRows || '<tr><td colspan="18" class="empty-hint">Смен за период нет</td></tr>'}</tbody>
+        <tbody>${shiftRows || '<tr><td colspan="19" class="empty-hint">Смен за период нет</td></tr>'}</tbody>
       </table>
     </div>
   `;

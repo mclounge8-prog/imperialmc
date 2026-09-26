@@ -17,8 +17,8 @@ import { fetchAllVenues } from '../utils/venues.js';
 import { readSelectedVenueId, resolveSelectedVenue, writeLastSection } from '../utils/preferences.js';
 import { pool } from '../db.js';
 import { manifestForClient, publicBaseUrl, readManifest } from '../services/terminalUpdates.js';
-import { readTelegramSettings, listTelegramChannelsWithVenues } from '../services/telegramNotify.js';
 import { renderTelegramSection } from '../views/telegramView.js';
+import { loadTelegramPageData } from './telegram.js';
 import { renderTobaccoTaresFragment } from './tobaccoTares.js';
 
 /**
@@ -194,11 +194,12 @@ export async function renderFragmentHtml(key, c) {
   }
 
   if (key === 'telegram') {
-    const [settings, channels] = await Promise.all([
-      readTelegramSettings(),
-      listTelegramChannelsWithVenues(),
-    ]);
-    return renderTelegramSection(settings, null, channels);
+    const data = await loadTelegramPageData();
+    return renderTelegramSection(data.settings, null, data.channels, {
+      venues: data.venues,
+      recentShifts: data.recentShifts,
+      venueId: data.venueId,
+    });
   }
 
   if (key === 'tobacco-tares') {
