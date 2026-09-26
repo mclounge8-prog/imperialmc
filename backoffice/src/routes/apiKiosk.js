@@ -3,6 +3,7 @@ import { pool } from '../db.js';
 import { requireDeviceToken } from '../middleware/deviceAuth.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { fetchVenueMenu } from '../services/venueMenu.js';
+
 const apiKiosk = new Hono();
 
 const UNIT_LABELS = { g: 'г', ml: 'мл', pcs: 'шт' };
