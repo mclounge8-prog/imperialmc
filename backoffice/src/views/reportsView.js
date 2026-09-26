@@ -197,6 +197,18 @@ export function renderReceiptsSection(venues, selectedVenueId, dateFrom, dateTo,
         <span class="report-summary-sub">${formatMoney(summary.paidTotal)}</span>
       </div>
       <div class="report-summary-card">
+        <span class="report-summary-label">Нал</span>
+        <span class="report-summary-value">${formatMoney(summary.cashTotal || 0)}</span>
+      </div>
+      <div class="report-summary-card">
+        <span class="report-summary-label">Карта</span>
+        <span class="report-summary-value">${formatMoney(summary.cardTotal || 0)}</span>
+      </div>
+      <div class="report-summary-card">
+        <span class="report-summary-label">QR-код</span>
+        <span class="report-summary-value">${formatMoney(summary.qrTotal || 0)}</span>
+      </div>
+      <div class="report-summary-card">
         <span class="report-summary-label">Отменено</span>
         <span class="report-summary-value">${summary.cancelledCount}</span>
       </div>
