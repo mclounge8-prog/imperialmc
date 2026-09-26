@@ -49,6 +49,7 @@ export function renderVenueCard(venue, assignedNames) {
           <button hx-get="/venues/${venue.id}/staff" hx-target="#venue-staff-panel-${venue.id}" hx-swap="innerHTML">Сотрудники</button>
           <button hx-get="/venues/${venue.id}/atol" hx-target="#venue-atol-panel-${venue.id}" hx-swap="innerHTML">Касса АТОЛ</button>
           <button hx-get="/venues/${venue.id}/tobacco" hx-target="#venue-tobacco-panel-${venue.id}" hx-swap="innerHTML">Учёт табака</button>
+          <button hx-get="/venues/${venue.id}/kiosk-pay" hx-target="#venue-kiosk-pay-panel-${venue.id}" hx-swap="innerHTML">Киоск: оплата</button>
           <button hx-get="/venues/${venue.id}/edit" hx-target="#venue-card-${venue.id}" hx-swap="outerHTML">Изменить</button>
           <button class="danger" hx-delete="/venues/${venue.id}" hx-target="#venue-card-${venue.id}" hx-swap="outerHTML" hx-confirm="Удалить заведение «${safeName}»? Это затронет всё, что к нему привязано.">Удалить</button>
         </div>
@@ -56,6 +57,45 @@ export function renderVenueCard(venue, assignedNames) {
       <div id="venue-staff-panel-${venue.id}" class="venue-staff-panel"></div>
       <div id="venue-atol-panel-${venue.id}" class="venue-atol-panel"></div>
       <div id="venue-tobacco-panel-${venue.id}" class="venue-tobacco-panel-host"></div>
+      <div id="venue-kiosk-pay-panel-${venue.id}" class="venue-kiosk-pay-host"></div>
+    </div>
+  `;
+}
+
+export function renderVenueKioskPayPanel(venue, errorMsg = null) {
+  const discount = Number(venue.kiosk_cashless_discount_percent ?? 12);
+  const qrUrl = venue.kiosk_qr_image_url || '';
+  const errorHtml = errorMsg ? `<div class="field-error">${escapeHtml(errorMsg)}</div>` : '';
+  const preview = qrUrl
+    ? `<img class="kiosk-qr-preview" src="${escapeHtml(qrUrl)}" alt="QR оплаты">`
+    : '<p class="empty-hint">QR ещё не загружен</p>';
+
+  return `
+    <div class="venue-kiosk-pay-panel" id="venue-kiosk-pay-panel-${venue.id}">
+      <div class="venue-tobacco-head">
+        <strong>Киоск: безнал и QR</strong>
+      </div>
+      <form
+        class="venue-tobacco-form"
+        hx-post="/venues/${venue.id}/kiosk-pay"
+        hx-encoding="multipart/form-data"
+        hx-target="#venue-kiosk-pay-panel-${venue.id}"
+        hx-swap="outerHTML"
+      >
+        ${errorHtml}
+        <label class="field-block">
+          <span>Скидка на безнал (карта и QR), %</span>
+          <input type="number" name="discount_percent" value="${discount}" min="0" max="100" step="1" required>
+        </label>
+        <label class="field-block">
+          <span>QR код для перевода (PNG)</span>
+          <input type="file" name="qr_image" accept="image/png">
+        </label>
+        ${preview}
+        <div class="venue-actions">
+          <button type="submit">Сохранить</button>
+        </div>
+      </form>
     </div>
   `;
 }

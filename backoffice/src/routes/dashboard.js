@@ -43,7 +43,9 @@ export async function renderFragmentHtml(key, c) {
               COALESCE(precheck_enabled, false) AS precheck_enabled,
               COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
               COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
-              COALESCE(kiosk_enabled, false) AS kiosk_enabled
+              COALESCE(kiosk_enabled, false) AS kiosk_enabled,
+              COALESCE(kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
+              kiosk_qr_image_url
        FROM venues ORDER BY name`
     );
     const venueCards = [];

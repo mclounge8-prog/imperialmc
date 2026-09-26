@@ -919,6 +919,23 @@ input[type="radio"] {
   color: var(--text-muted);
 }
 
+.venue-kiosk-pay-panel {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.kiosk-qr-preview {
+  display: block;
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 8px 0 12px;
+}
+
 .badge-kiosk {
   background: rgba(63, 99, 230, 0.2);
   color: #8aa4ff;

@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
-import { formatModifierLine, guestStatusLabel, guestStatusTint, STAFF_FLOW } from '../kiosk/status';
+import {
+  formatModifierLine,
+  guestStatusLabel,
+  guestStatusTint,
+  paymentMethodLabel,
+  STAFF_FLOW,
+} from '../kiosk/status';
 import type { KioskTicket, KioskTicketStatus } from '../api/client';
 
 type Props = {
@@ -9,14 +15,18 @@ type Props = {
   busy?: boolean;
   onClose: () => void;
   onStatus: (status: KioskTicketStatus) => void;
+  onReadyClose: () => void;
 };
 
-export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus }: Props) {
+export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus, onReadyClose }: Props) {
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmReady, setConfirmReady] = useState(false);
 
   if (!ticket) return null;
 
   const canCancel = ticket.status === 'new' || ticket.status === 'cooking';
+  const unpaid = ticket.paymentStatus !== 'paid';
+  const payLabel = paymentMethodLabel(ticket.paymentMethod);
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -25,7 +35,7 @@ export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus
         <View style={styles.box}>
           <View style={styles.top}>
             <View>
-              <Text style={styles.kicker}>Самообслуживание</Text>
+              <Text style={styles.kicker}>Самообслуживание{payLabel ? ` · ${payLabel}` : ''}</Text>
               <Text style={styles.number}>Заказ № {ticket.number}</Text>
             </View>
             <View style={[styles.badge, { borderColor: guestStatusTint(ticket.status) }]}>
@@ -34,6 +44,13 @@ export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus
               </Text>
             </View>
           </View>
+          {unpaid ? (
+            <Text style={styles.unpaid}>
+              {ticket.paymentMethod === 'cash' ? 'Расчёт за наличные — оплата до выдачи' : 'Ожидает оплату'}
+            </Text>
+          ) : (
+            <Text style={styles.paid}>Оплачено{payLabel ? ` · ${payLabel}` : ''}</Text>
+          )}
 
           <ScrollView style={styles.list} contentContainerStyle={styles.listInner}>
             {ticket.items.map((item) => (
@@ -57,23 +74,48 @@ export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus
             ))}
           </ScrollView>
 
-          <Text style={styles.total}>Итого {Math.round(ticket.total)} ₽</Text>
-          <Text style={styles.flowLabel}>Статус для кухни</Text>
+          <Text style={styles.total}>
+            {ticket.discountPercent
+              ? `Итого ${Math.round(ticket.total)} ₽ · скидка ${ticket.discountPercent}%`
+              : `Итого ${Math.round(ticket.total)} ₽`}
+          </Text>
+          <Text style={styles.flowLabel}>Статус</Text>
           <View style={styles.flow}>
             {STAFF_FLOW.map((step) => {
-              const active = ticket.status === step.key;
+              const active = ticket.status === step.key || (step.key === 'ready' && ticket.status === 'issued');
+              const isReady = step.key === 'ready';
               return (
                 <Pressable
                   key={step.key}
                   style={[styles.flowBtn, active && styles.flowBtnOn]}
-                  disabled={busy || active}
-                  onPress={() => onStatus(step.key)}
+                  disabled={busy || (active && !isReady)}
+                  onPress={() => {
+                    if (isReady) setConfirmReady(true);
+                    else onStatus(step.key);
+                  }}
                 >
                   <Text style={[styles.flowText, active && styles.flowTextOn]}>{step.label}</Text>
                 </Pressable>
               );
             })}
           </View>
+
+          {confirmReady ? (
+            <Pressable
+              style={styles.readySure}
+              disabled={busy}
+              onPress={() => {
+                setConfirmReady(false);
+                onReadyClose();
+              }}
+            >
+              <Text style={styles.readySureText}>
+                {unpaid
+                  ? 'Подтвердить готовность — сначала оплата, затем выдача'
+                  : 'Подтвердить готовность и выдачу, закрыть заказ'}
+              </Text>
+            </Pressable>
+          ) : null}
 
           {canCancel ? (
             confirmCancel ? (
@@ -138,6 +180,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   badgeText: { fontWeight: '800', fontSize: 13 },
+  unpaid: { color: '#f0c14b', fontWeight: '800', marginTop: 8 },
+  paid: { color: '#86efac', fontWeight: '700', marginTop: 8 },
   list: { marginTop: 14, flexGrow: 0 },
   listInner: { gap: 10, paddingBottom: 8 },
   item: {
@@ -166,6 +210,14 @@ const styles = StyleSheet.create({
   flowBtnOn: { backgroundColor: colors.accent2, borderColor: colors.accent2 },
   flowText: { color: colors.text, fontWeight: '800', fontSize: 12, textAlign: 'center' },
   flowTextOn: { color: '#fff' },
+  readySure: {
+    marginTop: 10,
+    backgroundColor: '#14532d',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  readySureText: { color: '#bbf7d0', fontWeight: '800', textAlign: 'center', paddingHorizontal: 8 },
   cancel: { marginTop: 10, alignItems: 'center', paddingVertical: 10 },
   cancelText: { color: colors.danger, fontWeight: '700' },
   cancelSure: {

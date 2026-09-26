@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
 import {
@@ -8,6 +10,7 @@ import {
   renderVenueListOob,
   renderVenueAtolPanel,
   renderVenueAtolJobsRows,
+  renderVenueKioskPayPanel,
 } from '../views/venuesView.js';
 import { renderVenueTobaccoPanel } from '../views/tobaccoView.js';
 import { cancelIfSuperseded } from '../services/fiscalJobGuards.js';
@@ -21,7 +24,9 @@ async function fetchVenue(id) {
             COALESCE(precheck_enabled, false) AS precheck_enabled,
             COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
             COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
-            COALESCE(kiosk_enabled, false) AS kiosk_enabled
+            COALESCE(kiosk_enabled, false) AS kiosk_enabled,
+            COALESCE(kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
+            kiosk_qr_image_url
      FROM venues WHERE id = $1`,
     [id]
   );
@@ -45,7 +50,9 @@ async function fetchAllVenueCards() {
             COALESCE(precheck_enabled, false) AS precheck_enabled,
             COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
             COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
-            COALESCE(kiosk_enabled, false) AS kiosk_enabled
+            COALESCE(kiosk_enabled, false) AS kiosk_enabled,
+            COALESCE(kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
+            kiosk_qr_image_url
      FROM venues ORDER BY name`
   );
   const cards = [];
@@ -460,6 +467,53 @@ venues.post('/:id/tobacco-settings', async (c) => {
 
   const html = await buildVenueTobaccoPanel(venueId);
   return c.html(html);
+});
+
+venues.get('/:id/kiosk-pay', async (c) => {
+  const venue = await fetchVenue(c.req.param('id'));
+  if (!venue) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+  return c.html(renderVenueKioskPayPanel(venue));
+});
+
+venues.post('/:id/kiosk-pay', async (c) => {
+  const id = c.req.param('id');
+  const venue = await fetchVenue(id);
+  if (!venue) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+
+  const body = await c.req.parseBody();
+  const raw = Number(body.discount_percent);
+  const discount = Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 12;
+
+  let qrUrl = venue.kiosk_qr_image_url || null;
+  const file = body.qr_image;
+  if (file && typeof file !== 'string') {
+    if (!file.type || file.type !== 'image/png') {
+      return c.html(renderVenueKioskPayPanel({ ...venue, kiosk_cashless_discount_percent: discount }, 'Нужен PNG'));
+    }
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const filename = `venue-${id}-qr-${Date.now()}.png`;
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'kiosk');
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.writeFile(path.join(uploadDir, filename), buffer);
+    qrUrl = `/uploads/kiosk/${filename}`;
+  }
+
+  await pool.query(
+    `UPDATE venues
+     SET kiosk_cashless_discount_percent = $2,
+         kiosk_qr_image_url = $3
+     WHERE id = $1`,
+    [id, discount, qrUrl]
+  );
+
+  const updated = await fetchVenue(id);
+  return c.html(renderVenueKioskPayPanel(updated));
 });
 
 export default venues;

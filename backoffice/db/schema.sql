@@ -826,3 +826,16 @@ CREATE INDEX IF NOT EXISTS idx_kiosk_ticket_items_ticket
   ON kiosk_ticket_items(ticket_id);
 CREATE INDEX IF NOT EXISTS idx_kiosk_ticket_item_modifiers_item
   ON kiosk_ticket_item_modifiers(ticket_item_id);
+
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS kiosk_cashless_discount_percent NUMERIC(5,2) NOT NULL DEFAULT 12;
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS kiosk_qr_image_url TEXT;
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS source VARCHAR(16) NOT NULL DEFAULT 'staff';
+
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS payment_method VARCHAR(16);
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS payment_status VARCHAR(16) NOT NULL DEFAULT 'unpaid';
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS subtotal NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS order_id INT REFERENCES orders(id) ON DELETE SET NULL;
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS guest_id INT REFERENCES order_guests(id) ON DELETE SET NULL;
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS receipt_id INT REFERENCES receipts(id) ON DELETE SET NULL;

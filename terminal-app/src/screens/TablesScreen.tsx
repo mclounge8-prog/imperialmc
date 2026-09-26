@@ -15,11 +15,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
-import { fetchTables, fetchOpenOrders, fetchPaidReceipts, fetchKioskTickets, setKioskTicketStatus } from '../api/client';
+import {
+  fetchTables,
+  fetchOpenOrders,
+  fetchPaidReceipts,
+  fetchKioskTickets,
+  setKioskTicketStatus,
+  closeKioskTicket,
+  payGuest,
+} from '../api/client';
 import type { KioskTicket, KioskTicketStatus, OpenOrderSummary, PaidReceiptSummary, Zone } from '../api/client';
 import PaidReceiptDetailModal from '../components/PaidReceiptDetailModal';
 import KioskTicketDetailModal from '../components/KioskTicketDetailModal';
-import { guestStatusLabel, isActiveKioskStatus } from '../kiosk/status';
+import StaffPaymentModal from '../components/StaffPaymentModal';
+import { guestStatusLabel, isActiveKioskStatus, paymentMethodLabel } from '../kiosk/status';
+import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import { layoutSizeForTable, layoutTablesOnViewport, normalizeTableSize, snapToGrid } from '../utils/tableLayout';
 import type { RootStackParamList } from '../../App';
@@ -55,6 +65,7 @@ export default function TablesScreen() {
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
   const [selectedKioskId, setSelectedKioskId] = useState<number | null>(null);
   const [kioskBusy, setKioskBusy] = useState(false);
+  const [payTicket, setPayTicket] = useState<KioskTicket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
@@ -411,6 +422,41 @@ export default function TablesScreen() {
             setKioskBusy(false);
           }
         }}
+        onReadyClose={() => {
+          const ticket = kioskTickets.find((t) => t.id === selectedKioskId);
+          if (!ticket || !session) return;
+          if (ticket.paymentStatus !== 'paid' && (ticket.paymentMethod === 'cash' || ticket.paymentMethod === 'card')) {
+            setPayTicket(ticket);
+            return;
+          }
+          setKioskBusy(true);
+          void closeKioskTicket(ticket.id, session.token)
+            .then(() => load({ silent: true }))
+            .finally(() => setKioskBusy(false));
+        }}
+      />
+      <StaffPaymentModal
+        visible={payTicket != null}
+        method={payTicket?.paymentMethod === 'card' ? 'card' : 'cash'}
+        amount={payTicket?.total ?? 0}
+        subtotal={payTicket?.subtotal}
+        discountPercent={payTicket?.discountPercent}
+        busy={kioskBusy}
+        onClose={() => setPayTicket(null)}
+        onConfirm={async (method) => {
+          if (!session || !payTicket?.orderId || !payTicket.guestId || !venue) return;
+          setKioskBusy(true);
+          try {
+            await payGuest(payTicket.orderId, payTicket.guestId, method, payTicket.total, session.token);
+            await closeKioskTicket(payTicket.id, session.token);
+            runPendingFiscalJobs(venue.id, session.token);
+            setPayTicket(null);
+            setSelectedKioskId(null);
+            await load({ silent: true });
+          } finally {
+            setKioskBusy(false);
+          }
+        }}
       />
     </View>
     </ScreenSwipeHost>
@@ -435,11 +481,16 @@ function KioskPulseRow({ ticket, onPress }: { ticket: KioskTicket; onPress: () =
     <Pressable onPress={onPress} style={styles.kioskRow}>
       <Animated.View style={[styles.kioskPulse, { opacity: pulse }]} />
       <View style={styles.kioskInfo}>
-        <Text style={styles.kioskBadge}>Самообслуживание</Text>
+        <Text style={styles.kioskBadge}>
+          Самообслуживание{paymentMethodLabel(ticket.paymentMethod) ? ` · ${paymentMethodLabel(ticket.paymentMethod)}` : ''}
+        </Text>
         <Text style={styles.openOrderName} numberOfLines={1}>
           Заказ № {ticket.number}
         </Text>
-        <Text style={styles.kioskStatus}>{guestStatusLabel(ticket.status)}</Text>
+        <Text style={styles.kioskStatus}>
+          {guestStatusLabel(ticket.status)}
+          {ticket.paymentStatus !== 'paid' ? ' · ждёт оплату' : ''}
+        </Text>
       </View>
       <Text style={styles.openOrderTotal}>{Math.round(ticket.total)} ₽</Text>
     </Pressable>

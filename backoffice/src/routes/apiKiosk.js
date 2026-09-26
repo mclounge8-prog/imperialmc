@@ -3,14 +3,15 @@ import { pool } from '../db.js';
 import { requireDeviceToken } from '../middleware/deviceAuth.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { fetchVenueMenu } from '../services/venueMenu.js';
+import { enqueuePrecheckFiscalJob } from '../services/fiscalQueue.js';
 
 const apiKiosk = new Hono();
 
 const UNIT_LABELS = { g: 'г', ml: 'мл', pcs: 'шт' };
 
 const ALLOWED_NEXT = {
-  new: ['cooking', 'ready', 'cancelled'],
-  cooking: ['new', 'ready', 'cancelled'],
+  new: ['cooking', 'ready', 'issued', 'cancelled'],
+  cooking: ['new', 'ready', 'issued', 'cancelled'],
   ready: ['new', 'cooking', 'issued'],
   issued: [],
   cancelled: [],
@@ -31,7 +32,10 @@ function sendError(c, err) {
 
 async function fetchVenueFlags(venueId) {
   const { rows } = await pool.query(
-    `SELECT id, name, COALESCE(kiosk_enabled, false) AS kiosk_enabled
+    `SELECT id, name,
+            COALESCE(kiosk_enabled, false) AS kiosk_enabled,
+            COALESCE(kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
+            kiosk_qr_image_url
      FROM venues WHERE id = $1`,
     [venueId]
   );
@@ -120,6 +124,10 @@ function assertValidModifierSelection(attachments, selectedModifierIds) {
   return selectedModifierIds.map((id) => attachmentByModifierId.get(id));
 }
 
+function roundMoney(value) {
+  return Math.round(Number(value) * 100) / 100;
+}
+
 function serializeTicket(ticket, items) {
   return {
     id: ticket.id,
@@ -127,7 +135,13 @@ function serializeTicket(ticket, items) {
     status: ticket.status,
     guestName: ticket.guest_name || null,
     comment: ticket.comment || null,
+    paymentMethod: ticket.payment_method || null,
+    paymentStatus: ticket.payment_status || 'unpaid',
+    discountPercent: Number(ticket.discount_percent || 0),
+    subtotal: Number(ticket.subtotal || ticket.total),
     total: Number(ticket.total),
+    orderId: ticket.order_id || null,
+    guestId: ticket.guest_id || null,
     createdAt: ticket.created_at,
     cookingAt: ticket.cooking_at,
     readyAt: ticket.ready_at,
@@ -217,7 +231,15 @@ apiKiosk.get('/bootstrap', requireDeviceToken, async (c) => {
   return c.json({
     active: device.is_active,
     kind,
-    venue: venue ? { id: venue.id, name: venue.name, kioskEnabled } : null,
+    venue: venue
+      ? {
+          id: venue.id,
+          name: venue.name,
+          kioskEnabled,
+          cashlessDiscountPercent: Number(venue.kiosk_cashless_discount_percent || 12),
+          qrImageUrl: venue.kiosk_qr_image_url || null,
+        }
+      : null,
     shiftOpen: Boolean(shift),
     ready: Boolean(device.is_active && venue && kioskEnabled && shift && kind === 'kiosk'),
   });
@@ -268,6 +290,10 @@ apiKiosk.post('/tickets', requireDeviceToken, async (c) => {
     const guestName =
       body && typeof body.guestName === 'string' ? body.guestName.trim().slice(0, 80) : '';
     const comment = body && typeof body.comment === 'string' ? body.comment.trim().slice(0, 400) : '';
+    const paymentMethod = body && typeof body.paymentMethod === 'string' ? body.paymentMethod : '';
+    if (!['cash', 'card', 'qr'].includes(paymentMethod)) {
+      throw httpError('Выбери способ оплаты', 400, 'PAYMENT_REQUIRED');
+    }
 
     if (!rawItems.length) {
       throw httpError('Корзина пуста', 400, 'EMPTY_CART');
@@ -318,12 +344,46 @@ apiKiosk.post('/tickets', requireDeviceToken, async (c) => {
       prepared.push({ menuItem, qty, selected, unitPrice });
     }
 
+    const cashless = paymentMethod === 'card' || paymentMethod === 'qr';
+    const discountPercent = cashless
+      ? Math.max(0, Math.min(100, Number(venue.kiosk_cashless_discount_percent || 12)))
+      : 0;
+    const discount = roundMoney((total * discountPercent) / 100);
+    const payable = roundMoney(total - discount);
+    const paymentStatus = paymentMethod === 'qr' ? 'paid' : 'unpaid';
+
+    const { rows: orderRows } = await client.query(
+      "INSERT INTO orders (table_id, venue_id, status, opened_by, source) VALUES (NULL, $1, 'open', NULL, 'kiosk') RETURNING id",
+      [venue.id]
+    );
+    const orderId = orderRows[0].id;
+    const { rows: guestRows } = await client.query(
+      'INSERT INTO order_guests (order_id, label, discount_percent) VALUES ($1, $2, $3) RETURNING id',
+      [orderId, `Киоск №${number}`, discountPercent]
+    );
+    const guestId = guestRows[0].id;
+
     const { rows: ticketRows } = await client.query(
       `INSERT INTO kiosk_tickets
-         (venue_id, device_id, shift_id, number, status, guest_name, comment, total)
-       VALUES ($1, $2, $3, $4, 'new', $5, $6, $7)
+         (venue_id, device_id, shift_id, number, status, guest_name, comment, total,
+          payment_method, payment_status, discount_percent, subtotal, order_id, guest_id)
+       VALUES ($1, $2, $3, $4, 'new', $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
-      [venue.id, device.id, shift.id, number, guestName || null, comment || null, total]
+      [
+        venue.id,
+        device.id,
+        shift.id,
+        number,
+        guestName || null,
+        comment || null,
+        payable,
+        paymentMethod,
+        paymentStatus,
+        discountPercent,
+        total,
+        orderId,
+        guestId,
+      ]
     );
     const ticket = ticketRows[0];
 
@@ -357,6 +417,105 @@ apiKiosk.post('/tickets', requireDeviceToken, async (c) => {
           await applyStockDelta(client, venue.id, a.warehouse_item_id, -Number(a.qty) * line.qty);
         }
       }
+
+      // eslint-disable-next-line no-await-in-loop
+      const { rows: orderItemRows } = await client.query(
+        `INSERT INTO order_items (order_id, guest_id, menu_item_id, name, price, qty)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id`,
+        [orderId, guestId, line.menuItem.id, line.menuItem.name, line.unitPrice, line.qty]
+      );
+      const orderItemId = orderItemRows[0].id;
+      for (const a of line.selected) {
+        // eslint-disable-next-line no-await-in-loop
+        await client.query(
+          `INSERT INTO order_item_modifiers (order_item_id, modifier_id, name, price, warehouse_item_id, qty)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [orderItemId, a.modifier_id, a.name, a.price, a.warehouse_item_id, a.qty]
+        );
+      }
+    }
+
+    if (paymentMethod === 'qr') {
+      const { rows: receiptRows } = await client.query(
+        `INSERT INTO receipts
+           (venue_id, order_id, guest_id, table_id, table_name, guest_label,
+            staff_id, staff_name, status, subtotal, discount, total, opened_at, closed_at, shift_id,
+            cancel_comment, precheck_was_printed, discount_percent)
+         VALUES ($1, $2, $3, NULL, NULL, $4, NULL, 'Киоск', 'paid', $5, $6, $7, now(), now(), $8, NULL, true, $9)
+         RETURNING id`,
+        [
+          venue.id,
+          orderId,
+          guestId,
+          `Киоск №${number}`,
+          total,
+          discount,
+          payable,
+          shift.id,
+          discountPercent,
+        ]
+      );
+      const receiptId = receiptRows[0].id;
+      for (const line of prepared) {
+        // eslint-disable-next-line no-await-in-loop
+        const { rows: ri } = await client.query(
+          `INSERT INTO receipt_items (receipt_id, menu_item_id, name, category_id, category_name, price, qty, line_total)
+           VALUES ($1, $2, $3, NULL, NULL, $4, $5, $6)
+           RETURNING id`,
+          [
+            receiptId,
+            line.menuItem.id,
+            line.menuItem.name,
+            line.unitPrice,
+            line.qty,
+            line.unitPrice * line.qty,
+          ]
+        );
+        for (const a of line.selected) {
+          // eslint-disable-next-line no-await-in-loop
+          await client.query(
+            `INSERT INTO receipt_item_modifiers (receipt_item_id, modifier_id, name, price, warehouse_item_id, qty)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [ri[0].id, a.modifier_id, a.name, a.price, a.warehouse_item_id, a.qty]
+          );
+        }
+      }
+      await client.query('INSERT INTO receipt_payments (receipt_id, method, amount) VALUES ($1, $2, $3)', [
+        receiptId,
+        'qr',
+        payable,
+      ]);
+      await client.query("UPDATE order_guests SET status = 'paid' WHERE id = $1", [guestId]);
+      await client.query("UPDATE orders SET status = 'paid', closed_at = now() WHERE id = $1", [orderId]);
+      await client.query('UPDATE kiosk_tickets SET receipt_id = $2, payment_status = $3 WHERE id = $1', [
+        ticket.id,
+        receiptId,
+        'paid',
+      ]);
+      await enqueuePrecheckFiscalJob(client, {
+        venueId: venue.id,
+        items: prepared.map((line) => ({
+          name: line.menuItem.name,
+          qty: line.qty,
+          price: line.unitPrice,
+          modifiers: line.selected.map((a) => ({
+            name: a.name,
+            price: a.price,
+            qty: a.qty,
+            isDefault: !!a.is_default,
+          })),
+        })),
+        total: payable,
+        subtotal: total,
+        discountPercent,
+        discountAmount: discount,
+        tableName: null,
+        guestLabel: `Киоск №${number}`,
+        operatorName: 'Киоск',
+        venueName: venue.name,
+        footerText: 'Оплачено по QR · покажите перевод сотруднику',
+      });
     }
 
     await client.query('COMMIT');
@@ -448,21 +607,25 @@ apiKiosk.post('/tickets/:id/status', requireStaffToken, async (c) => {
       throw httpError(`Нельзя сменить статус «${ticket.status}» на «${nextStatus}»`, 409, 'BAD_TRANSITION');
     }
 
-    const stamp =
-      nextStatus === 'cooking'
-        ? 'cooking_at'
-        : nextStatus === 'ready'
-          ? 'ready_at'
-          : nextStatus === 'issued'
-            ? 'issued_at'
+    const extraStamp =
+      nextStatus === 'issued'
+        ? ', ready_at = COALESCE(ready_at, now()), issued_at = now()'
+        : nextStatus === 'cooking'
+          ? ', cooking_at = now()'
+          : nextStatus === 'ready'
+            ? ', ready_at = now()'
             : nextStatus === 'cancelled'
-              ? 'cancelled_at'
-              : null;
+              ? ', cancelled_at = now()'
+              : '';
 
-    await client.query(
-      `UPDATE kiosk_tickets SET status = $2${stamp ? `, ${stamp} = now()` : ''} WHERE id = $1`,
-      [ticketId, nextStatus]
-    );
+    await client.query(`UPDATE kiosk_tickets SET status = $2${extraStamp} WHERE id = $1`, [
+      ticketId,
+      nextStatus,
+    ]);
+
+    if (nextStatus === 'issued' && ticket.payment_method && ticket.payment_status !== 'paid') {
+      throw httpError('Сначала проведите оплату', 409, 'NEED_PAYMENT');
+    }
 
     if (nextStatus === 'cancelled') {
       const { rows: itemRows } = await client.query(
@@ -487,11 +650,54 @@ apiKiosk.post('/tickets/:id/status', requireStaffToken, async (c) => {
           }
         }
       }
+      if (ticket.guest_id && ticket.payment_status !== 'paid') {
+        await client.query("UPDATE order_guests SET status = 'cancelled' WHERE id = $1 AND status = 'open'", [
+          ticket.guest_id,
+        ]);
+        if (ticket.order_id) {
+          await client.query(
+            "UPDATE orders SET status = 'cancelled', closed_at = now() WHERE id = $1 AND status = 'open'",
+            [ticket.order_id]
+          );
+        }
+      }
     }
 
     await client.query('COMMIT');
     const detail = await fetchTicketDetail(ticketId);
     return c.json({ ticket: detail });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    return sendError(c, err);
+  } finally {
+    client.release();
+  }
+});
+
+apiKiosk.post('/tickets/:id/close', requireStaffToken, async (c) => {
+  const ticketId = Number(c.req.param('id'));
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query('SELECT * FROM kiosk_tickets WHERE id = $1 FOR UPDATE', [ticketId]);
+    const ticket = rows[0];
+    if (!ticket) throw httpError('Заявка не найдена', 404, 'NOT_FOUND');
+    if (ticket.status === 'cancelled' || ticket.status === 'issued') {
+      throw httpError('Заказ уже закрыт', 409, 'ALREADY_CLOSED');
+    }
+    if (ticket.payment_status !== 'paid') {
+      throw httpError('Сначала проведите оплату', 409, 'NEED_PAYMENT');
+    }
+    await client.query(
+      `UPDATE kiosk_tickets
+       SET status = 'issued',
+           ready_at = COALESCE(ready_at, now()),
+           issued_at = now()
+       WHERE id = $1`,
+      [ticketId]
+    );
+    await client.query('COMMIT');
+    return c.json({ ticket: await fetchTicketDetail(ticketId) });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     return sendError(c, err);

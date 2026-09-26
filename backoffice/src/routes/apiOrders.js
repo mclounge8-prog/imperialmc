@@ -27,6 +27,12 @@ function parseDiscountPercent(raw) {
   return n;
 }
 
+function clampDiscountPercent(value) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n) || n < 0 || n > 100) return 0;
+  return n;
+}
+
 async function fetchGuestPrecheckState(clientOrPool, guestId) {
   const { rows } = await clientOrPool.query(
     'SELECT precheck_printed_at FROM order_guests WHERE id = $1',
@@ -66,6 +72,7 @@ apiOrders.get('/orders/open', requireStaffToken, async (c) => {
      FROM orders o
      LEFT JOIN tables t ON t.id = o.table_id
      WHERE o.venue_id = $1 AND o.status = 'open'
+       AND COALESCE(o.source, 'staff') <> 'kiosk'
      ORDER BY o.opened_at DESC`,
     [venueId]
   );
@@ -144,9 +151,7 @@ async function fetchOrderDetail(orderId) {
   const guests = guestRows.map((g) => {
     const guestItems = itemsById.filter((i) => i.guestId === g.id);
     const subtotal = roundMoney(guestItems.reduce((sum, i) => sum + i.lineTotal, 0));
-    const discountPercent = ALLOWED_DISCOUNT_PERCENTS.has(Number(g.discount_percent))
-      ? Number(g.discount_percent)
-      : 0;
+    const discountPercent = clampDiscountPercent(g.discount_percent);
     const discountAmount = roundMoney((subtotal * discountPercent) / 100);
     const total = roundMoney(subtotal - discountAmount);
     return {
@@ -304,13 +309,14 @@ apiOrders.post('/orders/:orderId/guests', requireStaffToken, async (c) => {
   return c.json({ order });
 });
 
-const PAYMENT_METHODS = ['cash', 'card', 'other'];
+const PAYMENT_METHODS = ['cash', 'card', 'other', 'qr'];
 
 async function fetchGuestForSettlement(orderId, guestId, client) {
   const { rows } = await client.query(
     `SELECT og.id, og.label, og.order_id, og.precheck_printed_at, og.discount_percent,
             o.venue_id, o.table_id, o.opened_at, t.name AS table_name,
             COALESCE(v.precheck_enabled, false) AS precheck_enabled,
+            COALESCE(o.source, 'staff') AS source,
             v.name AS venue_name
      FROM order_guests og
      JOIN orders o ON o.id = og.order_id
@@ -384,9 +390,7 @@ async function createReceipt(
   { guest, staff, status, items, payments, cancelComment = null, discountPercent = 0 }
 ) {
   const subtotal = roundMoney(items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0));
-  const pct = ALLOWED_DISCOUNT_PERCENTS.has(Number(discountPercent))
-    ? Number(discountPercent)
-    : 0;
+  const pct = clampDiscountPercent(discountPercent);
   const discount = status === 'paid' ? roundMoney((subtotal * pct) / 100) : 0;
   const total = roundMoney(subtotal - discount);
 
@@ -515,9 +519,7 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
     }
 
     // Скидка уже назначена на гостя (отдельное меню), не в момент оплаты.
-    const discountPercent = ALLOWED_DISCOUNT_PERCENTS.has(Number(guest.discount_percent))
-      ? Number(guest.discount_percent)
-      : 0;
+    const discountPercent = clampDiscountPercent(guest.discount_percent);
 
     // В режиме пречека оплату разрешаем только после печати пречека (кроме 0 ₽).
     const items = await fetchGuestItemsSnapshot(guestId, client);
@@ -525,7 +527,12 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
     const discount = roundMoney((subtotal * discountPercent) / 100);
     const payable = roundMoney(subtotal - discount);
 
-    if (guest.precheck_enabled && subtotal > 0.009 && !guest.precheck_printed_at) {
+    if (
+      guest.precheck_enabled &&
+      guest.source !== 'kiosk' &&
+      subtotal > 0.009 &&
+      !guest.precheck_printed_at
+    ) {
       await client.query('ROLLBACK');
       c.status(409);
       return c.json({
@@ -573,6 +580,12 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       discountPercent,
     });
     await client.query("UPDATE order_guests SET status = 'paid' WHERE id = $1", [guestId]);
+    await client.query(
+      `UPDATE kiosk_tickets
+       SET payment_status = 'paid', receipt_id = $2
+       WHERE order_id = $1`,
+      [orderId, receiptMeta.receiptId]
+    );
 
     await client.query('COMMIT');
     paidNotify = {
@@ -774,9 +787,7 @@ apiOrders.post('/orders/:orderId/guests/:guestId/precheck', requireStaffToken, a
       return c.json({ error: 'Нельзя напечатать пречек на пустой чек' });
     }
 
-    const discountPercent = ALLOWED_DISCOUNT_PERCENTS.has(Number(guest.discount_percent))
-      ? Number(guest.discount_percent)
-      : 0;
+    const discountPercent = clampDiscountPercent(guest.discount_percent);
     const discountAmount = roundMoney((subtotal * discountPercent) / 100);
     const payable = roundMoney(subtotal - discountAmount);
 

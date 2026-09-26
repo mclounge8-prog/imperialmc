@@ -80,6 +80,8 @@ export type DeviceStatus = {
     tobaccoAccountingEnabled?: boolean;
     tobaccoToleranceG?: number;
     kioskEnabled?: boolean;
+    cashlessDiscountPercent?: number;
+    qrImageUrl?: string;
   } | null;
 };
 
@@ -962,12 +964,20 @@ export type KioskTicketItem = {
   modifiers: KioskTicketModifier[];
 };
 
+export type KioskPaymentMethod = 'cash' | 'card' | 'qr';
+
 export type KioskTicket = {
   id: number;
   number: number;
   status: KioskTicketStatus;
   guestName: string | null;
   comment: string | null;
+  paymentMethod?: KioskPaymentMethod | null;
+  paymentStatus?: 'unpaid' | 'paid';
+  discountPercent?: number;
+  subtotal?: number;
+  orderId?: number | null;
+  guestId?: number | null;
   total: number;
   createdAt: string;
   cookingAt: string | null;
@@ -998,7 +1008,13 @@ export async function setKioskTicketStatus(
 export type KioskBootstrap = {
   active: boolean;
   kind: 'staff' | 'kiosk';
-  venue: { id: number; name: string; kioskEnabled: boolean } | null;
+  venue: {
+    id: number;
+    name: string;
+    kioskEnabled: boolean;
+    cashlessDiscountPercent?: number;
+    qrImageUrl?: string;
+  } | null;
   shiftOpen: boolean;
   ready: boolean;
 };
@@ -1037,11 +1053,22 @@ export async function fetchKioskMenu(deviceToken: string): Promise<MenuResponse>
 
 export async function createKioskTicket(
   deviceToken: string,
-  items: { menuItemId: number; qty: number; modifierIds: number[] }[]
+  items: { menuItemId: number; qty: number; modifierIds: number[] }[],
+  paymentMethod: KioskPaymentMethod
 ): Promise<{ ticket: KioskTicket }> {
   return deviceRequest('/api/kiosk/tickets', deviceToken, {
     method: 'POST',
-    body: { items },
+    body: { items, paymentMethod },
+  });
+}
+
+export async function closeKioskTicket(
+  ticketId: number,
+  token: string
+): Promise<{ ticket: KioskTicket }> {
+  return authorizedRequest(`/api/kiosk/tickets/${ticketId}/close`, token, {
+    method: 'POST',
+    body: {},
   });
 }
 

@@ -38,3 +38,10 @@ export function formatModifierLine(mod: KioskTicketModifier): string {
 export function isActiveKioskStatus(status: string): boolean {
   return status === 'new' || status === 'cooking' || status === 'ready';
 }
+
+export function paymentMethodLabel(method?: string | null): string {
+  if (method === 'cash') return 'Наличные';
+  if (method === 'card') return 'Карта';
+  if (method === 'qr') return 'QR';
+  return '';
+}

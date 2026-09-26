@@ -4,11 +4,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
-import { fetchKioskTickets, setKioskTicketStatus } from '../api/client';
+import { fetchKioskTickets, setKioskTicketStatus, closeKioskTicket, payGuest } from '../api/client';
 import type { KioskTicket, KioskTicketStatus } from '../api/client';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import KioskTicketDetailModal from '../components/KioskTicketDetailModal';
-import { formatModifierLine } from '../kiosk/status';
+import StaffPaymentModal from '../components/StaffPaymentModal';
+import { formatModifierLine, paymentMethodLabel } from '../kiosk/status';
+import { runPendingFiscalJobs } from '../services/fiscalWorker';
 
 const COLUMNS: { key: KioskTicketStatus; title: string; tint: string }[] = [
   { key: 'new', title: 'Оформлен', tint: '#8aa4ff' },
@@ -30,6 +32,7 @@ export default function KioskKitchenScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [payTicket, setPayTicket] = useState<KioskTicket | null>(null);
 
   const load = useCallback(async () => {
     if (!session || !venueId) return;
@@ -85,10 +88,16 @@ export default function KioskKitchenScreen() {
                 <ScrollView contentContainerStyle={styles.colList}>
                   {list.map((ticket) => (
                     <Pressable key={ticket.id} style={styles.card} onPress={() => setOpenId(ticket.id)}>
-                      <View style={styles.cardTop}>
-                        <Text style={styles.number}>№ {ticket.number}</Text>
-                        <Text style={styles.time}>{formatTime(ticket.createdAt)}</Text>
-                      </View>
+                        <View style={styles.cardTop}>
+                          <Text style={styles.number}>№ {ticket.number}</Text>
+                          <Text style={styles.time}>{formatTime(ticket.createdAt)}</Text>
+                        </View>
+                        {ticket.paymentMethod ? (
+                          <Text style={styles.payHint}>
+                            {paymentMethodLabel(ticket.paymentMethod)}
+                            {ticket.paymentStatus !== 'paid' ? ' · ждёт оплату' : ''}
+                          </Text>
+                        ) : null}
                       {ticket.items.map((item) => (
                         <View key={item.id} style={styles.itemBlock}>
                           <Text style={styles.item}>
@@ -117,6 +126,40 @@ export default function KioskKitchenScreen() {
           onClose={() => setOpenId(null)}
           onStatus={(next) => {
             if (openTicket) void changeStatus(openTicket, next);
+          }}
+          onReadyClose={() => {
+            if (!openTicket || !session) return;
+            if (
+              openTicket.paymentStatus !== 'paid' &&
+              (openTicket.paymentMethod === 'cash' || openTicket.paymentMethod === 'card')
+            ) {
+              setPayTicket(openTicket);
+              return;
+            }
+            void changeStatus(openTicket, 'issued');
+          }}
+        />
+        <StaffPaymentModal
+          visible={payTicket != null}
+          method={payTicket?.paymentMethod === 'card' ? 'card' : 'cash'}
+          amount={payTicket?.total ?? 0}
+          subtotal={payTicket?.subtotal}
+          discountPercent={payTicket?.discountPercent}
+          busy={busyId === payTicket?.id}
+          onClose={() => setPayTicket(null)}
+          onConfirm={async (method) => {
+            if (!session || !payTicket?.orderId || !payTicket.guestId || !venueId) return;
+            setBusyId(payTicket.id);
+            try {
+              await payGuest(payTicket.orderId, payTicket.guestId, method, payTicket.total, session.token);
+              await closeKioskTicket(payTicket.id, session.token);
+              runPendingFiscalJobs(venueId, session.token);
+              setPayTicket(null);
+              setOpenId(null);
+              await load();
+            } finally {
+              setBusyId(null);
+            }
           }}
         />
       </View>
@@ -168,5 +211,6 @@ const styles = StyleSheet.create({
   mod: { color: colors.textMuted, fontSize: 12, lineHeight: 16, marginLeft: 8 },
   total: { color: colors.accent2, fontWeight: '700', marginTop: 4 },
   openHint: { color: colors.textMuted, fontSize: 11, marginTop: 4 },
+  payHint: { color: '#f0c14b', fontSize: 12, fontWeight: '700' },
   empty: { color: colors.textMuted, textAlign: 'center', paddingVertical: 20 },
 });
