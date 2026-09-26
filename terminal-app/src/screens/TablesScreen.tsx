@@ -1,6 +1,7 @@
-import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,9 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
-import { fetchTables, fetchOpenOrders, fetchPaidReceipts } from '../api/client';
-import type { OpenOrderSummary, PaidReceiptSummary, Zone } from '../api/client';
+import { fetchTables, fetchOpenOrders, fetchPaidReceipts, fetchKioskTickets, setKioskTicketStatus } from '../api/client';
+import type { KioskTicket, KioskTicketStatus, OpenOrderSummary, PaidReceiptSummary, Zone } from '../api/client';
 import PaidReceiptDetailModal from '../components/PaidReceiptDetailModal';
+import KioskTicketDetailModal from '../components/KioskTicketDetailModal';
+import { guestStatusLabel, isActiveKioskStatus } from '../kiosk/status';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import { layoutSizeForTable, layoutTablesOnViewport, normalizeTableSize, snapToGrid } from '../utils/tableLayout';
 import type { RootStackParamList } from '../../App';
@@ -46,9 +49,12 @@ export default function TablesScreen() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [openOrders, setOpenOrders] = useState<OpenOrderSummary[]>([]);
+  const [kioskTickets, setKioskTickets] = useState<KioskTicket[]>([]);
   const [paidReceipts, setPaidReceipts] = useState<PaidReceiptSummary[]>([]);
   const [ordersTab, setOrdersTab] = useState<'open' | 'paid'>('open');
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
+  const [selectedKioskId, setSelectedKioskId] = useState<number | null>(null);
+  const [kioskBusy, setKioskBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
@@ -67,11 +73,12 @@ export default function TablesScreen() {
         setError(null);
       }
       try {
-        const [tablesData, ordersData, paidData] = await Promise.all([
+        const [tablesData, ordersData, paidData, kioskData] = await Promise.all([
           fetchTables(venue.id, session.token),
           fetchOpenOrders(venue.id, session.token),
           // Чеки текущей открытой смены (бэкенд фильтрует по shift_id).
           fetchPaidReceipts(venue.id, session.token),
+          fetchKioskTickets(venue.id, session.token).catch(() => ({ tickets: [] as KioskTicket[], shiftOpen: false })),
         ]);
         const nextZones = tablesData.zones.map((zone) => ({
           ...zone,
@@ -94,6 +101,7 @@ export default function TablesScreen() {
           return nextZones[0]?.id ?? null;
         });
         setOpenOrders(ordersData.orders);
+        setKioskTickets(kioskData.tickets.filter((t) => isActiveKioskStatus(t.status)));
         setPaidReceipts(paidData);
         hasLoadedRef.current = true;
         if (silent) setError(null);
@@ -111,6 +119,8 @@ export default function TablesScreen() {
   useFocusEffect(
     useCallback(() => {
       void load({ silent: hasLoadedRef.current });
+      const id = setInterval(() => void load({ silent: true }), 4000);
+      return () => clearInterval(id);
     }, [load])
   );
 
@@ -319,10 +329,17 @@ export default function TablesScreen() {
         </View>
 
         {ordersTab === 'open' ? (
-          openOrders.length === 0 ? (
+          openOrders.length === 0 && kioskTickets.length === 0 ? (
             <Text style={styles.emptyText}>Нет открытых заказов</Text>
           ) : (
             <ScrollView>
+              {kioskTickets.map((ticket) => (
+                <KioskPulseRow
+                  key={`kiosk-${ticket.id}`}
+                  ticket={ticket}
+                  onPress={() => setSelectedKioskId(ticket.id)}
+                />
+              ))}
               {openOrders.map((o) => (
                 <Pressable
                   key={o.id}
@@ -380,8 +397,52 @@ export default function TablesScreen() {
           void load();
         }}
       />
+      <KioskTicketDetailModal
+        ticket={kioskTickets.find((t) => t.id === selectedKioskId) ?? null}
+        busy={kioskBusy}
+        onClose={() => setSelectedKioskId(null)}
+        onStatus={async (next: KioskTicketStatus) => {
+          if (!session || selectedKioskId == null) return;
+          setKioskBusy(true);
+          try {
+            await setKioskTicketStatus(selectedKioskId, next, session.token);
+            await load({ silent: true });
+          } finally {
+            setKioskBusy(false);
+          }
+        }}
+      />
     </View>
     </ScreenSwipeHost>
+  );
+}
+
+function KioskPulseRow({ ticket, onPress }: { ticket: KioskTicket; onPress: () => void }) {
+  const pulse = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.28, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.06, duration: 700, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  return (
+    <Pressable onPress={onPress} style={styles.kioskRow}>
+      <Animated.View style={[styles.kioskPulse, { opacity: pulse }]} />
+      <View style={styles.kioskInfo}>
+        <Text style={styles.kioskBadge}>Самообслуживание</Text>
+        <Text style={styles.openOrderName} numberOfLines={1}>
+          Заказ № {ticket.number}
+        </Text>
+        <Text style={styles.kioskStatus}>{guestStatusLabel(ticket.status)}</Text>
+      </View>
+      <Text style={styles.openOrderTotal}>{Math.round(ticket.total)} ₽</Text>
+    </Pressable>
   );
 }
 
@@ -511,6 +572,33 @@ const styles = StyleSheet.create({
   },
   openOrderName: { color: colors.text, fontSize: 14, fontWeight: '600', flex: 1 },
   openOrderTotal: { color: colors.accent2, fontSize: 14, fontWeight: '600' },
+  kioskRow: {
+    backgroundColor: '#3a2a10',
+    borderWidth: 2,
+    borderColor: '#f0c14b',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    overflow: 'hidden',
+  },
+  kioskPulse: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: '#f0c14b',
+  },
+  kioskInfo: { flex: 1, gap: 2 },
+  kioskBadge: {
+    color: '#f0c14b',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  kioskStatus: { color: '#fde68a', fontSize: 12, fontWeight: '700' },
 
   headerAppTitle: { color: colors.text, fontSize: 14, fontWeight: '700', marginLeft: 12 },
   zoneSwitcher: { flexDirection: 'row', alignItems: 'center', gap: 12 },

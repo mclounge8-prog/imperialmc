@@ -1051,3 +1051,9 @@ export async function fetchKioskTicket(
 ): Promise<{ ticket: KioskTicket }> {
   return deviceRequest(`/api/kiosk/tickets/${ticketId}`, deviceToken);
 }
+
+export async function fetchMyKioskTickets(
+  deviceToken: string
+): Promise<{ tickets: KioskTicket[] }> {
+  return deviceRequest('/api/kiosk/mine', deviceToken);
+}

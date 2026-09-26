@@ -10,8 +10,8 @@ const UNIT_LABELS = { g: 'г', ml: 'мл', pcs: 'шт' };
 
 const ALLOWED_NEXT = {
   new: ['cooking', 'ready', 'cancelled'],
-  cooking: ['ready', 'cancelled'],
-  ready: ['issued'],
+  cooking: ['new', 'ready', 'cancelled'],
+  ready: ['new', 'cooking', 'issued'],
   issued: [],
   cancelled: [],
 };
@@ -221,6 +221,32 @@ apiKiosk.get('/bootstrap', requireDeviceToken, async (c) => {
     shiftOpen: Boolean(shift),
     ready: Boolean(device.is_active && venue && kioskEnabled && shift && kind === 'kiosk'),
   });
+});
+
+apiKiosk.get('/mine', requireDeviceToken, async (c) => {
+  try {
+    const device = c.get('device');
+    if (!device.venue_id) {
+      return c.json({ tickets: [] });
+    }
+    const { rows: tickets } = await pool.query(
+      `SELECT * FROM kiosk_tickets
+       WHERE device_id = $1 AND venue_id = $2
+         AND created_at > now() - interval '16 hours'
+       ORDER BY created_at DESC
+       LIMIT 30`,
+      [device.id, device.venue_id]
+    );
+    const details = [];
+    for (const ticket of tickets) {
+      // eslint-disable-next-line no-await-in-loop
+      const items = await fetchTicketItems(ticket.id);
+      details.push(serializeTicket(ticket, items));
+    }
+    return c.json({ tickets: details });
+  } catch (err) {
+    return sendError(c, err);
+  }
 });
 
 apiKiosk.get('/menu', requireDeviceToken, async (c) => {

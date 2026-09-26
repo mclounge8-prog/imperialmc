@@ -7,6 +7,7 @@ import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.imperialmcterminal.atol.AtolPackage
+import com.imperialmcterminal.kiosk.KioskLockPackage
 import com.imperialmcterminal.updates.UpdateModule
 import com.imperialmcterminal.updates.UpdatePackage
 
@@ -24,6 +25,7 @@ class MainApplication : Application(), ReactApplication {
         PackageList(this).packages.apply {
           add(AtolPackage())
           add(UpdatePackage())
+          add(KioskLockPackage())
         },
       jsBundleFilePath = otaBundle,
     )

@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DeviceProvider, useDevice } from './src/context/DeviceContext';
+import { KioskChrome } from './src/kiosk/KioskChrome';
 import DeviceRegistrationScreen from './src/screens/DeviceRegistrationScreen';
 import DeviceStatusScreen from './src/screens/DeviceStatusScreen';
 import KioskOrderScreen from './src/screens/KioskOrderScreen';
@@ -34,8 +35,10 @@ export default function KioskApp() {
   return (
     <SafeAreaProvider>
       <DeviceProvider kind="kiosk">
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <KioskRoot />
+        <KioskChrome>
+          <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+          <KioskRoot />
+        </KioskChrome>
       </DeviceProvider>
     </SafeAreaProvider>
   );

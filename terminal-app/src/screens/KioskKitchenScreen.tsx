@@ -7,35 +7,18 @@ import { useDevice } from '../context/DeviceContext';
 import { fetchKioskTickets, setKioskTicketStatus } from '../api/client';
 import type { KioskTicket, KioskTicketStatus } from '../api/client';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
+import KioskTicketDetailModal from '../components/KioskTicketDetailModal';
+import { formatModifierLine } from '../kiosk/status';
 
 const COLUMNS: { key: KioskTicketStatus; title: string; tint: string }[] = [
-  { key: 'new', title: 'Новые', tint: '#8aa4ff' },
-  { key: 'cooking', title: 'Готовятся', tint: '#d4a017' },
-  { key: 'ready', title: 'Готовы', tint: '#6ee7a8' },
-  { key: 'issued', title: 'Выданы', tint: colors.textMuted },
+  { key: 'new', title: 'Оформлен', tint: '#8aa4ff' },
+  { key: 'cooking', title: 'Изготавливается', tint: '#f0c14b' },
+  { key: 'ready', title: 'Готов', tint: '#6ee7a8' },
 ];
-
-const NEXT: Partial<Record<KioskTicketStatus, { status: KioskTicketStatus; label: string }>> = {
-  new: { status: 'cooking', label: 'Готовить' },
-  cooking: { status: 'ready', label: 'Готово' },
-  ready: { status: 'issued', label: 'Выдать' },
-};
 
 function formatTime(value: string | null): string {
   if (!value) return '';
   return new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-}
-
-function modsText(ticket: KioskTicket): string[] {
-  return ticket.items.map((item) => {
-    const mods = item.modifiers
-      .map((m) => {
-        const qty = m.qty > 0 && m.unitLabel ? ` ${m.qty} ${m.unitLabel}` : '';
-        return `${m.name}${qty}`;
-      })
-      .join(', ');
-    return mods ? `${item.qty}× ${item.name} — ${mods}` : `${item.qty}× ${item.name}`;
-  });
 }
 
 export default function KioskKitchenScreen() {
@@ -46,6 +29,7 @@ export default function KioskKitchenScreen() {
   const [shiftOpen, setShiftOpen] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!session || !venueId) return;
@@ -80,6 +64,8 @@ export default function KioskKitchenScreen() {
     }
   };
 
+  const openTicket = tickets.find((t) => t.id === openId) ?? null;
+
   return (
     <ScreenSwipeHost screen="Settings">
       <View style={styles.root}>
@@ -97,49 +83,42 @@ export default function KioskKitchenScreen() {
                   <Text style={styles.colCount}>{list.length}</Text>
                 </View>
                 <ScrollView contentContainerStyle={styles.colList}>
-                  {list.map((ticket) => {
-                    const next = NEXT[ticket.status];
-                    return (
-                      <View key={ticket.id} style={styles.card}>
-                        <View style={styles.cardTop}>
-                          <Text style={styles.number}>№ {ticket.number}</Text>
-                          <Text style={styles.time}>{formatTime(ticket.createdAt)}</Text>
-                        </View>
-                        {modsText(ticket).map((line) => (
-                          <Text key={line} style={styles.item}>
-                            {line}
-                          </Text>
-                        ))}
-                        <Text style={styles.total}>{Math.round(ticket.total)} ₽</Text>
-                        <View style={styles.actions}>
-                          {next ? (
-                            <Pressable
-                              style={styles.action}
-                              disabled={busyId === ticket.id}
-                              onPress={() => changeStatus(ticket, next.status)}
-                            >
-                              <Text style={styles.actionText}>{next.label}</Text>
-                            </Pressable>
-                          ) : null}
-                          {ticket.status === 'new' || ticket.status === 'cooking' ? (
-                            <Pressable
-                              style={[styles.action, styles.actionGhost]}
-                              disabled={busyId === ticket.id}
-                              onPress={() => changeStatus(ticket, 'cancelled')}
-                            >
-                              <Text style={styles.actionGhostText}>Отмена</Text>
-                            </Pressable>
-                          ) : null}
-                        </View>
+                  {list.map((ticket) => (
+                    <Pressable key={ticket.id} style={styles.card} onPress={() => setOpenId(ticket.id)}>
+                      <View style={styles.cardTop}>
+                        <Text style={styles.number}>№ {ticket.number}</Text>
+                        <Text style={styles.time}>{formatTime(ticket.createdAt)}</Text>
                       </View>
-                    );
-                  })}
+                      {ticket.items.map((item) => (
+                        <View key={item.id} style={styles.itemBlock}>
+                          <Text style={styles.item}>
+                            {item.qty}× {item.name}
+                          </Text>
+                          {item.modifiers.map((mod, idx) => (
+                            <Text key={`${item.id}-${idx}`} style={styles.mod}>
+                              {formatModifierLine(mod)}
+                            </Text>
+                          ))}
+                        </View>
+                      ))}
+                      <Text style={styles.total}>{Math.round(ticket.total)} ₽</Text>
+                      <Text style={styles.openHint}>Открыть полностью</Text>
+                    </Pressable>
+                  ))}
                   {!list.length ? <Text style={styles.empty}>Пусто</Text> : null}
                 </ScrollView>
               </View>
             );
           })}
         </ScrollView>
+        <KioskTicketDetailModal
+          ticket={openTicket}
+          busy={busyId === openTicket?.id}
+          onClose={() => setOpenId(null)}
+          onStatus={(next) => {
+            if (openTicket) void changeStatus(openTicket, next);
+          }}
+        />
       </View>
     </ScreenSwipeHost>
   );
@@ -156,7 +135,7 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, textAlign: 'center', padding: 8 },
   board: { padding: 12, gap: 10, flexGrow: 1 },
   column: {
-    width: 280,
+    width: 300,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -184,18 +163,10 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   number: { color: colors.text, fontSize: 20, fontWeight: '800' },
   time: { color: colors.textMuted, fontSize: 12 },
-  item: { color: colors.text, fontSize: 13, lineHeight: 18 },
+  itemBlock: { marginTop: 4 },
+  item: { color: colors.text, fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  mod: { color: colors.textMuted, fontSize: 12, lineHeight: 16, marginLeft: 8 },
   total: { color: colors.accent2, fontWeight: '700', marginTop: 4 },
-  actions: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  action: {
-    flex: 1,
-    backgroundColor: colors.accent2,
-    borderRadius: 8,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  actionText: { color: '#fff', fontWeight: '700' },
-  actionGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
-  actionGhostText: { color: colors.danger, fontWeight: '700' },
+  openHint: { color: colors.textMuted, fontSize: 11, marginTop: 4 },
   empty: { color: colors.textMuted, textAlign: 'center', paddingVertical: 20 },
 });

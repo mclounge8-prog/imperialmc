@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { useDevice } from '../context/DeviceContext';
+import { VenueSecretTitle } from '../kiosk/KioskChrome';
 
 export default function DeviceStatusScreen() {
   const { status, error, refresh, clearRegistration, kind } = useDevice();
@@ -37,6 +38,7 @@ export default function DeviceStatusScreen() {
 
   return (
     <View style={styles.container}>
+      {isKiosk ? <VenueSecretTitle name="Киоск" style={styles.title} /> : null}
       <Text style={styles.text}>{message}</Text>
       <Pressable style={styles.button} disabled={refreshing || clearing} onPress={handleRefresh}>
         {refreshing ? (
@@ -74,6 +76,7 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 16,
   },
+  title: { color: colors.text, fontSize: 22, fontWeight: '800' },
   text: {
     color: colors.textMuted,
     fontSize: 14,

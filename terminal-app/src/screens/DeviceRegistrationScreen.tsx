@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { colors } from '../theme/colors';
 import { useDevice } from '../context/DeviceContext';
+import { VenueSecretTitle } from '../kiosk/KioskChrome';
 
 export default function DeviceRegistrationScreen() {
   const { register, kind } = useDevice();
@@ -34,7 +35,11 @@ export default function DeviceRegistrationScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{isKiosk ? 'Регистрация киоска' : 'Регистрация устройства'}</Text>
+      {isKiosk ? (
+        <VenueSecretTitle name="Регистрация киоска" style={styles.title} />
+      ) : (
+        <Text style={styles.title}>Регистрация устройства</Text>
+      )}
       <Text style={styles.subtitle}>
         {isKiosk
           ? 'Новый код из бэкофиса → Устройства. Не тот же, что у терминала на этом планшете — киоск регистрируется отдельно и ставится рядом.'

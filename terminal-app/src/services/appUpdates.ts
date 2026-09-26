@@ -9,20 +9,29 @@ import {
   openUnknownSourcesSettings,
 } from '../native/updates';
 
+export type RemoteApkInfo = {
+  versionCode: number;
+  versionName: string;
+  url: string | null;
+  mandatory: boolean;
+  notes: string;
+  sha256: string | null;
+};
+
 export type RemoteUpdatesManifest = {
-  apk: {
-    versionCode: number;
-    versionName: string;
-    url: string | null;
-    mandatory: boolean;
-    notes: string;
-    sha256: string | null;
-  };
+  apk: RemoteApkInfo;
   js: {
     version: number;
     minApkVersionCode: number;
     url: string | null;
     mandatory: boolean;
+    notes: string;
+    sha256: string | null;
+  };
+  kiosk?: {
+    versionCode: number;
+    versionName: string;
+    url: string | null;
     notes: string;
     sha256: string | null;
   };
@@ -53,10 +62,30 @@ export async function fetchUpdatesManifest(): Promise<RemoteUpdatesManifest> {
   return response.json();
 }
 
-export async function planUpdate(): Promise<UpdatePlan> {
+export async function planUpdate(channel: 'staff' | 'kiosk' = 'staff'): Promise<UpdatePlan> {
   if (!isUpdatesAvailable()) return { kind: 'none' };
 
   const [local, remote] = await Promise.all([getAppVersion(), fetchUpdatesManifest()]);
+
+  if (channel === 'kiosk') {
+    const kiosk = remote.kiosk;
+    if (kiosk?.url && Number(kiosk.versionCode) > Number(local.versionCode)) {
+      return {
+        kind: 'apk',
+        remote: {
+          versionCode: Number(kiosk.versionCode),
+          versionName: String(kiosk.versionName || ''),
+          url: kiosk.url,
+          mandatory: false,
+          notes: String(kiosk.notes || ''),
+          sha256: kiosk.sha256 || null,
+        },
+        localVersionCode: local.versionCode,
+        localVersionName: local.versionName,
+      };
+    }
+    return { kind: 'none' };
+  }
 
   if (
     remote.apk.url &&

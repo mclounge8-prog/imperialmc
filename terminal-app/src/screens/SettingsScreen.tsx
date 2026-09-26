@@ -47,7 +47,7 @@ export default function SettingsScreen() {
         key: 'KioskKitchen',
         icon: '🍽',
         title: 'Киоск',
-        subtitle: 'Заявки самообслуживания: готовится / готово / выдано',
+        subtitle: 'Самообслуживание: оформлен / изготавливается / готов',
       });
     }
     return extra.length ? [...BASE_ROWS, ...extra] : BASE_ROWS;
