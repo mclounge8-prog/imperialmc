@@ -573,7 +573,7 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       }
       normalizedPayments = payments;
       const lockedMethod = kioskPaidRows[0]?.payment_method;
-      if (lockedMethod === 'cash' || lockedMethod === 'card') {
+      if (lockedMethod === 'cash' || lockedMethod === 'card' || lockedMethod === 'qr') {
         const other = normalizedPayments.find((p) => p.method !== lockedMethod);
         if (other) {
           await client.query('ROLLBACK');
@@ -615,6 +615,21 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
          WHERE id = $1`,
         [kioskPaidRows[0].id, receiptMeta.receiptId]
       );
+      if (kioskPaidRows[0].payment_method === 'qr') {
+        await enqueuePrecheckFiscalJob(client, {
+          venueId: guest.venue_id,
+          items,
+          subtotal,
+          discountPercent,
+          discountAmount: discount,
+          total: payable,
+          tableName: guest.table_name,
+          guestLabel: guest.label,
+          operatorName: staff.name,
+          venueName: guest.venue_name,
+          footerText: 'Оплачено по QR · перевод подтвердил сотрудник',
+        });
+      }
     }
 
     await client.query('COMMIT');

@@ -105,7 +105,7 @@ export default function KioskTicketDetailModal({ ticket, busy, onClose, onStatus
 
           {unpaid ? (
             <Pressable style={styles.payCta} disabled={busy} onPress={onPay}>
-              <Text style={styles.payCtaText}>Принять оплату</Text>
+              <Text style={styles.payCtaText}>Подтвердить оплату</Text>
               <Text style={styles.payCtaSub}>
                 {payLabel ? `${payLabel} · ` : ''}
                 {Math.round(ticket.total)} ₽

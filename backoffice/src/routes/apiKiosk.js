@@ -3,8 +3,6 @@ import { pool } from '../db.js';
 import { requireDeviceToken } from '../middleware/deviceAuth.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { fetchVenueMenu } from '../services/venueMenu.js';
-import { enqueuePrecheckFiscalJob } from '../services/fiscalQueue.js';
-
 const apiKiosk = new Hono();
 
 const UNIT_LABELS = { g: 'г', ml: 'мл', pcs: 'шт' };
@@ -363,8 +361,8 @@ apiKiosk.post('/tickets', requireDeviceToken, async (c) => {
         : 0;
     const discount = roundMoney((total * discountPercent) / 100);
     const payable = roundMoney(total - discount);
-    const paymentStatus = paymentMethod === 'qr' ? 'paid' : 'unpaid';
-    const initialStatus = paymentMethod === 'qr' ? 'cooking' : 'new';
+    const paymentStatus = 'unpaid';
+    const initialStatus = 'payment';
 
     const { rows: orderRows } = await client.query(
       "INSERT INTO orders (table_id, venue_id, status, opened_by, source) VALUES (NULL, $1, 'open', NULL, 'kiosk') RETURNING id",
@@ -380,10 +378,8 @@ apiKiosk.post('/tickets', requireDeviceToken, async (c) => {
     const { rows: ticketRows } = await client.query(
       `INSERT INTO kiosk_tickets
          (venue_id, device_id, shift_id, number, status, guest_name, comment, total,
-          payment_method, payment_status, discount_percent, subtotal, order_id, guest_id,
-          cooking_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-          CASE WHEN $5 = 'cooking' THEN now() ELSE NULL END)
+          payment_method, payment_status, discount_percent, subtotal, order_id, guest_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         venue.id,
@@ -453,87 +449,6 @@ apiKiosk.post('/tickets', requireDeviceToken, async (c) => {
       }
     }
 
-    if (paymentMethod === 'qr') {
-      const { rows: receiptRows } = await client.query(
-        `INSERT INTO receipts
-           (venue_id, order_id, guest_id, table_id, table_name, guest_label,
-            staff_id, staff_name, status, subtotal, discount, total, opened_at, closed_at, shift_id,
-            cancel_comment, precheck_was_printed, discount_percent)
-         VALUES ($1, $2, $3, NULL, NULL, $4, NULL, 'Киоск', 'paid', $5, $6, $7, now(), now(), $8, NULL, true, $9)
-         RETURNING id`,
-        [
-          venue.id,
-          orderId,
-          guestId,
-          `Киоск №${number}`,
-          total,
-          discount,
-          payable,
-          shift.id,
-          discountPercent,
-        ]
-      );
-      const receiptId = receiptRows[0].id;
-      for (const line of prepared) {
-        // eslint-disable-next-line no-await-in-loop
-        const { rows: ri } = await client.query(
-          `INSERT INTO receipt_items (receipt_id, menu_item_id, name, category_id, category_name, price, qty, line_total)
-           VALUES ($1, $2, $3, NULL, NULL, $4, $5, $6)
-           RETURNING id`,
-          [
-            receiptId,
-            line.menuItem.id,
-            line.menuItem.name,
-            line.unitPrice,
-            line.qty,
-            line.unitPrice * line.qty,
-          ]
-        );
-        for (const a of line.selected) {
-          // eslint-disable-next-line no-await-in-loop
-          await client.query(
-            `INSERT INTO receipt_item_modifiers (receipt_item_id, modifier_id, name, price, warehouse_item_id, qty)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [ri[0].id, a.modifier_id, a.name, a.price, a.warehouse_item_id, a.qty]
-          );
-        }
-      }
-      await client.query('INSERT INTO receipt_payments (receipt_id, method, amount) VALUES ($1, $2, $3)', [
-        receiptId,
-        'qr',
-        payable,
-      ]);
-      await client.query("UPDATE order_guests SET status = 'paid' WHERE id = $1", [guestId]);
-      await client.query('UPDATE kiosk_tickets SET receipt_id = $2, payment_status = $3 WHERE id = $1', [
-        ticket.id,
-        receiptId,
-        'paid',
-      ]);
-      await enqueuePrecheckFiscalJob(client, {
-        venueId: venue.id,
-        items: prepared.map((line) => ({
-          name: line.menuItem.name,
-          qty: line.qty,
-          price: line.unitPrice,
-          modifiers: line.selected.map((a) => ({
-            name: a.name,
-            price: a.price,
-            qty: a.qty,
-            isDefault: !!a.is_default,
-          })),
-        })),
-        total: payable,
-        subtotal: total,
-        discountPercent,
-        discountAmount: discount,
-        tableName: null,
-        guestLabel: `Киоск №${number}`,
-        operatorName: 'Киоск',
-        venueName: venue.name,
-        footerText: 'Оплачено по QR · покажите перевод сотруднику',
-      });
-    }
-
     await client.query('COMMIT');
     const detail = await fetchTicketDetail(ticket.id);
     return c.json({ ticket: detail });
@@ -582,11 +497,12 @@ apiKiosk.get('/tickets', requireStaffToken, async (c) => {
      WHERE venue_id = $1 AND shift_id = $2
      ORDER BY
        CASE status
-         WHEN 'new' THEN 0
-         WHEN 'cooking' THEN 1
-         WHEN 'ready' THEN 2
-         WHEN 'issued' THEN 3
-         ELSE 4
+         WHEN 'payment' THEN 0
+         WHEN 'new' THEN 1
+         WHEN 'cooking' THEN 2
+         WHEN 'ready' THEN 3
+         WHEN 'issued' THEN 4
+         ELSE 5
        END,
        created_at ASC`,
     [venueId, shift.id]

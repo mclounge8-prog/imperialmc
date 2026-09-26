@@ -75,6 +75,19 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
     });
   };
 
+  const tiles = useMemo(
+    () =>
+      groups.flatMap((group) =>
+        [...group.options]
+          .sort((a, b) => {
+            if (a.isDefault === b.isDefault) return a.name.localeCompare(b.name, 'ru');
+            return a.isDefault ? -1 : 1;
+          })
+          .map((opt) => ({ group, opt }))
+      ),
+    [groups]
+  );
+
   const selectedOptions = groups.flatMap((g) => g.options).filter((o) => selected.has(o.modifierId));
   const total = item.price + selectedOptions.reduce((sum, o) => sum + o.price, 0);
 
@@ -100,45 +113,37 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        {groups.map((group) => {
-          const ordered = [...group.options].sort((a, b) => {
-            if (a.isDefault === b.isDefault) return a.name.localeCompare(b.name, 'ru');
-            return a.isDefault ? -1 : 1;
-          });
-          return (
-            <View key={group.id ?? 'ungrouped'} style={styles.group}>
-              <Text style={styles.groupTitle}>{group.name}</Text>
-              <View style={styles.grid}>
-                {ordered.map((opt) => {
-                  const on = selected.has(opt.modifierId);
-                  return (
-                    <Pressable
-                      key={opt.modifierId}
-                      style={[
-                        styles.tile,
-                        { width: tileSize, height: tileSize },
-                        on && styles.tileOn,
-                        !on && opt.isDefault && styles.tileOff,
-                      ]}
-                      onPress={() => toggle(group, opt.modifierId)}
-                    >
-                      <View style={[styles.check, on && styles.checkOn]}>
-                        <Text style={styles.checkMark}>{on ? '✓' : ''}</Text>
-                      </View>
-                      <View style={[styles.glyph, on && styles.glyphOn]}>
-                        <Text style={[styles.glyphText, on && styles.glyphTextOn]}>{mark(opt.name)}</Text>
-                      </View>
-                      <Text style={[styles.optName, !on && opt.isDefault && styles.optOff]} numberOfLines={2}>
-                        {opt.name}
-                      </Text>
-                      {optionMeta(opt) ? <Text style={styles.optMeta}>{optionMeta(opt)}</Text> : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          );
-        })}
+        <View style={styles.grid}>
+          {tiles.map(({ group, opt }) => {
+            const on = selected.has(opt.modifierId);
+            return (
+              <Pressable
+                key={opt.modifierId}
+                style={[
+                  styles.tile,
+                  { width: tileSize, height: tileSize },
+                  on && styles.tileOn,
+                  !on && opt.isDefault && styles.tileOff,
+                ]}
+                onPress={() => toggle(group, opt.modifierId)}
+              >
+                <View style={[styles.check, on && styles.checkOn]}>
+                  <Text style={styles.checkMark}>{on ? '✓' : ''}</Text>
+                </View>
+                <Text style={styles.groupChip} numberOfLines={1}>
+                  {group.name}
+                </Text>
+                <View style={[styles.glyph, on && styles.glyphOn]}>
+                  <Text style={[styles.glyphText, on && styles.glyphTextOn]}>{mark(opt.name)}</Text>
+                </View>
+                <Text style={[styles.optName, !on && opt.isDefault && styles.optOff]} numberOfLines={2}>
+                  {opt.name}
+                </Text>
+                {optionMeta(opt) ? <Text style={styles.optMeta}>{optionMeta(opt)}</Text> : null}
+              </Pressable>
+            );
+          })}
+        </View>
       </ScrollView>
 
       <View style={styles.foot}>
@@ -170,10 +175,9 @@ const styles = StyleSheet.create({
   backText: { color: colors.text, fontSize: 18, fontWeight: '800' },
   title: { color: colors.text, fontSize: 30, fontWeight: '800' },
   lead: { color: colors.textMuted, fontSize: 16, marginTop: 4 },
-  body: { padding: 20, paddingBottom: 24, gap: 22 },
-  group: { gap: 12 },
-  groupTitle: { color: colors.accent2, fontSize: 18, fontWeight: '800' },
+  body: { padding: 20, paddingBottom: 24 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  groupChip: { color: colors.accent2, fontSize: 12, fontWeight: '800', textAlign: 'center' },
   tile: {
     backgroundColor: colors.surface,
     borderWidth: 3,

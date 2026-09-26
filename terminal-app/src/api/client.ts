@@ -406,7 +406,7 @@ export async function removeOrderItem(
   return order;
 }
 
-export type PaymentMethod = 'cash' | 'card';
+export type PaymentMethod = 'cash' | 'card' | 'qr';
 
 export async function payGuest(
   orderId: number,

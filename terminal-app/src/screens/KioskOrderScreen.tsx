@@ -227,7 +227,11 @@ export default function KioskOrderScreen() {
         method
       );
       resetToHome();
-      setFlash(`Заказ № ${data.ticket.number} оформлен`);
+      setFlash(
+        method === 'qr'
+          ? `Заказ № ${data.ticket.number} · покажи скрин перевода сотруднику`
+          : `Заказ № ${data.ticket.number} · оплата у сотрудника`
+      );
       setTimeout(() => setFlash(null), 4000);
       await loadBoot();
     } catch (e) {
@@ -284,7 +288,7 @@ export default function KioskOrderScreen() {
         {header}
         <ScrollView contentContainerStyle={styles.homeBody} showsVerticalScrollIndicator={false}>
           <Text style={styles.welcome}>Добро пожаловать</Text>
-          <Text style={styles.homeLead}>Выбери блюда на экране. Способ оплаты — в конце оформления.</Text>
+          <Text style={styles.homeLead}>Выбери блюда. Оплату подтвердит сотрудник на стойке.</Text>
           <Pressable
             style={styles.makeOrder}
             onPress={() => {
@@ -559,7 +563,9 @@ export default function KioskOrderScreen() {
               ) : (
                 <Text style={styles.wait}>QR для этой точки ещё не загружен в бэкофисе</Text>
               )}
-              <Text style={styles.qrHint}>При подтверждении оплаты покажите перевод сотруднику</Text>
+              <Text style={styles.qrHint}>
+                Оплати по QR, покажи скрин сотруднику и нажми «Я оплатил». Сотрудник подтвердит перевод.
+              </Text>
               <Pressable style={[styles.makeOrder, styles.submit]} disabled={busy || !qrUrl} onPress={() => void submit('qr')}>
                 {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.makeOrderText}>Я оплатил</Text>}
               </Pressable>

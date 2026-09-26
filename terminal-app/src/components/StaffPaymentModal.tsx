@@ -19,7 +19,7 @@ type Props = {
   busy?: boolean;
   error?: string | null;
   onClose: () => void;
-  onConfirm: (method: 'cash' | 'card') => void;
+  onConfirm: (method: 'cash' | 'card' | 'qr') => void;
 };
 
 export default function StaffPaymentModal({
@@ -37,8 +37,8 @@ export default function StaffPaymentModal({
   const received = parseFloat(cashText.replace(',', '.')) || 0;
   const change = received - amount;
   const canCash = received >= amount - 0.001;
-  const method = suggestedMethod === 'card' ? 'card' : 'cash';
-  const lockedLabel = paymentMethodLabel(suggestedMethod) || paymentMethodLabel(method);
+  const method = suggestedMethod === 'card' || suggestedMethod === 'qr' ? suggestedMethod : 'cash';
+  const lockedLabel = paymentMethodLabel(suggestedMethod || method);
 
   useEffect(() => {
     if (visible) setCashText('');
@@ -65,7 +65,7 @@ export default function StaffPaymentModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => !busy && onClose()}>
       <Pressable style={styles.backdrop} onPress={() => !busy && onClose()}>
         <Pressable style={styles.box} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>Оплата киоска</Text>
+          <Text style={styles.title}>Подтвердить оплату</Text>
           <Text style={[styles.method, { color: paymentMethodTint(suggestedMethod || method) }]}>{lockedLabel}</Text>
           <Text style={styles.amount}>{amount.toFixed(2)} ₽</Text>
           {discountPercent ? (
@@ -73,16 +73,28 @@ export default function StaffPaymentModal({
               было {(subtotal ?? amount).toFixed(2)} ₽ · скидка {discountPercent}% только на QR
             </Text>
           ) : (
-            <Text style={styles.hint}>Без скидки — скидка только на QR-код</Text>
+            <Text style={styles.hint}>Без скидки</Text>
           )}
-          <Text style={styles.lockHint}>Тип оплаты выбран на киоске, после проведения его нельзя сменить</Text>
 
           {busy ? (
             <ActivityIndicator color={colors.accent2} style={{ marginVertical: 24 }} />
+          ) : method === 'qr' ? (
+            <>
+              <Text style={styles.qrLead}>
+                Гость нажал «Я оплатил». Посмотри скрин перевода и подтверди, если деньги пришли.
+              </Text>
+              <Pressable style={styles.primary} onPress={() => onConfirm('qr')}>
+                <Text style={styles.primaryText}>Подтвердить оплату по QR</Text>
+              </Pressable>
+              <Pressable style={styles.cancel} onPress={onClose}>
+                <Text style={styles.cancelText}>Отмена</Text>
+              </Pressable>
+            </>
           ) : method === 'card' ? (
             <>
+              <Text style={styles.qrLead}>Гость выбрал карту. Проведи оплату на терминале и подтверди.</Text>
               <Pressable style={styles.primary} onPress={() => onConfirm('card')}>
-                <Text style={styles.primaryText}>Подтвердить карту</Text>
+                <Text style={styles.primaryText}>Подтвердить оплату картой</Text>
               </Pressable>
               <Pressable style={styles.cancel} onPress={onClose}>
                 <Text style={styles.cancelText}>Отмена</Text>
@@ -145,7 +157,7 @@ const styles = StyleSheet.create({
   method: { fontSize: 22, fontWeight: '800', marginTop: 6 },
   amount: { color: colors.accent2, fontSize: 32, fontWeight: '800', marginTop: 6 },
   hint: { color: colors.textMuted, marginTop: 4 },
-  lockHint: { color: colors.textMuted, marginTop: 6, fontSize: 13 },
+  qrLead: { color: colors.text, fontSize: 16, lineHeight: 22, marginTop: 14, marginBottom: 8 },
   sub: { color: colors.textMuted, marginTop: 14, marginBottom: 8, fontWeight: '700' },
   display: {
     backgroundColor: colors.surface2,
