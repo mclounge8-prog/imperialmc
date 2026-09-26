@@ -1,4 +1,5 @@
 import { escapeHtml } from './escapeHtml.js';
+import { formatVenueDateTime } from '../utils/timezone.js';
 
 function channelStatusBadge(ch) {
   const ready = ch.enabled && ch.hasToken && ch.hasChatId;
@@ -39,7 +40,41 @@ function renderChannelCard(ch) {
   `;
 }
 
-export function renderTelegramSection(settings, flash = null, channels = []) {
+function formatMoney(value) {
+  return `${Number(value || 0).toFixed(2)} ₽`;
+}
+
+function venueFilterOptions(venues, selectedVenueId) {
+  return (
+    `<option value="">Все заведения</option>` +
+    (venues || [])
+      .map(
+        (v) =>
+          `<option value="${v.id}"${String(v.id) === String(selectedVenueId) ? ' selected' : ''}>${escapeHtml(v.name)}</option>`
+      )
+      .join('')
+  );
+}
+
+function renderResendShiftRow(shift) {
+  return `
+    <tr>
+      <td>#${shift.id}</td>
+      <td>${escapeHtml(shift.venueName)}</td>
+      <td>${escapeHtml(formatVenueDateTime(shift.closedAt))}</td>
+      <td>${escapeHtml(shift.closedByName || '—')}</td>
+      <td>${formatMoney(shift.revenueTotal)}</td>
+      <td>
+        <form hx-post="/telegram/resend-shift" hx-target="#main-content" hx-swap="innerHTML">
+          <input type="hidden" name="shift_id" value="${shift.id}" />
+          <button type="submit" class="btn-secondary">Отправить в Telegram</button>
+        </form>
+      </td>
+    </tr>
+  `;
+}
+
+export function renderTelegramSection(settings, flash = null, channels = [], extras = {}) {
   const enabled = !!settings.enabled;
   const tokenDisplay = settings.hasToken ? '•••••••• (задан)' : 'не задан';
   const chatDisplay = settings.chatId ? escapeHtml(settings.chatId) : 'не задан';
@@ -60,6 +95,54 @@ export function renderTelegramSection(settings, flash = null, channels = []) {
     </header>
 
     ${flashHtml}
+
+    <section class="card" style="margin-bottom:1.25rem;">
+      <h2 style="margin:0 0 .75rem;font-size:1.05rem;">Повторить отчёт о закрытии смены</h2>
+      <p class="muted" style="margin:0 0 .75rem;font-size:.9rem;">
+        Если алерт не пришёл — выбери смену и нажми «Отправить в Telegram».
+        Уйдёт выручка/касса и учёт табака (если на точке включён и был подсчёт).
+      </p>
+      <form
+        class="filters-bar"
+        style="margin-bottom:1rem;"
+        hx-get="/telegram/resend-shift"
+        hx-target="#main-content"
+        hx-swap="innerHTML"
+      >
+        <select name="venueId">${venueFilterOptions(extras.venues, extras.venueId)}</select>
+        <button type="submit" class="btn-secondary">Показать смены</button>
+      </form>
+      ${(extras.venues || []).length
+        ? `
+      <form
+        class="filters-bar"
+        style="margin-bottom:1rem;"
+        hx-post="/telegram/resend-shift"
+        hx-target="#main-content"
+        hx-swap="innerHTML"
+      >
+        <select name="venue_id" required>${venueFilterOptions(extras.venues, extras.venueId).replace('<option value="">Все заведения</option>', '<option value="">Заведение…</option>')}</select>
+        <input type="hidden" name="latest" value="1" />
+        <button type="submit">Последняя закрытая смена этой точки</button>
+      </form>`
+        : ''}
+      <table class="data-table data-table-compact">
+        <thead>
+          <tr>
+            <th>Смена</th>
+            <th>Точка</th>
+            <th>Закрыта</th>
+            <th>Кассир</th>
+            <th>Выручка</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(extras.recentShifts || []).map(renderResendShiftRow).join('') ||
+            '<tr><td colspan="6" class="empty-hint">Закрытых смен нет</td></tr>'}
+        </tbody>
+      </table>
+    </section>
 
     <section class="card" style="margin-bottom:1.25rem;">
       <h2 style="margin:0 0 .75rem;font-size:1.05rem;">Каналы по точкам</h2>

@@ -2,15 +2,13 @@ import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { enqueueCashFiscalJob, enqueueShiftFiscalJob } from '../services/fiscalQueue.js';
+import { sendClosedShiftTelegramAlerts } from '../services/shiftCloseTelegram.js';
 import {
   buildCashMovementMessage,
-  buildShiftCloseMessage,
   buildShiftOpenMessage,
-  buildTobaccoCountMessage,
   fetchPreviousShiftClosingCash,
   fetchVenueName,
   notifyTelegramSafe,
-  sendTelegramMessage,
 } from '../services/telegramNotify.js';
 import {
   fetchShiftTobaccoCount,
@@ -374,38 +372,14 @@ apiShifts.post('/close', async (c) => {
     // Сначала отчёт по выручке/кассе, затем табак — последовательно,
     // иначе при таймаутах Telegram часто «теряется» одно из двух параллельных сообщений.
     notifyTelegramSafe(async () => {
-      await sendTelegramMessage(
-        buildShiftCloseMessage({
-          venueName,
-          closingCash: countedCash,
-          expectedCash,
-          revenueTotal: stats.revenueTotal,
-          cashSales: stats.paymentBreakdown.cash,
-          cardSales: stats.paymentBreakdown.card,
-          qrSales: stats.paymentBreakdown.qr,
-          otherSales: stats.paymentBreakdown.other,
-          receiptsCount: stats.receiptsCount,
-          deposits: stats.cash.deposits,
-          withdrawals: stats.cash.withdrawals,
-          cashier: staff.name,
-        }),
-        { venueId }
-      );
-      if (venueTobacco?.tobacco_accounting_enabled && tobaccoCount) {
-        await sendTelegramMessage(
-          buildTobaccoCountMessage({
-            venueName,
-            cashier: staff.name,
-            skipped: !!tobaccoCount.skipped,
-            totalNetG: tobaccoCount.totalNetG,
-            totalExpectedG: tobaccoCount.totalExpectedG,
-            withinTolerance: tobaccoCount.withinTolerance,
-            toleranceG: Number(venueTobacco.tobacco_tolerance_g),
-            lines: tobaccoCount.lines || [],
-          }),
-          { venueId }
-        );
-      }
+      await sendClosedShiftTelegramAlerts({
+        shift: rows[0],
+        stats,
+        venueName,
+        cashier: staff.name,
+        tobaccoCount,
+        venueTobacco,
+      });
       return null;
     }, { venueId });
     return c.json({
