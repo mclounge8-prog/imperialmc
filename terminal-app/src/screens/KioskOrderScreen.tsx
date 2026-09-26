@@ -377,9 +377,13 @@ export default function KioskOrderScreen() {
           contentContainerStyle={styles.grid}
           columnWrapperStyle={cols > 1 ? [styles.gridRow, { gap }] : undefined}
           ListHeaderComponent={
-            <Text style={styles.menuHeading} numberOfLines={1}>
-              {currentCatName}
-            </Text>
+            <ImageBackground source={kioskAssets.board} style={styles.menuBanner} imageStyle={styles.menuBannerImg}>
+              <LinearGradient colors={['rgba(7,7,7,0.15)', kk.bg]} style={styles.menuBannerShade}>
+                <Text style={styles.menuHeading} numberOfLines={1}>
+                  {currentCatName}
+                </Text>
+              </LinearGradient>
+            </ImageBackground>
           }
           ListEmptyComponent={<Text style={styles.empty}>В этой категории пока нет блюд</Text>}
           renderItem={({ item }) => (
@@ -709,11 +713,13 @@ const styles = StyleSheet.create({
   catMarkOn: { color: kk.ink },
   catName: { color: kk.cream, fontWeight: '800', fontSize: 15, textAlign: 'center' },
   catNameOn: { color: kk.ink },
+  menuBanner: { height: 132, marginBottom: 14, borderRadius: 18, overflow: 'hidden' },
+  menuBannerImg: { opacity: 0.55 },
+  menuBannerShade: { flex: 1, justifyContent: 'flex-end', padding: 14 },
   menuHeading: {
     color: kk.gold,
     fontSize: 26,
     fontWeight: '800',
-    marginBottom: 12,
     width: '100%',
     letterSpacing: 0.6,
   },
