@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   ScrollView,
@@ -16,6 +15,7 @@ import { useDevice } from '../context/DeviceContext';
 import { VenueSecretTitle } from '../kiosk/KioskChrome';
 import { guestStatusLabel, guestStatusTint } from '../kiosk/status';
 import KioskCustomizePanel from '../components/KioskCustomizePanel';
+import KioskCheckoutPanel from '../components/KioskCheckoutPanel';
 import KioskReadyBanner from '../components/KioskReadyBanner';
 import {
   API_BASE_URL,
@@ -504,86 +504,30 @@ export default function KioskOrderScreen() {
       ) : null}
 
       {payStep ? (
-        <View style={[styles.fullOverlay, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
-          {payStep === 'type' ? (
-            <>
-              <Text style={styles.overlayTitle}>Как будешь платить?</Text>
-              <View style={styles.payTiles}>
-                <Pressable style={styles.payTile} disabled={busy} onPress={() => void submit('cash')}>
-                  <Text style={styles.payEmoji}>💵</Text>
-                  <Text style={styles.payTileTitle}>Наличные</Text>
-                  <Text style={styles.payTileSub}>Оплата у сотрудника при выдаче</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.payTile}
-                  disabled={busy}
-                  onPress={() => {
-                    bumpActivity();
-                    setPayStep('cashless');
-                  }}
-                >
-                  <Text style={styles.payEmoji}>💳</Text>
-                  <Text style={styles.payTileTitle}>Безналичные</Text>
-                  <Text style={styles.payTileSub}>Карта или QR-код</Text>
-                </Pressable>
-              </View>
-            </>
-          ) : null}
-
-          {payStep === 'cashless' ? (
-            <>
-              <Text style={styles.overlayTitle}>Безнал</Text>
-              <View style={styles.payTiles}>
-                <Pressable style={styles.payTile} disabled={busy} onPress={() => void submit('card')}>
-                  <Text style={styles.payEmoji}>💳</Text>
-                  <Text style={styles.payTileTitle}>Карта</Text>
-                  <Text style={styles.payTileSub}>Оплата у сотрудника · без скидки</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.payTile}
-                  disabled={busy}
-                  onPress={() => {
-                    bumpActivity();
-                    setPayStep('qr');
-                  }}
-                >
-                  <Text style={styles.payEmoji}>▣</Text>
-                  <Text style={styles.payTileTitle}>Карта — QR-код</Text>
-                  <Text style={styles.payTileSub}>Скидка {discountPct}%</Text>
-                </Pressable>
-              </View>
-            </>
-          ) : null}
-
-          {payStep === 'qr' ? (
-            <>
-              <Text style={styles.overlayTitle}>Карта — QR-код · скидка {discountPct}%</Text>
-              {qrUrl ? (
-                <FastImage source={{ uri: qrUrl }} style={styles.qr} resizeMode={FastImage.resizeMode.contain} />
-              ) : (
-                <Text style={styles.wait}>QR для этой точки ещё не загружен в бэкофисе</Text>
-              )}
-              <Text style={styles.qrHint}>
-                Оплати по QR, покажи скрин сотруднику и нажми «Я оплатил». Сотрудник подтвердит перевод.
-              </Text>
-              <Pressable style={[styles.makeOrder, styles.submit]} disabled={busy || !qrUrl} onPress={() => void submit('qr')}>
-                {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.makeOrderText}>Я оплатил</Text>}
-              </Pressable>
-            </>
-          ) : null}
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {busy && payStep !== 'qr' ? <ActivityIndicator color={colors.accent2} /> : null}
-          <Pressable
-            style={styles.ghost}
-            onPress={() => {
-              bumpActivity();
-              setPayStep(payStep === 'type' ? null : payStep === 'qr' ? 'cashless' : 'type');
-            }}
-          >
-            <Text style={styles.ghostText}>Назад</Text>
-          </Pressable>
-        </View>
+        <KioskCheckoutPanel
+          cart={cart}
+          total={total}
+          discountPct={discountPct}
+          qrUrl={qrUrl}
+          step={payStep}
+          busy={busy}
+          error={error}
+          onBack={() => {
+            bumpActivity();
+            setPayStep(payStep === 'type' ? null : payStep === 'qr' ? 'cashless' : 'type');
+          }}
+          onCash={() => void submit('cash')}
+          onCashless={() => {
+            bumpActivity();
+            setPayStep('cashless');
+          }}
+          onCard={() => void submit('card')}
+          onOpenQr={() => {
+            bumpActivity();
+            setPayStep('qr');
+          }}
+          onConfirmQr={() => void submit('qr')}
+        />
       ) : null}
 
       {idlePrompt ? (
@@ -830,24 +774,6 @@ const styles = StyleSheet.create({
   cartName: { color: colors.text, fontWeight: '800', fontSize: 16, flexShrink: 1 },
   mods: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
   submit: { minWidth: 0, width: '100%', minHeight: 72, marginTop: 10 },
-  payTiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'center' },
-  payTile: {
-    width: 240,
-    height: 240,
-    borderWidth: 3,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    borderRadius: 28,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  payEmoji: { fontSize: 52 },
-  payTileTitle: { color: colors.text, fontSize: 26, fontWeight: '800' },
-  payTileSub: { color: colors.textMuted, fontSize: 16, textAlign: 'center' },
-  qr: { width: 280, height: 280, alignSelf: 'center', backgroundColor: '#fff', borderRadius: 16 },
-  qrHint: { color: colors.text, fontSize: 18, textAlign: 'center', marginVertical: 16, lineHeight: 26 },
   idleWrap: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.65)',
