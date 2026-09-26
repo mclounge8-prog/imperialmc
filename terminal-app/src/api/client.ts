@@ -72,7 +72,15 @@ export async function loginWithPin(pin: string, deviceToken: string): Promise<St
 
 export type DeviceStatus = {
   active: boolean;
-  venue: { id: number; name: string; precheckEnabled?: boolean; tobaccoAccountingEnabled?: boolean; tobaccoToleranceG?: number } | null;
+  kind?: 'staff' | 'kiosk';
+  venue: {
+    id: number;
+    name: string;
+    precheckEnabled?: boolean;
+    tobaccoAccountingEnabled?: boolean;
+    tobaccoToleranceG?: number;
+    kioskEnabled?: boolean;
+  } | null;
 };
 
 export async function registerDevice(code: string): Promise<{ token: string }> {
@@ -930,5 +938,56 @@ export async function retryAllFiscalJobs(
 export async function deleteFiscalJob(jobId: number, venueId: number, token: string): Promise<void> {
   await authorizedRequest(`/api/fiscal/jobs/${jobId}?venueId=${venueId}`, token, {
     method: 'DELETE',
+  });
+}
+
+export type KioskTicketStatus = 'new' | 'cooking' | 'ready' | 'issued' | 'cancelled';
+
+export type KioskTicketModifier = {
+  name: string;
+  price: number;
+  qty: number;
+  unit: string | null;
+  unitLabel: string | null;
+};
+
+export type KioskTicketItem = {
+  id: number;
+  name: string;
+  qty: number;
+  price: number;
+  modifiers: KioskTicketModifier[];
+};
+
+export type KioskTicket = {
+  id: number;
+  number: number;
+  status: KioskTicketStatus;
+  guestName: string | null;
+  comment: string | null;
+  total: number;
+  createdAt: string;
+  cookingAt: string | null;
+  readyAt: string | null;
+  issuedAt: string | null;
+  cancelledAt: string | null;
+  items: KioskTicketItem[];
+};
+
+export async function fetchKioskTickets(
+  venueId: number,
+  token: string
+): Promise<{ tickets: KioskTicket[]; shiftOpen: boolean }> {
+  return authorizedRequest(`/api/kiosk/tickets?venueId=${venueId}`, token);
+}
+
+export async function setKioskTicketStatus(
+  ticketId: number,
+  status: KioskTicketStatus,
+  token: string
+): Promise<{ ticket: KioskTicket }> {
+  return authorizedRequest(`/api/kiosk/tickets/${ticketId}/status`, token, {
+    method: 'POST',
+    body: { status },
   });
 }

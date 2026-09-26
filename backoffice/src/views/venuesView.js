@@ -8,6 +8,7 @@ export function renderVenueCard(venue, assignedNames) {
     : 'Сотрудники не назначены';
   const precheckOn = !!venue.precheck_enabled;
   const tobaccoOn = !!venue.tobacco_accounting_enabled;
+  const kioskOn = !!venue.kiosk_enabled;
 
   return `
     <div class="venue-card" id="venue-card-${venue.id}">
@@ -15,16 +16,28 @@ export function renderVenueCard(venue, assignedNames) {
         <div class="venue-info">
           <div class="venue-name">${safeName}</div>
           <div class="venue-address">${safeAddress}</div>
-          <label class="venue-precheck-toggle">
-            <input
-              type="checkbox"
-              ${precheckOn ? 'checked' : ''}
-              hx-post="/venues/${venue.id}/precheck-toggle"
-              hx-target="#venue-card-${venue.id}"
-              hx-swap="outerHTML"
-            >
-            <span>Режим пречека${precheckOn ? ' · включён' : ''}</span>
-          </label>
+          <div class="venue-flag-toggles">
+            <label class="venue-precheck-toggle">
+              <input
+                type="checkbox"
+                ${precheckOn ? 'checked' : ''}
+                hx-post="/venues/${venue.id}/precheck-toggle"
+                hx-target="#venue-card-${venue.id}"
+                hx-swap="outerHTML"
+              >
+              <span>Режим пречека${precheckOn ? ' · включён' : ''}</span>
+            </label>
+            <label class="venue-precheck-toggle">
+              <input
+                type="checkbox"
+                ${kioskOn ? 'checked' : ''}
+                hx-post="/venues/${venue.id}/kiosk-toggle"
+                hx-target="#venue-card-${venue.id}"
+                hx-swap="outerHTML"
+              >
+              <span>Киоск самообслуживания${kioskOn ? ' · включён' : ''}</span>
+            </label>
+          </div>
           ${
             tobaccoOn
               ? `<div class="venue-flag-hint">Учёт табака · вкл · погрешность ${Number(venue.tobacco_tolerance_g ?? 100)} г</div>`
@@ -262,7 +275,7 @@ export function renderVenuesSection(venueCards) {
   return `
     <header>
       <h1>Заведения</h1>
-      <p>Точки продаж — у каждой свой склад, свои столы и назначенные сотрудники</p>
+      <p>Точки продаж — у каждой свой склад, свои столы и назначенные сотрудники. Киоск самообслуживания включается чекбоксом на карточке, приложение: <a href="/kiosk/install.html" target="_blank" rel="noopener">/kiosk/</a></p>
     </header>
 
     <form

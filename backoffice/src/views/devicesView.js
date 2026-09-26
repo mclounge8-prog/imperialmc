@@ -25,6 +25,8 @@ export function renderDeviceRow(device, venues, { oob = false } = {}) {
   const displayName = device.name ? escapeHtml(device.name) : `Устройство #${device.id}`;
   const statusLabel = device.is_active ? 'Активно' : 'Деактивировано';
   const statusClass = device.is_active ? 'badge-active' : 'badge-inactive';
+  const kind = device.kind === 'kiosk' ? 'kiosk' : 'staff';
+  const kindLabel = kind === 'kiosk' ? 'Киоск' : 'Терминал';
   const toggleLabel = device.is_active ? 'Деактивировать' : 'Активировать';
   const lastSeen = formatDateTime(device.last_seen_at);
   const lastSeenText = lastSeen ? `был(о) на связи ${lastSeen}` : 'ещё не выходило на связь';
@@ -45,9 +47,20 @@ export function renderDeviceRow(device, venues, { oob = false } = {}) {
         >
         <span class="device-meta">
           <span class="badge ${statusClass}">${statusLabel}</span>
+          <span class="badge ${kind === 'kiosk' ? 'badge-kiosk' : 'badge-staff'}">${kindLabel}</span>
           ${lastSeenText}
         </span>
       </div>
+      <select
+        name="kind"
+        hx-put="/devices/${device.id}/kind"
+        hx-trigger="change"
+        hx-target="#device-row-${device.id}"
+        hx-swap="outerHTML"
+      >
+        <option value="staff"${kind === 'staff' ? ' selected' : ''}>Терминал</option>
+        <option value="kiosk"${kind === 'kiosk' ? ' selected' : ''}>Киоск</option>
+      </select>
       <select
         name="venue_id"
         hx-put="/devices/${device.id}/venue"
@@ -88,7 +101,7 @@ export function renderDevicesSection(devices, venues) {
   return `
     <header>
       <h1>Устройства</h1>
-      <p>Android-терминалы — регистрация, назначение на заведение, активация</p>
+      <p>Android-терминалы и киоски — регистрация, назначение на заведение, активация</p>
     </header>
 
     <div class="subsection">
@@ -101,9 +114,11 @@ export function renderDevicesSection(devices, venues) {
       >Сгенерировать код регистрации</button>
       <div id="registration-code-display"></div>
       <p class="hint">
-        Список ниже сам подхватит новое устройство, как только планшет введёт код —
-        обновлять страницу не нужно. Чтобы перенести терминал на другую точку,
-        смени заведение в списке — удалять устройство не нужно.
+        Список ниже сам подхватит новое устройство, как только планшет или киоск введёт код —
+        обновлять страницу не нужно. Киоск открывается по адресу
+        <a href="/kiosk/" target="_blank" rel="noopener">/kiosk/</a>.
+        Тип (терминал / киоск) можно сменить в списке. Чтобы перенести на другую точку,
+        смени заведение — удалять устройство не нужно.
       </p>
     </div>
 

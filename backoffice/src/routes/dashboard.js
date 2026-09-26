@@ -42,7 +42,8 @@ export async function renderFragmentHtml(key, c) {
       `SELECT id, name, address,
               COALESCE(precheck_enabled, false) AS precheck_enabled,
               COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
-              COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g
+              COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
+              COALESCE(kiosk_enabled, false) AS kiosk_enabled
        FROM venues ORDER BY name`
     );
     const venueCards = [];
@@ -179,7 +180,7 @@ export async function renderFragmentHtml(key, c) {
 
   if (key === 'devices') {
     const { rows: deviceRows } = await pool.query(
-      'SELECT id, name, venue_id, is_active, last_seen_at FROM devices ORDER BY registered_at DESC'
+      'SELECT id, name, venue_id, is_active, last_seen_at, COALESCE(kind, \'staff\') AS kind FROM devices ORDER BY registered_at DESC'
     );
     const { rows: venueRows } = await pool.query('SELECT id, name FROM venues ORDER BY name');
     return renderDevicesSection(deviceRows, venueRows);

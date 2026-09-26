@@ -1,0 +1,17 @@
+{
+  "name": "Imperial MC — Киоск",
+  "short_name": "Киоск IMC",
+  "description": "Киоск самообслуживания Imperial MC: меню, модификаторы, заявка на кухню",
+  "id": "/kiosk/",
+  "start_url": "/kiosk/",
+  "scope": "/kiosk/",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#121214",
+  "theme_color": "#121214",
+  "lang": "ru",
+  "icons": [
+    { "src": "/img/logo-white.webp", "sizes": "512x512", "type": "image/webp", "purpose": "any" }
+  ]
+}

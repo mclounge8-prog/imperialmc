@@ -20,6 +20,7 @@ import { useFiscalSync } from './src/hooks/useFiscalSync';
 import AtolStatusScreen from './src/screens/AtolStatusScreen';
 import CashScreen from './src/screens/CashScreen';
 import TobaccoAccountingScreen from './src/screens/TobaccoAccountingScreen';
+import KioskKitchenScreen from './src/screens/KioskKitchenScreen';
 import AppUpdateGate from './src/components/AppUpdateGate';
 import { colors } from './src/theme/colors';
 
@@ -36,6 +37,7 @@ export type RootStackParamList = {
   AtolStatus: undefined;
   Cash: undefined;
   TobaccoAccounting: undefined;
+  KioskKitchen: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -123,6 +125,11 @@ function RootNavigator() {
             name="TobaccoAccounting"
             component={TobaccoAccountingScreen}
             options={{ title: 'Учёт табака' }}
+          />
+          <Stack.Screen
+            name="KioskKitchen"
+            component={KioskKitchenScreen}
+            options={{ title: 'Киоск · кухня' }}
           />
         </>
       )}

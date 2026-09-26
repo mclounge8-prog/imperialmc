@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Киоск Imperial MC — установка MVP</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: dark; --bg:#121214; --card:#1b1b1f; --border:#34343c; --text:#f1f1f3; --muted:#98979f; --accent:#3f63e6; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font:16px/1.5 Inter,sans-serif; }
+    main { max-width:720px; margin:0 auto; padding:40px 20px 64px; }
+    h1 { font-family:'Space Grotesk',sans-serif; font-size:32px; margin:0 0 8px; }
+    p { color:var(--muted); }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; margin:16px 0; }
+    ol { margin:0; padding-left:20px; }
+    li { margin:8px 0; }
+    a.btn { display:inline-block; margin:8px 8px 0 0; padding:12px 16px; border-radius:12px; background:var(--accent); color:#fff; text-decoration:none; font-weight:700; }
+    a.ghost { background:transparent; border:1px solid var(--border); color:var(--text); }
+    code { color:#8aa4ff; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Киоск самообслуживания</h1>
+    <p>MVP для планшета гостя. Оплаты и фискализации нет — заявка уходит на кухню терминала.</p>
+    <p>
+      <a class="btn" href="/kiosk/">Открыть киоск</a>
+      <a class="btn ghost" href="/kiosk/imperial-kiosk-mvp.zip">Скачать ZIP</a>
+    </p>
+    <div class="card">
+      <strong>Как тестировать</strong>
+      <ol>
+        <li>В бэкофисе на карточке заведения включи чекбокс <em>Киоск самообслуживания</em>.</li>
+        <li>Раздел «Устройства» → сгенерируй код. На планшете киоска открой <code>https://imperial-mc.online/kiosk/</code> и введи код.</li>
+        <li>Назначь устройство на заведение, тип — «Киоск».</li>
+        <li>На терминале официанта открой смену. Киоск без открытой смены не принимает заказы.</li>
+        <li>Собери заказ с модификаторами. Номер заявки появится у гостя и на экране «Киоск · кухня» в терминале.</li>
+        <li>PWA: в Chrome меню → «Установить приложение» / «На экран Домой».</li>
+      </ol>
+    </div>
+  </main>
+</body>
+</html>

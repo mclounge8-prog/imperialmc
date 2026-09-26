@@ -20,7 +20,8 @@ async function fetchVenue(id) {
     `SELECT id, name, address,
             COALESCE(precheck_enabled, false) AS precheck_enabled,
             COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
-            COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g
+            COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
+            COALESCE(kiosk_enabled, false) AS kiosk_enabled
      FROM venues WHERE id = $1`,
     [id]
   );
@@ -43,7 +44,8 @@ async function fetchAllVenueCards() {
     `SELECT id, name, address,
             COALESCE(precheck_enabled, false) AS precheck_enabled,
             COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
-            COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g
+            COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
+            COALESCE(kiosk_enabled, false) AS kiosk_enabled
      FROM venues ORDER BY name`
   );
   const cards = [];
@@ -124,6 +126,24 @@ venues.post('/:id/precheck-toggle', async (c) => {
 
   await pool.query(
     'UPDATE venues SET precheck_enabled = NOT COALESCE(precheck_enabled, false) WHERE id = $1',
+    [id]
+  );
+
+  const updated = await fetchVenue(id);
+  const assignedNames = await fetchAssignedStaffNames(id);
+  return c.html(renderVenueCard(updated, assignedNames));
+});
+
+venues.post('/:id/kiosk-toggle', async (c) => {
+  const id = c.req.param('id');
+  const current = await fetchVenue(id);
+  if (!current) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+
+  await pool.query(
+    'UPDATE venues SET kiosk_enabled = NOT COALESCE(kiosk_enabled, false) WHERE id = $1',
     [id]
   );
 

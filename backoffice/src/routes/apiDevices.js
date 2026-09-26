@@ -40,10 +40,11 @@ apiDevices.post('/register', async (c) => {
     return c.json({ error: 'Код истёк, сгенерируй новый в бэкофисе' });
   }
 
+  const kind = body && body.kind === 'kiosk' ? 'kiosk' : 'staff';
   const token = generateDeviceToken();
   const tokenHash = await bcrypt.hash(token, 10);
 
-  await pool.query('INSERT INTO devices (token_hash) VALUES ($1)', [tokenHash]);
+  await pool.query('INSERT INTO devices (token_hash, kind) VALUES ($1, $2)', [tokenHash, kind]);
   await pool.query('UPDATE device_registration_codes SET used_at = now() WHERE code = $1', [code]);
 
   return c.json({ token });
@@ -63,7 +64,8 @@ apiDevices.get('/me', requireDeviceToken, async (c) => {
       `SELECT id, name,
               COALESCE(precheck_enabled, false) AS precheck_enabled,
               COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
-              COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g
+              COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
+              COALESCE(kiosk_enabled, false) AS kiosk_enabled
        FROM venues WHERE id = $1`,
       [device.venue_id]
     );
@@ -74,11 +76,12 @@ apiDevices.get('/me', requireDeviceToken, async (c) => {
           precheckEnabled: !!rows[0].precheck_enabled,
           tobaccoAccountingEnabled: !!rows[0].tobacco_accounting_enabled,
           tobaccoToleranceG: Number(rows[0].tobacco_tolerance_g),
+          kioskEnabled: !!rows[0].kiosk_enabled,
         }
       : null;
   }
 
-  return c.json({ active: device.is_active, venue });
+  return c.json({ active: device.is_active, kind: device.kind || 'staff', venue });
 });
 
 export default apiDevices;

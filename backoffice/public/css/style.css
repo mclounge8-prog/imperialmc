@@ -896,9 +896,36 @@ input[type="radio"] {
   margin-top: 12px;
 }
 
+.venue-flag-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.venue-precheck-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
 .venue-flag-hint {
   margin-top: 8px;
   font-size: 12px;
+  color: var(--text-muted);
+}
+
+.badge-kiosk {
+  background: rgba(63, 99, 230, 0.2);
+  color: #8aa4ff;
+}
+
+.badge-staff {
+  background: rgba(152, 151, 159, 0.16);
   color: var(--text-muted);
 }
 
