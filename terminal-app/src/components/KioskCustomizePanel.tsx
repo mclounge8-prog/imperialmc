@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { UNIT_LABELS } from '../kiosk/status';
@@ -18,9 +18,20 @@ function optionMeta(opt: { price: number; qty: number; unit: string | null }): s
   return parts.join(' · ');
 }
 
+function mark(name: string): string {
+  const ch = name.trim().charAt(0);
+  return ch ? ch.toUpperCase() : '•';
+}
+
 export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  const cols = width >= 1100 ? 4 : width >= 720 ? 3 : 2;
+  const gap = 14;
+  const pad = 20;
+  const tileSize = Math.floor((width - pad * 2 - gap * (cols - 1)) / cols);
 
   useEffect(() => {
     const next = new Set<number>();
@@ -42,8 +53,7 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
   }, [item]);
 
   const countInGroup = useCallback(
-    (group: ModifierGroup, set: Set<number>) =>
-      group.options.filter((o) => set.has(o.modifierId)).length,
+    (group: ModifierGroup, set: Set<number>) => group.options.filter((o) => set.has(o.modifierId)).length,
     []
   );
 
@@ -81,12 +91,12 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
     <View style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }]}>
       <View style={styles.head}>
         <Pressable style={styles.back} onPress={onClose}>
-          <Text style={styles.backText}>← Назад</Text>
+          <Text style={styles.backText}>← Меню</Text>
         </Pressable>
-        <View style={styles.headText}>
-          <Text style={styles.title}>{item.name}</Text>
-          <Text style={styles.lead}>Нажми, чтобы добавить или убрать. Всё крупно — как на витрине.</Text>
-        </View>
+        <Text style={styles.title} numberOfLines={2}>
+          {item.name}
+        </Text>
+        <Text style={styles.lead}>Нажми квадрат, чтобы добавить или убрать</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -98,25 +108,30 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
           return (
             <View key={group.id ?? 'ungrouped'} style={styles.group}>
               <Text style={styles.groupTitle}>{group.name}</Text>
-              <View style={styles.tiles}>
+              <View style={styles.grid}>
                 {ordered.map((opt) => {
                   const on = selected.has(opt.modifierId);
-                  const action = on
-                    ? opt.isDefault
-                      ? 'В составе · нажми, чтобы убрать'
-                      : 'Добавлено · нажми, чтобы убрать'
-                    : opt.isDefault
-                      ? 'Убрано · нажми, чтобы вернуть'
-                      : 'Нажми, чтобы добавить';
                   return (
                     <Pressable
                       key={opt.modifierId}
-                      style={[styles.tile, on && styles.tileOn, !on && opt.isDefault && styles.tileOff]}
+                      style={[
+                        styles.tile,
+                        { width: tileSize, height: tileSize },
+                        on && styles.tileOn,
+                        !on && opt.isDefault && styles.tileOff,
+                      ]}
                       onPress={() => toggle(group, opt.modifierId)}
                     >
-                      <Text style={[styles.optName, !on && opt.isDefault && styles.optOff]}>{opt.name}</Text>
+                      <View style={[styles.check, on && styles.checkOn]}>
+                        <Text style={styles.checkMark}>{on ? '✓' : ''}</Text>
+                      </View>
+                      <View style={[styles.glyph, on && styles.glyphOn]}>
+                        <Text style={[styles.glyphText, on && styles.glyphTextOn]}>{mark(opt.name)}</Text>
+                      </View>
+                      <Text style={[styles.optName, !on && opt.isDefault && styles.optOff]} numberOfLines={2}>
+                        {opt.name}
+                      </Text>
                       {optionMeta(opt) ? <Text style={styles.optMeta}>{optionMeta(opt)}</Text> : null}
-                      <Text style={[styles.optAction, on && styles.optActionOn]}>{action}</Text>
                     </Pressable>
                   );
                 })}
@@ -128,7 +143,11 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
 
       <View style={styles.foot}>
         <Text style={styles.total}>{Math.round(total)} ₽</Text>
-        <Pressable style={[styles.add, !canConfirm && styles.addOff]} disabled={!canConfirm} onPress={() => onConfirm([...selected])}>
+        <Pressable
+          style={[styles.add, !canConfirm && styles.addOff]}
+          disabled={!canConfirm}
+          onPress={() => onConfirm([...selected])}
+        >
           <Text style={styles.addText}>В заказ</Text>
         </Pressable>
       </View>
@@ -138,43 +157,64 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
 
 const styles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFill, backgroundColor: colors.bg, zIndex: 20 },
-  head: { paddingHorizontal: 20, paddingBottom: 8, gap: 8 },
+  head: { paddingHorizontal: 20, paddingBottom: 8 },
   back: {
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 10,
+    marginBottom: 8,
   },
   backText: { color: colors.text, fontSize: 18, fontWeight: '800' },
-  headText: { gap: 4 },
-  title: { color: colors.text, fontSize: 34, fontWeight: '800' },
-  lead: { color: colors.textMuted, fontSize: 16 },
-  body: { padding: 20, paddingBottom: 24, gap: 20 },
-  group: { gap: 10 },
-  groupTitle: { color: colors.accent2, fontSize: 20, fontWeight: '800' },
-  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  title: { color: colors.text, fontSize: 30, fontWeight: '800' },
+  lead: { color: colors.textMuted, fontSize: 16, marginTop: 4 },
+  body: { padding: 20, paddingBottom: 24, gap: 22 },
+  group: { gap: 12 },
+  groupTitle: { color: colors.accent2, fontSize: 18, fontWeight: '800' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   tile: {
-    minWidth: 220,
-    flexGrow: 1,
-    flexBasis: '40%',
-    minHeight: 110,
     backgroundColor: colors.surface,
     borderWidth: 3,
     borderColor: colors.border,
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 24,
+    padding: 12,
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 8,
   },
   tileOn: { borderColor: colors.accent2, backgroundColor: '#1a2748' },
   tileOff: { opacity: 0.72 },
-  optName: { color: colors.text, fontSize: 22, fontWeight: '800' },
+  check: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface2,
+  },
+  checkOn: { backgroundColor: colors.accent2, borderColor: colors.accent2 },
+  checkMark: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  glyph: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glyphOn: { backgroundColor: colors.accent },
+  glyphText: { color: colors.text, fontSize: 34, fontWeight: '800' },
+  glyphTextOn: { color: '#fff' },
+  optName: { color: colors.text, fontSize: 16, fontWeight: '800', textAlign: 'center', paddingHorizontal: 6 },
   optOff: { textDecorationLine: 'line-through', color: colors.textMuted },
-  optMeta: { color: colors.accent2, fontSize: 16, fontWeight: '700' },
-  optAction: { color: colors.textMuted, fontSize: 14, fontWeight: '600', marginTop: 4 },
-  optActionOn: { color: '#9db4ff' },
+  optMeta: { color: colors.accent2, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   foot: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -189,7 +229,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.accent2,
     borderRadius: 18,
-    minHeight: 68,
+    minHeight: 72,
     alignItems: 'center',
     justifyContent: 'center',
   },

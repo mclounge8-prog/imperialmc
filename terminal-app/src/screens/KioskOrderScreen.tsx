@@ -72,6 +72,12 @@ function needsCustomize(item: MenuItem): boolean {
   return item.modifierGroups.some((g) => g.options.length > 0);
 }
 
+function catMark(name: string, icon: string | null): string {
+  if (icon && icon.trim()) return icon.trim();
+  const ch = name.trim().charAt(0);
+  return ch ? ch.toUpperCase() : '•';
+}
+
 function waitReason(boot: KioskBootstrap | null): string {
   if (!boot) return 'Проверяю устройство…';
   if (!boot.active) return 'Устройство деактивировано в бэкофисе';
@@ -87,8 +93,7 @@ function waitReason(boot: KioskBootstrap | null): string {
 export default function KioskOrderScreen() {
   const { deviceToken, status, refresh } = useDevice();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const wide = width >= 860;
+  const { width, height } = useWindowDimensions();
 
   const [boot, setBoot] = useState<KioskBootstrap | null>(null);
   const [menu, setMenu] = useState<{ categories: MenuCategory[]; uncategorized: MenuItem[] } | null>(null);
@@ -124,6 +129,13 @@ export default function KioskOrderScreen() {
     idlePromptAt.current = null;
     lastTouch.current = Date.now();
   }, []);
+
+  const openCheckout = useCallback(() => {
+    if (!cart.length) return;
+    bumpActivity();
+    setCartOpen(false);
+    setPayStep('type');
+  }, [bumpActivity, cart.length]);
 
   const loadBoot = useCallback(async () => {
     if (!deviceToken) return;
@@ -227,15 +239,19 @@ export default function KioskOrderScreen() {
 
   const total = cart.reduce((sum, l) => sum + l.unitPrice * l.qty, 0);
   const cartCount = cart.reduce((sum, l) => sum + l.qty, 0);
-  const cols = width >= 1200 ? 3 : 2;
+  const landscape = width >= height;
+  const catRail = landscape ? 168 : 148;
+  const catTile = catRail - 20;
+  const cols = width - catRail >= 1100 ? 4 : width - catRail >= 720 ? 3 : 2;
   const gridPad = 16;
-  const gap = 12;
-  const sideCats = wide && ordering ? 220 : 0;
-  const tileW = Math.max(160, (width - sideCats - gridPad * 2 - gap * (cols - 1)) / cols);
+  const gap = 14;
+  const tileW = Math.max(150, Math.floor((width - catRail - gridPad * 2 - gap * (cols - 1)) / cols));
   const venueName = boot?.venue?.name || status?.venue?.name || 'Киоск';
   const visibleTickets = tickets.filter((t) => t.status !== 'cancelled');
   const discountPct = Number(boot?.venue?.cashlessDiscountPercent ?? 12);
   const qrUrl = boot?.venue?.qrImageUrl ? `${API_BASE_URL}${boot.venue.qrImageUrl}` : null;
+  const currentCatName =
+    categoryId === 'uncat' ? 'Ещё' : cats.find((c) => c.id === categoryId)?.name || 'Меню';
 
   const header = (
     <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
@@ -269,7 +285,13 @@ export default function KioskOrderScreen() {
         <ScrollView contentContainerStyle={styles.homeBody} showsVerticalScrollIndicator={false}>
           <Text style={styles.welcome}>Добро пожаловать</Text>
           <Text style={styles.homeLead}>Выбери блюда на экране. Способ оплаты — в конце оформления.</Text>
-          <Pressable style={styles.makeOrder} onPress={() => { bumpActivity(); setOrdering(true); }}>
+          <Pressable
+            style={styles.makeOrder}
+            onPress={() => {
+              bumpActivity();
+              setOrdering(true);
+            }}
+          >
             <Text style={styles.makeOrderText}>Сделать заказ</Text>
           </Pressable>
           {flash ? <Text style={styles.flash}>{flash}</Text> : null}
@@ -278,10 +300,7 @@ export default function KioskOrderScreen() {
             <Text style={styles.empty}>Пока нет заказов с этого киоска</Text>
           ) : (
             visibleTickets.map((ticket) => (
-              <View
-                key={ticket.id}
-                style={[styles.ticketRow, ticket.status === 'ready' && styles.ticketRowReady]}
-              >
+              <View key={ticket.id} style={[styles.ticketRow, ticket.status === 'ready' && styles.ticketRowReady]}>
                 <Text style={styles.ticketNum}>№ {ticket.number}</Text>
                 <Text style={[styles.ticketStatus, { color: guestStatusTint(ticket.status) }]}>
                   {guestStatusLabel(ticket.status)}
@@ -296,74 +315,58 @@ export default function KioskOrderScreen() {
     );
   }
 
-  const catTiles = (
-    <>
-      {cats.map((c) => (
-        <Pressable
-          key={c.id}
-          style={[styles.catTile, categoryId === c.id && styles.catTileOn]}
-          onPress={() => {
-            bumpActivity();
-            setCategoryId(c.id);
-          }}
-        >
-          <Text style={[styles.catTileText, categoryId === c.id && styles.catTileTextOn]}>{c.name}</Text>
-        </Pressable>
-      ))}
-      {menu?.uncategorized.length ? (
-        <Pressable
-          style={[styles.catTile, categoryId === 'uncat' && styles.catTileOn]}
-          onPress={() => {
-            bumpActivity();
-            setCategoryId('uncat');
-          }}
-        >
-          <Text style={[styles.catTileText, categoryId === 'uncat' && styles.catTileTextOn]}>Ещё</Text>
-        </Pressable>
-      ) : null}
-    </>
-  );
+  const renderCatTile = (id: number | 'uncat', name: string, icon: string | null) => {
+    const on = categoryId === id;
+    return (
+      <Pressable
+        key={String(id)}
+        style={[styles.catTile, { width: catTile, height: catTile }, on && styles.catTileOn]}
+        onPress={() => {
+          bumpActivity();
+          setCategoryId(id);
+        }}
+      >
+        <Text style={[styles.catMark, on && styles.catMarkOn]}>{catMark(name, icon)}</Text>
+        <Text style={[styles.catName, on && styles.catNameOn]} numberOfLines={2}>
+          {name}
+        </Text>
+      </Pressable>
+    );
+  };
 
   return (
     <View style={styles.root} onTouchStart={bumpActivity}>
-      {header}
-      <View style={styles.menuBar}>
-        <Pressable
-          style={styles.back}
-          onPress={() => {
-            resetToHome();
-          }}
-        >
+      <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
+        <Pressable style={styles.back} onPress={resetToHome}>
           <Text style={styles.backText}>← К статусам</Text>
         </Pressable>
-        <Pressable
-          style={styles.cartChip}
-          onPress={() => {
-            bumpActivity();
-            setCartOpen(true);
-          }}
-        >
-          <Text style={styles.cartChipText}>
-            Корзина {cartCount ? `· ${cartCount}` : ''} {total ? `· ${Math.round(total)} ₽` : ''}
-          </Text>
-        </Pressable>
+        <VenueSecretTitle name={venueName} style={styles.venue} />
+        <Text style={styles.topHint}>{currentCatName}</Text>
       </View>
 
-      <View style={[styles.menuShell, !wide && styles.menuShellCol]}>
-        {wide ? (
-          <ScrollView style={styles.catCol} contentContainerStyle={styles.catColInner}>
-            {catTiles}
-          </ScrollView>
-        ) : (
-          <View style={styles.catWrap}>{catTiles}</View>
-        )}
+      <View style={styles.menuShell}>
+        <ScrollView
+          style={[styles.catCol, { width: catRail }]}
+          contentContainerStyle={styles.catColInner}
+          showsVerticalScrollIndicator={false}
+        >
+          {cats.map((c) => renderCatTile(c.id, c.name, c.icon))}
+          {menu?.uncategorized.length ? renderCatTile('uncat', 'Ещё', '🍽') : null}
+        </ScrollView>
+
         <FlatList
           data={items}
-          key={cols}
+          key={`${cols}-${tileW}`}
           numColumns={cols}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.grid}
-          columnWrapperStyle={cols > 1 ? styles.gridRow : undefined}
+          columnWrapperStyle={cols > 1 ? [styles.gridRow, { gap }] : undefined}
+          ListHeaderComponent={
+            <Text style={styles.menuHeading} numberOfLines={1}>
+              {currentCatName}
+            </Text>
+          }
+          ListEmptyComponent={<Text style={styles.empty}>В этой категории пока нет блюд</Text>}
           renderItem={({ item }) => (
             <Pressable
               style={[styles.tile, { width: tileW }]}
@@ -380,40 +383,75 @@ export default function KioskOrderScreen() {
                 />
               ) : (
                 <View style={[styles.pic, styles.picEmpty]}>
-                  <Text style={styles.picHint}>🍽</Text>
+                  <Text style={styles.picHint}>{catMark(item.name, '🍽')}</Text>
                 </View>
               )}
-              <Text style={styles.itemName} numberOfLines={3}>
-                {item.name}
-              </Text>
-              <Text style={styles.price}>{Math.round(item.price)} ₽</Text>
+              <View style={styles.tileCap}>
+                <Text style={styles.itemName} numberOfLines={2}>
+                  {item.name}
+                </Text>
+                <Text style={styles.price}>{Math.round(item.price)} ₽</Text>
+              </View>
             </Pressable>
           )}
         />
       </View>
 
-      {lastLine ? (
-        <View style={[styles.lastBar, { paddingBottom: insets.bottom + 10 }]}>
-          <View style={styles.lastInfo}>
-            <Text style={styles.lastName} numberOfLines={1}>
-              {lastLine.item.name}
-            </Text>
-            <Text style={styles.lastMeta}>
-              {Math.round(lastLine.unitPrice * lastLine.qty)} ₽
-              {lineMods(lastLine.item, lastLine.modifierIds) ? ` · ${lineMods(lastLine.item, lastLine.modifierIds)}` : ''}
-            </Text>
-          </View>
-          <View style={styles.qtyRow}>
-            <Pressable style={styles.qtyBtn} onPress={() => changeQty(lastLine.key, -1)}>
-              <Text style={styles.qtyBtnText}>−</Text>
-            </Pressable>
-            <Text style={styles.qtyVal}>{lastLine.qty}</Text>
-            <Pressable style={styles.qtyBtn} onPress={() => changeQty(lastLine.key, 1)}>
-              <Text style={styles.qtyBtnText}>+</Text>
-            </Pressable>
-          </View>
+      <View style={[styles.dock, { paddingBottom: insets.bottom + 10 }]}>
+        <View style={styles.dockLast}>
+          {lastLine ? (
+            <>
+              <View style={styles.lastInfo}>
+                <Text style={styles.lastName} numberOfLines={1}>
+                  {lastLine.item.name}
+                </Text>
+                <Text style={styles.lastMeta} numberOfLines={1}>
+                  {Math.round(lastLine.unitPrice * lastLine.qty)} ₽
+                  {lineMods(lastLine.item, lastLine.modifierIds)
+                    ? ` · ${lineMods(lastLine.item, lastLine.modifierIds)}`
+                    : ''}
+                </Text>
+              </View>
+              <View style={styles.qtyRow}>
+                <Pressable style={styles.qtyBtn} onPress={() => changeQty(lastLine.key, -1)}>
+                  <Text style={styles.qtyBtnText}>−</Text>
+                </Pressable>
+                <Text style={styles.qtyVal}>{lastLine.qty}</Text>
+                <Pressable style={styles.qtyBtn} onPress={() => changeQty(lastLine.key, 1)}>
+                  <Text style={styles.qtyBtnText}>+</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.dockHint}>Нажми плитку — блюдо попадёт в заказ</Text>
+          )}
         </View>
-      ) : null}
+
+        <Pressable
+          style={styles.dockCart}
+          onPress={() => {
+            bumpActivity();
+            setCartOpen(true);
+          }}
+        >
+          <Text style={styles.dockCartIcon}>🛒</Text>
+          <Text style={styles.dockCartLabel}>Корзина</Text>
+          {cartCount ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{cartCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+
+        <Pressable
+          style={[styles.dockCheckout, !cart.length && styles.dockCheckoutOff]}
+          disabled={!cart.length}
+          onPress={openCheckout}
+        >
+          <Text style={styles.dockCheckoutText}>Оформить</Text>
+          {cart.length ? <Text style={styles.dockCheckoutSum}>{Math.round(total)} ₽</Text> : null}
+        </Pressable>
+      </View>
 
       {cartOpen ? (
         <View style={[styles.fullOverlay, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
@@ -443,17 +481,19 @@ export default function KioskOrderScreen() {
           </ScrollView>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Pressable
-            style={[styles.makeOrder, styles.submit]}
+            style={[styles.makeOrder, styles.submit, !cart.length && styles.dockCheckoutOff]}
             disabled={!cart.length}
-            onPress={() => {
-              bumpActivity();
-              setCartOpen(false);
-              setPayStep('type');
-            }}
+            onPress={openCheckout}
           >
             <Text style={styles.makeOrderText}>Оформить · {Math.round(total)} ₽</Text>
           </Pressable>
-          <Pressable style={styles.ghost} onPress={() => setCartOpen(false)}>
+          <Pressable
+            style={styles.ghost}
+            onPress={() => {
+              bumpActivity();
+              setCartOpen(false);
+            }}
+          >
             <Text style={styles.ghostText}>Назад к меню</Text>
           </Pressable>
         </View>
@@ -519,9 +559,7 @@ export default function KioskOrderScreen() {
               ) : (
                 <Text style={styles.wait}>QR для этой точки ещё не загружен в бэкофисе</Text>
               )}
-              <Text style={styles.qrHint}>
-                При подтверждении оплаты покажите перевод сотруднику
-              </Text>
+              <Text style={styles.qrHint}>При подтверждении оплаты покажите перевод сотруднику</Text>
               <Pressable style={[styles.makeOrder, styles.submit]} disabled={busy || !qrUrl} onPress={() => void submit('qr')}>
                 {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.makeOrderText}>Я оплатил</Text>}
               </Pressable>
@@ -580,15 +618,15 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   centerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   topBar: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 10,
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
-  venue: { color: colors.text, fontSize: 22, fontWeight: '800' },
-  topHint: { color: colors.textMuted, fontWeight: '700' },
+  venue: { color: colors.text, fontSize: 20, fontWeight: '800' },
+  topHint: { color: colors.textMuted, fontWeight: '800', flexShrink: 1, textAlign: 'right' },
   eyebrow: { color: colors.accent2, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
   heroTitle: { color: colors.text, fontSize: 36, fontWeight: '800' },
   wait: {
@@ -622,7 +660,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 12,
   },
-  empty: { color: colors.textMuted, fontSize: 16, textAlign: 'center' },
+  empty: { color: colors.textMuted, fontSize: 16, textAlign: 'center', paddingVertical: 24 },
   ticketRow: {
     alignSelf: 'stretch',
     flexDirection: 'row',
@@ -650,14 +688,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   ghostText: { color: colors.text, fontWeight: '700', fontSize: 16 },
-  menuBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    gap: 12,
-  },
   back: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -666,73 +696,121 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   backText: { color: colors.text, fontSize: 16, fontWeight: '800' },
-  cartChip: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  cartChipText: { color: colors.text, fontWeight: '800', fontSize: 16 },
   menuShell: { flex: 1, flexDirection: 'row' },
-  menuShellCol: { flexDirection: 'column' },
-  catCol: { width: 220, borderRightWidth: 1, borderRightColor: colors.border },
-  catColInner: { padding: 10, gap: 10 },
-  catWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, paddingBottom: 8 },
+  catCol: { borderRightWidth: 1, borderRightColor: colors.border, backgroundColor: colors.surface },
+  catColInner: { padding: 10, gap: 10, alignItems: 'center', paddingBottom: 24 },
   catTile: {
-    minHeight: 72,
     borderWidth: 3,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
+    backgroundColor: colors.surface2,
+    borderRadius: 22,
+    alignItems: 'center',
     justifyContent: 'center',
+    padding: 10,
+    gap: 8,
   },
   catTileOn: { backgroundColor: colors.accent2, borderColor: colors.accent2 },
-  catTileText: { color: colors.text, fontWeight: '800', fontSize: 16 },
-  catTileTextOn: { color: '#fff' },
-  grid: { padding: 16, paddingBottom: 120 },
-  gridRow: { gap: 12, marginBottom: 12 },
+  catMark: { color: colors.text, fontSize: 36, fontWeight: '800', lineHeight: 42 },
+  catMarkOn: { color: '#fff' },
+  catName: { color: colors.text, fontWeight: '800', fontSize: 15, textAlign: 'center' },
+  catNameOn: { color: '#fff' },
+  menuHeading: {
+    color: colors.text,
+    fontSize: 26,
+    fontWeight: '800',
+    marginBottom: 12,
+    width: '100%',
+  },
+  grid: { padding: 16, paddingBottom: 24 },
+  gridRow: { marginBottom: 14 },
   tile: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 18,
+    borderRadius: 20,
     overflow: 'hidden',
   },
-  pic: { height: 150, width: '100%', backgroundColor: colors.surface2 },
+  pic: { width: '100%', aspectRatio: 1, backgroundColor: colors.surface2 },
   picEmpty: { alignItems: 'center', justifyContent: 'center' },
-  picHint: { fontSize: 36 },
-  itemName: { color: colors.text, fontWeight: '800', fontSize: 18, paddingHorizontal: 12, paddingTop: 10, minHeight: 56 },
-  price: { color: colors.accent2, fontWeight: '800', fontSize: 20, padding: 12 },
-  lastBar: {
+  picHint: { fontSize: 48, color: colors.text },
+  tileCap: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12, minHeight: 74, justifyContent: 'space-between' },
+  itemName: { color: colors.text, fontWeight: '800', fontSize: 16, lineHeight: 20 },
+  price: { color: colors.accent2, fontWeight: '800', fontSize: 20, marginTop: 6 },
+  dock: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
-  lastInfo: { flex: 1 },
-  lastName: { color: colors.text, fontWeight: '800', fontSize: 18 },
-  lastMeta: { color: colors.textMuted, marginTop: 2 },
-  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dockLast: {
+    flex: 1,
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.surface2,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  dockHint: { color: colors.textMuted, fontSize: 16, fontWeight: '700' },
+  lastInfo: { flex: 1, minWidth: 0 },
+  lastName: { color: colors.text, fontWeight: '800', fontSize: 17 },
+  lastMeta: { color: colors.textMuted, marginTop: 2, fontSize: 13 },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qtyBtn: {
     width: 48,
     height: 48,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface2,
+    backgroundColor: colors.bg,
   },
   qtyBtnText: { color: colors.text, fontSize: 24, fontWeight: '800' },
   qtyVal: { color: colors.text, fontWeight: '800', fontSize: 20, minWidth: 24, textAlign: 'center' },
+  dockCart: {
+    width: 88,
+    height: 88,
+    borderRadius: 20,
+    backgroundColor: colors.surface2,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dockCartIcon: { fontSize: 26 },
+  dockCartLabel: { color: colors.text, fontWeight: '800', fontSize: 12, marginTop: 2 },
+  badge: {
+    position: 'absolute',
+    top: 6,
+    right: 8,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.accent2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  badgeText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  dockCheckout: {
+    minWidth: 200,
+    height: 88,
+    borderRadius: 20,
+    backgroundColor: colors.accent2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+  dockCheckoutOff: { opacity: 0.35 },
+  dockCheckoutText: { color: '#fff', fontSize: 24, fontWeight: '800' },
+  dockCheckoutSum: { color: '#dbe4ff', fontSize: 16, fontWeight: '800', marginTop: 2 },
   fullOverlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.bg,
@@ -748,18 +826,18 @@ const styles = StyleSheet.create({
   submit: { minWidth: 0, width: '100%', minHeight: 72, marginTop: 10 },
   payTiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'center' },
   payTile: {
-    width: 280,
-    minHeight: 180,
+    width: 240,
+    height: 240,
     borderWidth: 3,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    borderRadius: 22,
+    borderRadius: 28,
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  payEmoji: { fontSize: 42 },
+  payEmoji: { fontSize: 52 },
   payTileTitle: { color: colors.text, fontSize: 26, fontWeight: '800' },
   payTileSub: { color: colors.textMuted, fontSize: 16, textAlign: 'center' },
   qr: { width: 280, height: 280, alignSelf: 'center', backgroundColor: '#fff', borderRadius: 16 },
