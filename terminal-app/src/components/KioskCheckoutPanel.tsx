@@ -11,7 +11,7 @@ import {
 import FastImage from '@d11/react-native-fast-image';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
+import { kk } from '../kiosk/theme';
 import type { MenuItem } from '../api/client';
 
 export type CheckoutCartLine = {
@@ -268,7 +268,7 @@ export default function KioskCheckoutPanel({
           ) : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          {busy && step !== 'qr' ? <ActivityIndicator color={colors.accent2} style={{ marginTop: 12 }} /> : null}
+          {busy && step !== 'qr' ? <ActivityIndicator color={kk.gold} style={{ marginTop: 12 }} /> : null}
         </View>
       </View>
 
@@ -316,7 +316,7 @@ function roundMoney(value: number): number {
 const styles = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#0e1016',
+    backgroundColor: kk.bg,
     paddingHorizontal: 20,
     zIndex: 22,
   },
@@ -334,10 +334,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  backText: { color: colors.text, fontSize: 17, fontWeight: '800' },
+  backText: { color: kk.cream, fontSize: 17, fontWeight: '800' },
   title: {
     flex: 1,
-    color: colors.text,
+    color: kk.cream,
     fontSize: 28,
     fontWeight: '800',
     textAlign: 'center',
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontSize: 13,
   },
-  receiptLead: { color: colors.textMuted, marginTop: 4, marginBottom: 14, fontSize: 16 },
+  receiptLead: { color: kk.muted, marginTop: 4, marginBottom: 14, fontSize: 16 },
   receiptList: { flex: 1 },
   receiptListInner: { paddingBottom: 8 },
   line: {
@@ -371,12 +371,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   lineTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  lineName: { color: colors.text, fontSize: 20, fontWeight: '800', flex: 1 },
-  lineSum: { color: colors.text, fontSize: 20, fontWeight: '800' },
-  lineQty: { color: colors.textMuted, marginTop: 4, fontWeight: '700' },
+  lineName: { color: kk.cream, fontSize: 20, fontWeight: '800', flex: 1 },
+  lineSum: { color: kk.cream, fontSize: 20, fontWeight: '800' },
+  lineQty: { color: kk.muted, marginTop: 4, fontWeight: '700' },
   extraRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, gap: 12 },
   extraName: { color: '#c7d2fe', fontSize: 15, flex: 1 },
-  extraPrice: { color: colors.textMuted, fontWeight: '700' },
+  extraPrice: { color: kk.muted, fontWeight: '700' },
   extraPaid: { color: '#fbbf24' },
   totalBox: {
     borderTopWidth: 1,
@@ -386,9 +386,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalMuted: { color: colors.textMuted, fontSize: 16, fontWeight: '700' },
+  totalMuted: { color: kk.muted, fontSize: 16, fontWeight: '700' },
   discountLabel: { color: '#fbbf24', fontSize: 16, fontWeight: '800' },
-  totalLabel: { color: colors.text, fontSize: 22, fontWeight: '800' },
+  totalLabel: { color: kk.cream, fontSize: 22, fontWeight: '800' },
   totalValue: { color: '#fff', fontSize: 30, fontWeight: '800' },
   payCol: { gap: 14 },
   payWide: { flex: 1, justifyContent: 'center' },
@@ -414,8 +414,8 @@ const styles = StyleSheet.create({
   methodEmoji: { fontSize: 34 },
   methodCopy: { flex: 1, gap: 4 },
   methodTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  methodTitle: { color: colors.text, fontSize: 26, fontWeight: '800' },
-  methodSub: { color: colors.textMuted, fontSize: 16, lineHeight: 22 },
+  methodTitle: { color: kk.cream, fontSize: 26, fontWeight: '800' },
+  methodSub: { color: kk.muted, fontSize: 16, lineHeight: 22 },
   methodArrow: { fontSize: 42, fontWeight: '300', marginTop: -4 },
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { color: '#111', fontWeight: '800', fontSize: 13 },
@@ -429,8 +429,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   qr: { backgroundColor: '#fff', borderRadius: 20 },
-  qrMissing: { color: colors.text, textAlign: 'center', fontSize: 18, padding: 20 },
-  qrHint: { color: colors.text, fontSize: 18, textAlign: 'center', lineHeight: 26 },
+  qrMissing: { color: kk.cream, textAlign: 'center', fontSize: 18, padding: 20 },
+  qrHint: { color: kk.cream, fontSize: 18, textAlign: 'center', lineHeight: 26 },
   confirm: {
     alignSelf: 'stretch',
     backgroundColor: '#fbbf24',
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
   },
   confirmOff: { opacity: 0.4 },
   confirmText: { color: '#111', fontSize: 24, fontWeight: '800' },
-  error: { color: colors.danger, textAlign: 'center', fontSize: 16, fontWeight: '700' },
+  error: { color: kk.red, textAlign: 'center', fontSize: 16, fontWeight: '700' },
   offerWrap: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(6, 8, 12, 0.72)',

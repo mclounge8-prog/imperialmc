@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import type { KioskTicket } from '../api/client';
+import { kk } from '../kiosk/theme';
 
 type Props = {
   tickets: KioskTicket[];
@@ -49,21 +50,21 @@ const styles = StyleSheet.create({
   card: {
     minWidth: 280,
     maxWidth: 640,
-    backgroundColor: '#14532d',
+    backgroundColor: kk.gold,
     borderWidth: 3,
-    borderColor: '#4ade80',
+    borderColor: '#fff3c4',
     borderRadius: 18,
     paddingVertical: 12,
     paddingHorizontal: 22,
     alignItems: 'center',
   },
   kicker: {
-    color: '#bbf7d0',
+    color: kk.ink,
     fontWeight: '800',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
     fontSize: 13,
   },
-  nums: { color: '#fff', fontSize: 34, fontWeight: '800', marginTop: 2 },
-  sub: { color: '#dcfce7', fontSize: 15, fontWeight: '600', marginTop: 2 },
+  nums: { color: kk.ink, fontSize: 34, fontWeight: '800', marginTop: 2 },
+  sub: { color: '#3a2a08', fontSize: 15, fontWeight: '700', marginTop: 2 },
 });

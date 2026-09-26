@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
 import { UNIT_LABELS } from '../kiosk/status';
+import { kk } from '../kiosk/theme';
 import type { MenuItem, ModifierGroup } from '../api/client';
 
 type Props = {
@@ -12,12 +12,12 @@ type Props = {
 };
 
 const CAT_COLORS = [
-  { bg: '#1d3b66', text: '#bfdbfe' },
-  { bg: '#3d2a10', text: '#fcd34d' },
-  { bg: '#134032', text: '#86efac' },
-  { bg: '#4a1630', text: '#f9a8d4' },
-  { bg: '#2d2154', text: '#ddd6fe' },
+  { bg: '#3a2a0c', text: '#f3d36b' },
+  { bg: '#4a1216', text: '#fecaca' },
+  { bg: '#2a210c', text: '#fde68a' },
   { bg: '#3f2610', text: '#fdba74' },
+  { bg: '#1c1814', text: '#f6f0e6' },
+  { bg: '#5a1a12', text: '#fca5a5' },
 ];
 
 function catColor(name: string) {
@@ -182,30 +182,30 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
 }
 
 const styles = StyleSheet.create({
-  root: { ...StyleSheet.absoluteFill, backgroundColor: colors.bg, zIndex: 20 },
+  root: { ...StyleSheet.absoluteFill, backgroundColor: kk.bg, zIndex: 20 },
   head: { paddingHorizontal: 20, paddingBottom: 8 },
   back: {
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: kk.border,
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginBottom: 8,
   },
-  backText: { color: colors.text, fontSize: 18, fontWeight: '800' },
-  title: { color: colors.text, fontSize: 30, fontWeight: '800' },
-  lead: { color: colors.textMuted, fontSize: 16, marginTop: 4 },
+  backText: { color: kk.cream, fontSize: 18, fontWeight: '800' },
+  title: { color: kk.gold, fontSize: 30, fontWeight: '800' },
+  lead: { color: kk.muted, fontSize: 16, marginTop: 4 },
   body: { padding: 20, paddingBottom: 24 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   tile: {
-    backgroundColor: colors.surface,
+    backgroundColor: kk.surface,
     borderWidth: 3,
-    borderColor: colors.border,
+    borderColor: kk.border,
     borderRadius: 24,
     overflow: 'hidden',
   },
-  tileOn: { borderColor: colors.accent2, backgroundColor: '#151c33' },
+  tileOn: { borderColor: kk.gold, backgroundColor: '#2a210c' },
   tileOff: { opacity: 0.72 },
   catBar: {
     flexDirection: 'row',
@@ -235,12 +235,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.25)',
   },
-  checkOn: { backgroundColor: colors.accent2, borderColor: colors.accent2 },
-  checkMark: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  checkOn: { backgroundColor: kk.gold, borderColor: kk.gold },
+  checkMark: { color: kk.ink, fontWeight: '800', fontSize: 15 },
   tileMid: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, gap: 4 },
-  optName: { color: colors.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
-  optOff: { textDecorationLine: 'line-through', color: colors.textMuted },
-  qty: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
+  optName: { color: kk.cream, fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  optOff: { textDecorationLine: 'line-through', color: kk.muted },
+  qty: { color: kk.muted, fontSize: 13, fontWeight: '700' },
   priceBar: {
     minHeight: 44,
     alignItems: 'center',
@@ -248,10 +248,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   priceBarOn: { backgroundColor: '#3f2d0a' },
-  priceBarOff: { backgroundColor: colors.surface2 },
+  priceBarOff: { backgroundColor: kk.surface2 },
   priceText: { fontWeight: '800', fontSize: 18 },
   priceTextOn: { color: '#fbbf24' },
-  priceTextOff: { color: colors.textMuted, fontSize: 14 },
+  priceTextOff: { color: kk.muted, fontSize: 14 },
   foot: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -259,18 +259,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: kk.border,
   },
-  total: { color: colors.text, fontSize: 32, fontWeight: '800', minWidth: 120 },
+  total: { color: kk.cream, fontSize: 32, fontWeight: '800', minWidth: 120 },
   extras: { color: '#fbbf24', fontWeight: '800', marginTop: 2 },
   add: {
     flex: 1,
-    backgroundColor: colors.accent2,
+    backgroundColor: kk.gold,
     borderRadius: 18,
     minHeight: 72,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addOff: { opacity: 0.4 },
-  addText: { color: '#fff', fontSize: 24, fontWeight: '800' },
+  addText: { color: kk.ink, fontSize: 24, fontWeight: '800' },
 });

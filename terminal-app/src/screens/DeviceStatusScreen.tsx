@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { useDevice } from '../context/DeviceContext';
+import BrandMark from '../kiosk/BrandMark';
 import { VenueSecretTitle } from '../kiosk/KioskChrome';
+import { kk } from '../kiosk/theme';
 
 export default function DeviceStatusScreen() {
   const { status, error, refresh, clearRegistration, kind } = useDevice();
@@ -37,25 +39,28 @@ export default function DeviceStatusScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {isKiosk ? <VenueSecretTitle name="Киоск" style={styles.title} /> : null}
+    <View style={[styles.container, isKiosk && styles.kioskContainer]}>
+      {isKiosk ? <BrandMark size="lg" /> : null}
+      {isKiosk ? <VenueSecretTitle name="Киоск" style={styles.kioskTitle} /> : null}
       <Text style={styles.text}>{message}</Text>
       <Pressable style={styles.button} disabled={refreshing || clearing} onPress={handleRefresh}>
         {refreshing ? (
-          <ActivityIndicator color={colors.text} />
+          <ActivityIndicator color={isKiosk ? kk.gold : colors.text} />
         ) : (
-          <Text style={styles.buttonText}>Обновить</Text>
+          <Text style={[styles.buttonText, isKiosk && { color: kk.cream }]}>Обновить</Text>
         )}
       </Pressable>
       <Pressable
-        style={[styles.button, styles.primaryButton]}
+        style={[styles.button, styles.primaryButton, isKiosk && styles.kioskPrimary]}
         disabled={refreshing || clearing}
         onPress={handleReregister}
       >
         {clearing ? (
           <ActivityIndicator color="#f1f1f3" />
         ) : (
-          <Text style={styles.primaryButtonText}>Зарегистрировать заново</Text>
+          <Text style={[styles.primaryButtonText, isKiosk && styles.kioskPrimaryText]}>
+            Зарегистрировать заново
+          </Text>
         )}
       </Pressable>
       <Text style={styles.hint}>
@@ -76,6 +81,10 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 16,
   },
+  kioskContainer: { backgroundColor: kk.bg },
+  kioskTitle: { color: kk.gold, fontSize: 22, fontWeight: '800' },
+  kioskPrimary: { backgroundColor: kk.gold, borderColor: kk.gold },
+  kioskPrimaryText: { color: kk.ink, fontWeight: '800' },
   title: { color: colors.text, fontSize: 22, fontWeight: '800' },
   text: {
     color: colors.textMuted,

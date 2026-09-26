@@ -6,15 +6,15 @@ import { KioskChrome } from './src/kiosk/KioskChrome';
 import DeviceRegistrationScreen from './src/screens/DeviceRegistrationScreen';
 import DeviceStatusScreen from './src/screens/DeviceStatusScreen';
 import KioskOrderScreen from './src/screens/KioskOrderScreen';
-import { colors } from './src/theme/colors';
+import { kk } from './src/kiosk/theme';
 
 function KioskRoot() {
   const { deviceToken, status, loading } = useDevice();
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.accent2} size="large" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: kk.bg }}>
+        <ActivityIndicator color={kk.gold} size="large" />
       </View>
     );
   }
@@ -36,7 +36,7 @@ export default function KioskApp() {
     <SafeAreaProvider>
       <DeviceProvider kind="kiosk">
         <KioskChrome>
-          <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+          <StatusBar barStyle="light-content" backgroundColor={kk.bg} translucent />
           <KioskRoot />
         </KioskChrome>
       </DeviceProvider>

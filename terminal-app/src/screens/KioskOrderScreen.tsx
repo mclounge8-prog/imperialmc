@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,10 +10,11 @@ import {
   View,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
+import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../theme/colors';
 import { useDevice } from '../context/DeviceContext';
-import { VenueSecretTitle } from '../kiosk/KioskChrome';
+import BrandMark from '../kiosk/BrandMark';
+import { kk, kioskAssets } from '../kiosk/theme';
 import { guestStatusLabel, guestStatusTint } from '../kiosk/status';
 import KioskCustomizePanel from '../components/KioskCustomizePanel';
 import KioskCheckoutPanel from '../components/KioskCheckoutPanel';
@@ -259,7 +261,7 @@ export default function KioskOrderScreen() {
 
   const header = (
     <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
-      <VenueSecretTitle name={venueName} style={styles.venue} />
+      <BrandMark venueName={venueName} size="sm" />
       <Text style={styles.topHint}>Самообслуживание</Text>
     </View>
   );
@@ -269,7 +271,7 @@ export default function KioskOrderScreen() {
       <View style={styles.root}>
         {header}
         <View style={styles.centerBody}>
-          <Text style={styles.eyebrow}>Киоск</Text>
+          <BrandMark size="lg" />
           <Text style={styles.heroTitle}>Ожидание</Text>
           <Text style={styles.wait}>{waitReason(boot)}</Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -285,20 +287,29 @@ export default function KioskOrderScreen() {
   if (!ordering) {
     return (
       <View style={styles.root}>
-        {header}
+        <ImageBackground source={kioskAssets.shawarma} style={styles.homeHero} imageStyle={styles.homeHeroImg}>
+          <LinearGradient colors={['rgba(7,7,7,0.28)', 'rgba(7,7,7,0.88)', kk.bg]} style={styles.homeHeroShade}>
+            <View style={[styles.homeTop, { paddingTop: insets.top + 10 }]}>
+              <BrandMark venueName={venueName} size="lg" />
+            </View>
+            <View style={styles.ribbon}>
+              <Text style={styles.ribbonText}>Всегда голодный — всегда рядом</Text>
+            </View>
+            <Text style={styles.homeLead}>Собери заказ. Оплату подтвердит сотрудник на стойке.</Text>
+            <Pressable
+              style={styles.makeOrder}
+              onPress={() => {
+                bumpActivity();
+                setOrdering(true);
+              }}
+            >
+              <Text style={styles.makeOrderText}>Сделать заказ</Text>
+            </Pressable>
+            {flash ? <Text style={styles.flash}>{flash}</Text> : null}
+          </LinearGradient>
+        </ImageBackground>
+
         <ScrollView contentContainerStyle={styles.homeBody} showsVerticalScrollIndicator={false}>
-          <Text style={styles.welcome}>Добро пожаловать</Text>
-          <Text style={styles.homeLead}>Выбери блюда. Оплату подтвердит сотрудник на стойке.</Text>
-          <Pressable
-            style={styles.makeOrder}
-            onPress={() => {
-              bumpActivity();
-              setOrdering(true);
-            }}
-          >
-            <Text style={styles.makeOrderText}>Сделать заказ</Text>
-          </Pressable>
-          {flash ? <Text style={styles.flash}>{flash}</Text> : null}
           <Text style={styles.section}>Статусы заказов</Text>
           {!visibleTickets.length ? (
             <Text style={styles.empty}>Пока нет заказов с этого киоска</Text>
@@ -344,7 +355,7 @@ export default function KioskOrderScreen() {
         <Pressable style={styles.back} onPress={resetToHome}>
           <Text style={styles.backText}>← К статусам</Text>
         </Pressable>
-        <VenueSecretTitle name={venueName} style={styles.venue} />
+        <BrandMark venueName={venueName} size="sm" />
         <Text style={styles.topHint}>{currentCatName}</Text>
       </View>
 
@@ -390,11 +401,13 @@ export default function KioskOrderScreen() {
                   <Text style={styles.picHint}>{catMark(item.name, '🍽')}</Text>
                 </View>
               )}
+              <View style={styles.pricePill}>
+                <Text style={styles.pricePillText}>{Math.round(item.price)} ₽</Text>
+              </View>
               <View style={styles.tileCap}>
                 <Text style={styles.itemName} numberOfLines={2}>
                   {item.name}
                 </Text>
-                <Text style={styles.price}>{Math.round(item.price)} ₽</Text>
               </View>
             </Pressable>
           )}
@@ -576,8 +589,8 @@ export default function KioskOrderScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  centerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
+  root: { flex: 1, backgroundColor: kk.bg },
+  centerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 },
   topBar: {
     paddingHorizontal: 16,
     paddingBottom: 10,
@@ -585,118 +598,152 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
+    backgroundColor: kk.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: kk.border,
   },
-  venue: { color: colors.text, fontSize: 20, fontWeight: '800' },
-  topHint: { color: colors.textMuted, fontWeight: '800', flexShrink: 1, textAlign: 'right' },
-  eyebrow: { color: colors.accent2, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
-  heroTitle: { color: colors.text, fontSize: 36, fontWeight: '800' },
+  topHint: { color: kk.gold, fontWeight: '800', flexShrink: 1, textAlign: 'right', letterSpacing: 0.6 },
+  heroTitle: { color: kk.cream, fontSize: 36, fontWeight: '800' },
   wait: {
-    color: colors.text,
-    backgroundColor: colors.surface2,
+    color: kk.cream,
+    backgroundColor: kk.surface2,
     padding: 16,
     borderRadius: 12,
     textAlign: 'center',
     maxWidth: 460,
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: kk.border,
   },
-  welcome: { color: colors.text, fontSize: 42, fontWeight: '800', textAlign: 'center' },
-  homeLead: { color: colors.textMuted, fontSize: 18, textAlign: 'center', maxWidth: 520, lineHeight: 26 },
-  homeBody: { padding: 24, alignItems: 'center', gap: 16, paddingBottom: 40 },
+  homeHero: { minHeight: 420 },
+  homeHeroImg: { opacity: 0.92 },
+  homeHeroShade: { paddingHorizontal: 24, paddingBottom: 28, gap: 16, alignItems: 'center' },
+  homeTop: { alignItems: 'center', marginBottom: 8 },
+  ribbon: {
+    backgroundColor: kk.gold,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 6,
+    transform: [{ rotate: '-1deg' }],
+  },
+  ribbonText: {
+    color: kk.ink,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  homeLead: { color: kk.cream, fontSize: 18, textAlign: 'center', maxWidth: 520, lineHeight: 26 },
+  homeBody: { padding: 24, alignItems: 'center', gap: 12, paddingBottom: 40 },
   makeOrder: {
-    backgroundColor: colors.accent2,
-    borderRadius: 22,
+    backgroundColor: kk.gold,
+    borderRadius: 8,
     minHeight: 84,
-    minWidth: 280,
+    minWidth: 300,
     paddingHorizontal: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  makeOrderText: { color: '#fff', fontSize: 26, fontWeight: '800' },
-  flash: { color: '#86efac', fontSize: 18, fontWeight: '800' },
+  makeOrderText: { color: kk.ink, fontSize: 26, fontWeight: '800' },
+  flash: { color: kk.goldSoft, fontSize: 18, fontWeight: '800' },
   section: {
     alignSelf: 'stretch',
-    color: colors.textMuted,
+    color: kk.gold,
     fontWeight: '800',
-    letterSpacing: 0.6,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    marginTop: 12,
+    marginTop: 8,
   },
-  empty: { color: colors.textMuted, fontSize: 16, textAlign: 'center', paddingVertical: 24 },
+  empty: { color: kk.muted, fontSize: 16, textAlign: 'center', paddingVertical: 24 },
   ticketRow: {
     alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.border,
+    backgroundColor: kk.surface,
+    borderWidth: 1,
+    borderColor: kk.border,
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 18,
   },
-  ticketRowReady: { borderColor: '#4ade80', backgroundColor: '#14532d' },
-  ticketNum: { color: colors.text, fontSize: 24, fontWeight: '800', minWidth: 90 },
+  ticketRowReady: { borderColor: kk.gold, backgroundColor: '#2a210c' },
+  ticketNum: { color: kk.cream, fontSize: 24, fontWeight: '800', minWidth: 90 },
   ticketStatus: { flex: 1, fontSize: 20, fontWeight: '800' },
-  ticketSum: { color: colors.text, fontSize: 18, fontWeight: '700' },
-  error: { color: colors.danger, textAlign: 'center', fontSize: 15 },
+  ticketSum: { color: kk.gold, fontSize: 18, fontWeight: '800' },
+  error: { color: kk.red, textAlign: 'center', fontSize: 15 },
   ghost: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: kk.gold,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 18,
     alignSelf: 'center',
     marginTop: 10,
   },
-  ghostText: { color: colors.text, fontWeight: '700', fontSize: 16 },
+  ghostText: { color: kk.gold, fontWeight: '800', fontSize: 16 },
   back: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: kk.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    backgroundColor: kk.surface,
   },
-  backText: { color: colors.text, fontSize: 16, fontWeight: '800' },
+  backText: { color: kk.cream, fontSize: 16, fontWeight: '800' },
   menuShell: { flex: 1, flexDirection: 'row' },
-  catCol: { borderRightWidth: 1, borderRightColor: colors.border, backgroundColor: colors.surface },
+  catCol: { borderRightWidth: 1, borderRightColor: kk.border, backgroundColor: kk.surface },
   catColInner: { padding: 10, gap: 10, alignItems: 'center', paddingBottom: 24 },
   catTile: {
-    borderWidth: 3,
-    borderColor: colors.border,
-    backgroundColor: colors.surface2,
+    borderWidth: 2,
+    borderColor: kk.border,
+    backgroundColor: kk.surface2,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 10,
     gap: 8,
   },
-  catTileOn: { backgroundColor: colors.accent2, borderColor: colors.accent2 },
-  catMark: { color: colors.text, fontSize: 36, fontWeight: '800', lineHeight: 42 },
-  catMarkOn: { color: '#fff' },
-  catName: { color: colors.text, fontWeight: '800', fontSize: 15, textAlign: 'center' },
-  catNameOn: { color: '#fff' },
+  catTileOn: { backgroundColor: kk.gold, borderColor: kk.gold },
+  catMark: { color: kk.cream, fontSize: 36, fontWeight: '800', lineHeight: 42 },
+  catMarkOn: { color: kk.ink },
+  catName: { color: kk.cream, fontWeight: '800', fontSize: 15, textAlign: 'center' },
+  catNameOn: { color: kk.ink },
   menuHeading: {
-    color: colors.text,
+    color: kk.gold,
     fontSize: 26,
     fontWeight: '800',
     marginBottom: 12,
     width: '100%',
+    letterSpacing: 0.6,
   },
   grid: { padding: 16, paddingBottom: 24 },
   gridRow: { marginBottom: 14 },
   tile: {
-    backgroundColor: colors.surface,
+    backgroundColor: kk.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: kk.border,
     borderRadius: 20,
     overflow: 'hidden',
   },
-  pic: { width: '100%', aspectRatio: 1, backgroundColor: colors.surface2 },
+  pic: { width: '100%', aspectRatio: 1, backgroundColor: kk.surface2 },
   picEmpty: { alignItems: 'center', justifyContent: 'center' },
-  picHint: { fontSize: 48, color: colors.text },
-  tileCap: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12, minHeight: 74, justifyContent: 'space-between' },
-  itemName: { color: colors.text, fontWeight: '800', fontSize: 16, lineHeight: 20 },
-  price: { color: colors.accent2, fontWeight: '800', fontSize: 20, marginTop: 6 },
+  picHint: { fontSize: 48, color: kk.gold },
+  pricePill: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    backgroundColor: kk.red,
+    borderRadius: 999,
+    minWidth: 64,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  pricePillText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  tileCap: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 14, minHeight: 64, justifyContent: 'center' },
+  itemName: { color: kk.cream, fontWeight: '800', fontSize: 16, lineHeight: 20 },
   dock: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -704,8 +751,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
+    borderTopColor: kk.border,
+    backgroundColor: kk.surface,
   },
   dockLast: {
     flex: 1,
@@ -713,40 +760,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.surface2,
+    backgroundColor: kk.surface2,
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: kk.border,
   },
-  dockHint: { color: colors.textMuted, fontSize: 16, fontWeight: '700' },
+  dockHint: { color: kk.muted, fontSize: 16, fontWeight: '700' },
   lastInfo: { flex: 1, minWidth: 0 },
-  lastName: { color: colors.text, fontWeight: '800', fontSize: 17 },
-  lastMeta: { color: colors.textMuted, marginTop: 2, fontSize: 13 },
+  lastName: { color: kk.cream, fontWeight: '800', fontSize: 17 },
+  lastMeta: { color: kk.muted, marginTop: 2, fontSize: 13 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qtyBtn: {
     width: 48,
     height: 48,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: kk.goldDeep,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.bg,
+    backgroundColor: kk.bg,
   },
-  qtyBtnText: { color: colors.text, fontSize: 24, fontWeight: '800' },
-  qtyVal: { color: colors.text, fontWeight: '800', fontSize: 20, minWidth: 24, textAlign: 'center' },
+  qtyBtnText: { color: kk.gold, fontSize: 24, fontWeight: '800' },
+  qtyVal: { color: kk.cream, fontWeight: '800', fontSize: 20, minWidth: 24, textAlign: 'center' },
   dockCart: {
     width: 88,
     height: 88,
     borderRadius: 20,
-    backgroundColor: colors.surface2,
+    backgroundColor: kk.surface2,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: kk.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dockCartIcon: { fontSize: 26 },
-  dockCartLabel: { color: colors.text, fontWeight: '800', fontSize: 12, marginTop: 2 },
+  dockCartLabel: { color: kk.cream, fontWeight: '800', fontSize: 12, marginTop: 2 },
   badge: {
     position: 'absolute',
     top: 6,
@@ -754,7 +803,7 @@ const styles = StyleSheet.create({
     minWidth: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: colors.accent2,
+    backgroundColor: kk.red,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 5,
@@ -763,31 +812,31 @@ const styles = StyleSheet.create({
   dockCheckout: {
     minWidth: 200,
     height: 88,
-    borderRadius: 20,
-    backgroundColor: colors.accent2,
+    borderRadius: 10,
+    backgroundColor: kk.gold,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 22,
   },
   dockCheckoutOff: { opacity: 0.35 },
-  dockCheckoutText: { color: '#fff', fontSize: 24, fontWeight: '800' },
-  dockCheckoutSum: { color: '#dbe4ff', fontSize: 16, fontWeight: '800', marginTop: 2 },
+  dockCheckoutText: { color: kk.ink, fontSize: 24, fontWeight: '800' },
+  dockCheckoutSum: { color: '#3a2a08', fontSize: 16, fontWeight: '800', marginTop: 2 },
   fullOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: colors.bg,
+    backgroundColor: kk.bg,
     paddingHorizontal: 20,
     zIndex: 22,
   },
-  overlayTitle: { color: colors.text, fontSize: 32, fontWeight: '800', marginBottom: 16, textAlign: 'center' },
+  overlayTitle: { color: kk.gold, fontSize: 32, fontWeight: '800', marginBottom: 16, textAlign: 'center' },
   cartList: { flex: 1 },
-  cartLine: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 12 },
+  cartLine: { borderBottomWidth: 1, borderBottomColor: kk.border, paddingVertical: 12 },
   cartTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-  cartName: { color: colors.text, fontWeight: '800', fontSize: 16, flexShrink: 1 },
-  mods: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
+  cartName: { color: kk.cream, fontWeight: '800', fontSize: 16, flexShrink: 1 },
+  mods: { color: kk.muted, fontSize: 13, marginTop: 4 },
   submit: { minWidth: 0, width: '100%', minHeight: 72, marginTop: 10 },
   idleWrap: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 50,
@@ -796,8 +845,10 @@ const styles = StyleSheet.create({
   idleCard: {
     width: '100%',
     maxWidth: 480,
-    backgroundColor: colors.surface,
+    backgroundColor: kk.surface,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: kk.gold,
     padding: 24,
     alignItems: 'center',
     gap: 12,

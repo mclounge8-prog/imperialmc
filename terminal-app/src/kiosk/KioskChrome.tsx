@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Pressable, Text, type StyleProp, type TextStyle } from 'react-native';
+import { Pressable, Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import AppUpdateGate from '../components/AppUpdateGate';
 import KioskSettingsPanel from '../components/KioskSettingsPanel';
 import { startKioskLock } from '../native/kioskLock';
@@ -16,17 +16,10 @@ export function useKioskChrome(): Chrome {
   return useContext(KioskChromeContext);
 }
 
-export function VenueSecretTitle({
-  name,
-  style,
-}: {
-  name: string;
-  style?: StyleProp<TextStyle>;
-}) {
+function useSecretOpen() {
   const { openSettings } = useKioskChrome();
   const taps = useRef({ count: 0, at: 0 });
-
-  const onPress = () => {
+  return () => {
     const now = Date.now();
     if (now - taps.current.at > 1600) taps.current.count = 0;
     taps.current.at = now;
@@ -36,10 +29,34 @@ export function VenueSecretTitle({
       openSettings();
     }
   };
+}
 
+export function VenueSecretTitle({
+  name,
+  style,
+}: {
+  name: string;
+  style?: StyleProp<TextStyle>;
+}) {
+  const onPress = useSecretOpen();
   return (
     <Pressable onPress={onPress} hitSlop={12}>
       <Text style={style}>{name}</Text>
+    </Pressable>
+  );
+}
+
+export function KioskSecretPressable({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const onPress = useSecretOpen();
+  return (
+    <Pressable onPress={onPress} hitSlop={12} style={style}>
+      {children}
     </Pressable>
   );
 }
