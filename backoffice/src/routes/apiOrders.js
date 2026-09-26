@@ -531,12 +531,28 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       return c.json({ error: 'Оплата уже проведена, тип оплаты менять нельзя', code: 'ALREADY_PAID' });
     }
 
-    // Скидка уже назначена на гостя (отдельное меню), не в момент оплаты.
-    const discountPercent = clampDiscountPercent(guest.discount_percent);
-
     // В режиме пречека оплату разрешаем только после печати пречека (кроме 0 ₽).
     const items = await fetchGuestItemsSnapshot(guestId, client);
     const subtotal = roundMoney(items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0));
+
+    let discountPercent = clampDiscountPercent(guest.discount_percent);
+    if (kioskPaidRows[0] && payments && payments[0]?.method) {
+      const chosen = payments[0].method;
+      const { rows: venueDisc } = await client.query(
+        'SELECT COALESCE(kiosk_cashless_discount_percent, 12) AS pct FROM venues WHERE id = $1',
+        [guest.venue_id]
+      );
+      const qrPct = Math.max(0, Math.min(100, Number(venueDisc[0]?.pct || 12)));
+      discountPercent = chosen === 'qr' ? qrPct : 0;
+      const nextTotal = roundMoney(subtotal - roundMoney((subtotal * discountPercent) / 100));
+      await client.query('UPDATE order_guests SET discount_percent = $2 WHERE id = $1', [guestId, discountPercent]);
+      await client.query(
+        `UPDATE kiosk_tickets
+         SET payment_method = $2, discount_percent = $3, total = $4
+         WHERE id = $1`,
+        [kioskPaidRows[0].id, chosen, discountPercent, nextTotal]
+      );
+    }
     const discount = roundMoney((subtotal * discountPercent) / 100);
     const payable = roundMoney(subtotal - discount);
 
@@ -572,18 +588,6 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
         }
       }
       normalizedPayments = payments;
-      const lockedMethod = kioskPaidRows[0]?.payment_method;
-      if (lockedMethod === 'cash' || lockedMethod === 'card' || lockedMethod === 'qr') {
-        const other = normalizedPayments.find((p) => p.method !== lockedMethod);
-        if (other) {
-          await client.query('ROLLBACK');
-          c.status(409);
-          return c.json({
-            error: 'Тип оплаты уже выбран на киоске, менять нельзя',
-            code: 'PAYMENT_METHOD_LOCKED',
-          });
-        }
-      }
       const paymentsTotal = roundMoney(normalizedPayments.reduce((sum, p) => sum + p.amount, 0));
       if (Math.abs(paymentsTotal - payable) > 0.01) {
         await client.query('ROLLBACK');
@@ -615,7 +619,7 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
          WHERE id = $1`,
         [kioskPaidRows[0].id, receiptMeta.receiptId]
       );
-      if (kioskPaidRows[0].payment_method === 'qr') {
+      if (normalizedPayments.some((p) => p.method === 'qr')) {
         await enqueuePrecheckFiscalJob(client, {
           venueId: guest.venue_id,
           items,

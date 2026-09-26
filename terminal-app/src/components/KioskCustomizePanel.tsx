@@ -11,16 +11,24 @@ type Props = {
   onConfirm: (modifierIds: number[]) => void;
 };
 
-function optionMeta(opt: { price: number; qty: number; unit: string | null }): string {
-  const parts: string[] = [];
-  if (opt.qty > 0 && opt.unit) parts.push(`${opt.qty} ${UNIT_LABELS[opt.unit] || opt.unit}`);
-  if (opt.price > 0) parts.push(`+${Math.round(opt.price)} ₽`);
-  return parts.join(' · ');
+const CAT_COLORS = [
+  { bg: '#1d3b66', text: '#bfdbfe' },
+  { bg: '#3d2a10', text: '#fcd34d' },
+  { bg: '#134032', text: '#86efac' },
+  { bg: '#4a1630', text: '#f9a8d4' },
+  { bg: '#2d2154', text: '#ddd6fe' },
+  { bg: '#3f2610', text: '#fdba74' },
+];
+
+function catColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash + name.charCodeAt(i) * (i + 3)) % CAT_COLORS.length;
+  return CAT_COLORS[hash];
 }
 
-function mark(name: string): string {
-  const ch = name.trim().charAt(0);
-  return ch ? ch.toUpperCase() : '•';
+function optionQty(opt: { qty: number; unit: string | null }): string {
+  if (opt.qty > 0 && opt.unit) return `${opt.qty} ${UNIT_LABELS[opt.unit] || opt.unit}`;
+  return '';
 }
 
 export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props) {
@@ -89,7 +97,8 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
   );
 
   const selectedOptions = groups.flatMap((g) => g.options).filter((o) => selected.has(o.modifierId));
-  const total = item.price + selectedOptions.reduce((sum, o) => sum + o.price, 0);
+  const extras = selectedOptions.reduce((sum, o) => sum + o.price, 0);
+  const total = item.price + extras;
 
   const canConfirm = groups.every((g) => {
     if (!g.id) return true;
@@ -109,13 +118,16 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
         <Text style={styles.title} numberOfLines={2}>
           {item.name}
         </Text>
-        <Text style={styles.lead}>Нажми квадрат, чтобы добавить или убрать</Text>
+        <Text style={styles.lead}>Категория сверху, доплата снизу. Нажми плитку, чтобы добавить или убрать</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <View style={styles.grid}>
           {tiles.map(({ group, opt }) => {
             const on = selected.has(opt.modifierId);
+            const tint = catColor(group.name);
+            const extra = opt.price > 0;
+            const qty = optionQty(opt);
             return (
               <Pressable
                 key={opt.modifierId}
@@ -127,19 +139,25 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
                 ]}
                 onPress={() => toggle(group, opt.modifierId)}
               >
+                <View style={[styles.catBar, { backgroundColor: tint.bg }]}>
+                  <Text style={[styles.catBarText, { color: tint.text }]} numberOfLines={1}>
+                    {group.name}
+                  </Text>
+                </View>
                 <View style={[styles.check, on && styles.checkOn]}>
                   <Text style={styles.checkMark}>{on ? '✓' : ''}</Text>
                 </View>
-                <Text style={styles.groupChip} numberOfLines={1}>
-                  {group.name}
-                </Text>
-                <View style={[styles.glyph, on && styles.glyphOn]}>
-                  <Text style={[styles.glyphText, on && styles.glyphTextOn]}>{mark(opt.name)}</Text>
+                <View style={styles.tileMid}>
+                  <Text style={[styles.optName, !on && opt.isDefault && styles.optOff]} numberOfLines={3}>
+                    {opt.name}
+                  </Text>
+                  {qty ? <Text style={styles.qty}>{qty}</Text> : null}
                 </View>
-                <Text style={[styles.optName, !on && opt.isDefault && styles.optOff]} numberOfLines={2}>
-                  {opt.name}
-                </Text>
-                {optionMeta(opt) ? <Text style={styles.optMeta}>{optionMeta(opt)}</Text> : null}
+                <View style={[styles.priceBar, extra ? styles.priceBarOn : styles.priceBarOff]}>
+                  <Text style={[styles.priceText, extra ? styles.priceTextOn : styles.priceTextOff]}>
+                    {extra ? `+${Math.round(opt.price)} ₽` : 'без доплаты'}
+                  </Text>
+                </View>
               </Pressable>
             );
           })}
@@ -147,7 +165,10 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
       </ScrollView>
 
       <View style={styles.foot}>
-        <Text style={styles.total}>{Math.round(total)} ₽</Text>
+        <View>
+          <Text style={styles.total}>{Math.round(total)} ₽</Text>
+          {extras > 0 ? <Text style={styles.extras}>доплаты +{Math.round(extras)} ₽</Text> : null}
+        </View>
         <Pressable
           style={[styles.add, !canConfirm && styles.addOff]}
           disabled={!canConfirm}
@@ -177,48 +198,51 @@ const styles = StyleSheet.create({
   lead: { color: colors.textMuted, fontSize: 16, marginTop: 4 },
   body: { padding: 20, paddingBottom: 24 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  groupChip: { color: colors.accent2, fontSize: 12, fontWeight: '800', textAlign: 'center' },
   tile: {
     backgroundColor: colors.surface,
     borderWidth: 3,
     borderColor: colors.border,
     borderRadius: 24,
-    padding: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    overflow: 'hidden',
   },
-  tileOn: { borderColor: colors.accent2, backgroundColor: '#1a2748' },
+  tileOn: { borderColor: colors.accent2, backgroundColor: '#151c33' },
   tileOff: { opacity: 0.72 },
+  catBar: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  catBarText: { fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 },
   check: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface2,
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   checkOn: { backgroundColor: colors.accent2, borderColor: colors.accent2 },
-  checkMark: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  glyph: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
-    backgroundColor: colors.surface2,
+  checkMark: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  tileMid: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, gap: 4 },
+  optName: { color: colors.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  optOff: { textDecorationLine: 'line-through', color: colors.textMuted },
+  qty: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
+  priceBar: {
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 8,
   },
-  glyphOn: { backgroundColor: colors.accent },
-  glyphText: { color: colors.text, fontSize: 34, fontWeight: '800' },
-  glyphTextOn: { color: '#fff' },
-  optName: { color: colors.text, fontSize: 16, fontWeight: '800', textAlign: 'center', paddingHorizontal: 6 },
-  optOff: { textDecorationLine: 'line-through', color: colors.textMuted },
-  optMeta: { color: colors.accent2, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  priceBarOn: { backgroundColor: '#3f2d0a' },
+  priceBarOff: { backgroundColor: colors.surface2 },
+  priceText: { fontWeight: '800', fontSize: 18 },
+  priceTextOn: { color: '#fbbf24' },
+  priceTextOff: { color: colors.textMuted, fontSize: 14 },
   foot: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -229,6 +253,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   total: { color: colors.text, fontSize: 32, fontWeight: '800', minWidth: 120 },
+  extras: { color: '#fbbf24', fontWeight: '800', marginTop: 2 },
   add: {
     flex: 1,
     backgroundColor: colors.accent2,

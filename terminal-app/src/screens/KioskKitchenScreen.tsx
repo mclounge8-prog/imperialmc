@@ -162,6 +162,7 @@ export default function KioskKitchenScreen() {
           amount={payTicket?.total ?? 0}
           subtotal={payTicket?.subtotal}
           discountPercent={payTicket?.discountPercent}
+          qrDiscountPercent={status?.venue?.cashlessDiscountPercent ?? 12}
           suggestedMethod={payTicket?.paymentMethod}
           busy={busyId === payTicket?.id}
           error={payError}
@@ -169,7 +170,7 @@ export default function KioskKitchenScreen() {
             setPayTicket(null);
             setPayError(null);
           }}
-          onConfirm={async (method) => {
+          onConfirm={async (method, payable) => {
             if (!session || !payTicket || !venueId) return;
             if (!payTicket.orderId || !payTicket.guestId) {
               setPayError('У заявки нет чека — обновите терминал и попробуйте снова');
@@ -178,7 +179,7 @@ export default function KioskKitchenScreen() {
             setBusyId(payTicket.id);
             setPayError(null);
             try {
-              await payGuest(payTicket.orderId, payTicket.guestId, method, payTicket.total, session.token);
+              await payGuest(payTicket.orderId, payTicket.guestId, method, payable, session.token);
               runPendingFiscalJobs(venueId, session.token);
               setPayTicket(null);
               await load();
