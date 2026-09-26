@@ -49,15 +49,15 @@ async function fetchReceiptsAndCash(rangeStart, rangeEnd, venueId) {
     params
   );
 
-  const { rows: cashRows } = await pool.query(
-    `SELECT r.closed_at, rp.amount
+  const { rows: paymentRows } = await pool.query(
+    `SELECT r.closed_at, rp.amount, rp.method
      FROM receipt_payments rp
      JOIN receipts r ON r.id = rp.receipt_id
-     WHERE ${conditions.join(' AND ')} AND rp.method = 'cash'`,
+     WHERE ${conditions.join(' AND ')} AND rp.method IN ('cash', 'card', 'qr', 'other')`,
     params
   );
 
-  return { receiptRows, cashRows };
+  return { receiptRows, paymentRows };
 }
 
 function buildDayBuckets(startDayISO, days) {
@@ -72,6 +72,8 @@ function buildDayBuckets(startDayISO, days) {
       revenue: 0,
       receiptCount: 0,
       cash: 0,
+      card: 0,
+      qr: 0,
     });
   }
   return buckets;
@@ -82,17 +84,23 @@ function bucketFor(buckets, closedAt) {
   return buckets.find((b) => t >= b.startMs && t < b.endMs);
 }
 
-function fillDayBuckets(buckets, receiptRows, cashRows) {
+function addPayment(bucket, method, amount) {
+  if (method === 'cash') bucket.cash += amount;
+  else if (method === 'card') bucket.card += amount;
+  else if (method === 'qr') bucket.qr += amount;
+}
+
+function fillDayBuckets(buckets, receiptRows, paymentRows) {
   for (const r of receiptRows) {
     const bucket = bucketFor(buckets, r.closed_at);
     if (!bucket) continue;
     bucket.revenue += Number(r.total);
     bucket.receiptCount += 1;
   }
-  for (const r of cashRows) {
+  for (const r of paymentRows) {
     const bucket = bucketFor(buckets, r.closed_at);
     if (!bucket) continue;
-    bucket.cash += Number(r.amount);
+    addPayment(bucket, r.method, Number(r.amount));
   }
 }
 
@@ -100,12 +108,14 @@ function fillDayBuckets(buckets, receiptRows, cashRows) {
  * Почасовые суммы за один день venue TZ.
  * avgCheck[h] = revenue[h] / receiptCount[h] (0 если чеков нет).
  */
-function buildHourlyForDay(dayISO, receiptRows, cashRows) {
+function buildHourlyForDay(dayISO, receiptRows, paymentRows) {
   const { start, end } = venueDayRange(dayISO);
   const startMs = start.getTime();
   const endMs = end.getTime();
   const revenue = emptyHours();
   const cash = emptyHours();
+  const card = emptyHours();
+  const qr = emptyHours();
   const receiptCount = emptyHours();
 
   for (const r of receiptRows) {
@@ -115,15 +125,17 @@ function buildHourlyForDay(dayISO, receiptRows, cashRows) {
     revenue[hour] += Number(r.total);
     receiptCount[hour] += 1;
   }
-  for (const r of cashRows) {
+  for (const r of paymentRows) {
     const t = new Date(r.closed_at).getTime();
     if (t < startMs || t >= endMs) continue;
     const hour = venueHour(r.closed_at);
-    cash[hour] += Number(r.amount);
+    if (r.method === 'cash') cash[hour] += Number(r.amount);
+    else if (r.method === 'card') card[hour] += Number(r.amount);
+    else if (r.method === 'qr') qr[hour] += Number(r.amount);
   }
 
   const avgCheck = revenue.map((v, i) => (receiptCount[i] > 0 ? v / receiptCount[i] : 0));
-  return { revenue, cash, receiptCount, guestCount: receiptCount.slice(), avgCheck };
+  return { revenue, cash, card, qr, receiptCount, guestCount: receiptCount.slice(), avgCheck };
 }
 
 function avgCheckOf(b) {
@@ -173,12 +185,12 @@ apiPwa.get('/stats', async (c) => {
   const { start: rangeStart } = venueDayRange(rangeStartDay);
   const { end: rangeEnd } = venueDayRange(selectedDay);
 
-  const { receiptRows, cashRows } = await fetchReceiptsAndCash(rangeStart, rangeEnd, venueId);
+  const { receiptRows, paymentRows } = await fetchReceiptsAndCash(rangeStart, rangeEnd, venueId);
   const allBuckets = buildDayBuckets(rangeStartDay, totalDays);
-  fillDayBuckets(allBuckets, receiptRows, cashRows);
+  fillDayBuckets(allBuckets, receiptRows, paymentRows);
 
-  const selectedHours = buildHourlyForDay(selectedDay, receiptRows, cashRows);
-  const compareHours = buildHourlyForDay(compareDay, receiptRows, cashRows);
+  const selectedHours = buildHourlyForDay(selectedDay, receiptRows, paymentRows);
+  const compareHours = buildHourlyForDay(compareDay, receiptRows, paymentRows);
   const hourLabels = Array.from({ length: HOURS }, (_, h) => String(h).padStart(2, '0'));
 
   const trendDates = allBuckets.slice(COMPARE_OFFSET_DAYS).map((b) => b.date);
@@ -203,6 +215,8 @@ apiPwa.get('/stats', async (c) => {
         venues: cashOnHand.venues,
       },
       cash: buildMetric(allBuckets, (b) => b.cash, selectedHours.cash, compareHours.cash),
+      card: buildMetric(allBuckets, (b) => b.card, selectedHours.card, compareHours.card),
+      qr: buildMetric(allBuckets, (b) => b.qr, selectedHours.qr, compareHours.qr),
       revenue: buildMetric(allBuckets, (b) => b.revenue, selectedHours.revenue, compareHours.revenue),
       avgCheck: buildMetric(allBuckets, avgCheckOf, selectedHours.avgCheck, compareHours.avgCheck),
       receiptCount: buildMetric(

@@ -116,22 +116,38 @@ export async function fetchReceiptsPage({ venueId, dateFrom, dateTo, page }) {
 
 export async function fetchReceiptsSummary({ venueId, dateFrom, dateTo }) {
   const { where, params } = receiptWhere({ venueId, dateFrom, dateTo });
-  const { rows } = await pool.query(
-    `SELECT
-       COUNT(*) FILTER (WHERE r.status = 'paid')::int AS paid_count,
-       COUNT(*) FILTER (WHERE r.status = 'cancelled')::int AS cancelled_count,
-       COALESCE(SUM(r.total) FILTER (WHERE r.status = 'paid'), 0) AS paid_total,
-       COALESCE(SUM(r.discount) FILTER (WHERE r.status = 'paid'), 0) AS discount_total
-     FROM receipts r
-     ${where}`,
-    params
-  );
+  const [{ rows }, { rows: payRows }] = await Promise.all([
+    pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE r.status = 'paid')::int AS paid_count,
+         COUNT(*) FILTER (WHERE r.status = 'cancelled')::int AS cancelled_count,
+         COALESCE(SUM(r.total) FILTER (WHERE r.status = 'paid'), 0) AS paid_total,
+         COALESCE(SUM(r.discount) FILTER (WHERE r.status = 'paid'), 0) AS discount_total
+       FROM receipts r
+       ${where}`,
+      params
+    ),
+    pool.query(
+      `SELECT
+         COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'cash'), 0) AS cash_total,
+         COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'card'), 0) AS card_total,
+         COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'qr'), 0) AS qr_total
+       FROM receipt_payments rp
+       JOIN receipts r ON r.id = rp.receipt_id
+       ${where ? `${where} AND r.status = 'paid'` : `WHERE r.status = 'paid'`}`,
+      params
+    ),
+  ]);
   const row = rows[0] || {};
+  const pay = payRows[0] || {};
   return {
     paidCount: Number(row.paid_count || 0),
     cancelledCount: Number(row.cancelled_count || 0),
     paidTotal: Number(row.paid_total || 0),
     discountTotal: Number(row.discount_total || 0),
+    cashTotal: Number(pay.cash_total || 0),
+    cardTotal: Number(pay.card_total || 0),
+    qrTotal: Number(pay.qr_total || 0),
   };
 }
 

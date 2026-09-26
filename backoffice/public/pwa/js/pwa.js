@@ -542,6 +542,9 @@
     renderSummaryCards([
       { label: 'Оплачено', value: formatInt(summary.paidCount) },
       { label: 'Выручка', value: formatMoney(summary.paidTotal) },
+      { label: 'Нал', value: formatMoney(summary.cashTotal) },
+      { label: 'Карта', value: formatMoney(summary.cardTotal) },
+      { label: 'QR-код', value: formatMoney(summary.qrTotal) },
       { label: 'Отмены', value: formatInt(summary.cancelledCount) },
       { label: 'Скидки', value: formatMoney(summary.discountTotal) },
     ]);
@@ -810,6 +813,8 @@
   var CARD_DEFS = [
     { key: 'cashOnHand', label: 'Наличка', formatter: formatMoney, deltaFormatter: formatSignedMoney, kind: 'cashOnHand' },
     { key: 'cash', label: 'Наличными за день', formatter: formatMoney, deltaFormatter: formatSignedMoney },
+    { key: 'card', label: 'Карта за день', formatter: formatMoney, deltaFormatter: formatSignedMoney },
+    { key: 'qr', label: 'QR-код за день', formatter: formatMoney, deltaFormatter: formatSignedMoney },
     { key: 'revenue', label: 'Выручка', formatter: formatMoney, deltaFormatter: formatSignedMoney },
     { key: 'avgCheck', label: 'Средний чек', formatter: formatMoney, deltaFormatter: formatSignedMoney },
     { key: 'receiptCount', label: 'Количество чеков', formatter: formatInt, deltaFormatter: formatSignedInt },
