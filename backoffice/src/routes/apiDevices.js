@@ -66,7 +66,8 @@ apiDevices.get('/me', requireDeviceToken, async (c) => {
               COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
               COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
               COALESCE(kiosk_enabled, false) AS kiosk_enabled,
-              COALESCE(kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent
+              COALESCE(kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
+              kiosk_qr_image_url
        FROM venues WHERE id = $1`,
       [device.venue_id]
     );
@@ -79,6 +80,7 @@ apiDevices.get('/me', requireDeviceToken, async (c) => {
           tobaccoToleranceG: Number(rows[0].tobacco_tolerance_g),
           kioskEnabled: !!rows[0].kiosk_enabled,
           cashlessDiscountPercent: Number(rows[0].kiosk_cashless_discount_percent || 12),
+          qrImageUrl: rows[0].kiosk_qr_image_url || null,
         }
       : null;
   }

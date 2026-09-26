@@ -303,6 +303,7 @@
   var METHOD_LABELS = {
     cash: 'Наличные',
     card: 'Карта',
+    qr: 'QR-код',
     other: 'Другое',
   };
 

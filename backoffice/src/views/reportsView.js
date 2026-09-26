@@ -1,7 +1,7 @@
 import { escapeHtml } from './escapeHtml.js';
 import { formatVenueDateTime } from '../utils/timezone.js';
 
-const METHOD_LABELS = { cash: 'Наличные', card: 'Карта', other: 'Другое' };
+const METHOD_LABELS = { cash: 'Наличные', card: 'Карта', qr: 'QR-код', other: 'Другое' };
 const STATUS_LABELS = { paid: 'Оплачен', cancelled: 'Отменён' };
 
 function formatDateTime(value) {
@@ -281,6 +281,7 @@ function renderCashDayRow(day) {
       <td>${formatMoney(day.revenueTotal)}</td>
       <td>${formatMoney(day.cashSales)}</td>
       <td>${formatMoney(day.cardSales)}</td>
+      <td>${formatMoney(day.qrSales)}</td>
       <td>${formatMoney(day.deposits)}</td>
       <td>${formatMoney(day.withdrawals)}</td>
       <td>${formatMoney(day.openingCash)}</td>
@@ -307,6 +308,7 @@ function renderCashShiftRow(shift) {
       <td>${formatMoney(shift.openingCash)}</td>
       <td>${formatMoney(shift.cashSales)}</td>
       <td>${formatMoney(shift.cardSales)}</td>
+      <td>${formatMoney(shift.qrSales)}</td>
       <td>${formatMoney(shift.deposits)}</td>
       <td>${formatMoney(shift.withdrawals)}</td>
       <td>${formatMoney(shift.expectedCash)}</td>
@@ -323,6 +325,7 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
   const revenue = shifts.reduce((sum, s) => sum + s.revenueTotal, 0);
   const cashSales = shifts.reduce((sum, s) => sum + s.cashSales, 0);
   const cardSales = shifts.reduce((sum, s) => sum + s.cardSales, 0);
+  const qrSales = shifts.reduce((sum, s) => sum + s.qrSales, 0);
 
   return `
     <header>
@@ -364,6 +367,10 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
         <span class="report-summary-label">Карта</span>
         <span class="report-summary-value">${formatMoney(cardSales)}</span>
       </div>
+      <div class="report-summary-card">
+        <span class="report-summary-label">QR-код</span>
+        <span class="report-summary-value">${formatMoney(qrSales)}</span>
+      </div>
     </div>
 
     <div class="subsection">
@@ -378,6 +385,7 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
             <th>Выручка</th>
             <th>Нал.</th>
             <th>Карта</th>
+            <th>QR-код</th>
             <th>Внесения</th>
             <th>Инкассации</th>
             <th>Начало</th>
@@ -386,7 +394,7 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
             <th>Разница</th>
           </tr>
         </thead>
-        <tbody>${dayRows || '<tr><td colspan="13" class="empty-hint">Смен за период нет</td></tr>'}</tbody>
+        <tbody>${dayRows || '<tr><td colspan="14" class="empty-hint">Смен за период нет</td></tr>'}</tbody>
       </table>
     </div>
 
@@ -406,6 +414,7 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
             <th>Начало</th>
             <th>Нал. продажи</th>
             <th>Карта</th>
+            <th>QR-код</th>
             <th>Внесения</th>
             <th>Инкассации</th>
             <th>Ожидалось</th>
@@ -414,7 +423,7 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
             <th>Выручка</th>
           </tr>
         </thead>
-        <tbody>${shiftRows || '<tr><td colspan="17" class="empty-hint">Смен за период нет</td></tr>'}</tbody>
+        <tbody>${shiftRows || '<tr><td colspan="18" class="empty-hint">Смен за период нет</td></tr>'}</tbody>
       </table>
     </div>
   `;

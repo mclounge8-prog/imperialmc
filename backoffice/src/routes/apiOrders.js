@@ -536,22 +536,29 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
     const subtotal = roundMoney(items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0));
 
     let discountPercent = clampDiscountPercent(guest.discount_percent);
-    if (kioskPaidRows[0] && payments && PAYMENT_METHODS.includes(payments[0]?.method)) {
-      const chosen = payments[0].method;
+    const chosen =
+      payments && PAYMENT_METHODS.includes(payments[0]?.method) ? payments[0].method : null;
+    if (chosen === 'qr' || kioskPaidRows[0]) {
       const { rows: venueDisc } = await client.query(
         'SELECT COALESCE(kiosk_cashless_discount_percent, 12) AS pct FROM venues WHERE id = $1',
         [guest.venue_id]
       );
       const qrPct = Math.max(0, Math.min(100, Number(venueDisc[0]?.pct || 12)));
-      discountPercent = chosen === 'qr' ? qrPct : 0;
+      if (kioskPaidRows[0] && chosen) {
+        discountPercent = chosen === 'qr' ? qrPct : 0;
+      } else if (chosen === 'qr' && discountPercent === 0) {
+        discountPercent = qrPct;
+      }
       const nextTotal = roundMoney(subtotal - roundMoney((subtotal * discountPercent) / 100));
       await client.query('UPDATE order_guests SET discount_percent = $2 WHERE id = $1', [guestId, discountPercent]);
-      await client.query(
-        `UPDATE kiosk_tickets
-         SET payment_method = $2, discount_percent = $3, total = $4
-         WHERE id = $1`,
-        [kioskPaidRows[0].id, chosen, discountPercent, nextTotal]
-      );
+      if (kioskPaidRows[0] && chosen) {
+        await client.query(
+          `UPDATE kiosk_tickets
+           SET payment_method = $2, discount_percent = $3, total = $4
+           WHERE id = $1`,
+          [kioskPaidRows[0].id, chosen, discountPercent, nextTotal]
+        );
+      }
     }
     const discount = roundMoney((subtotal * discountPercent) / 100);
     const payable = roundMoney(subtotal - discount);

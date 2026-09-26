@@ -370,7 +370,7 @@ export async function enqueueCashFiscalJob(client, { venueId, shiftId, type, amo
   );
 }
 
-const METHOD_LABELS = { cash: 'Наличные', card: 'Безнал', other: 'Другое' };
+const METHOD_LABELS = { cash: 'Наличные', card: 'Безнал', qr: 'QR-код', other: 'Другое' };
 
 /** Нефискальная копия оплаченного чека (расшифровка как на фискальном). */
 export function buildReceiptCopyPayload({

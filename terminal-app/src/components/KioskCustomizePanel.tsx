@@ -140,12 +140,12 @@ export default function KioskCustomizePanel({ item, onClose, onConfirm }: Props)
                 onPress={() => toggle(group, opt.modifierId)}
               >
                 <View style={[styles.catBar, { backgroundColor: tint.bg }]}>
-                  <Text style={[styles.catBarText, { color: tint.text }]} numberOfLines={1}>
+                  <Text style={[styles.catBarText, { color: tint.text }]} numberOfLines={2}>
                     {group.name}
                   </Text>
-                </View>
-                <View style={[styles.check, on && styles.checkOn]}>
-                  <Text style={styles.checkMark}>{on ? '✓' : ''}</Text>
+                  <View style={[styles.check, on && styles.checkOn]}>
+                    <Text style={styles.checkMark}>{on ? '✓' : ''}</Text>
+                  </View>
                 </View>
                 <View style={styles.tileMid}>
                   <Text style={[styles.optName, !on && opt.isDefault && styles.optOff]} numberOfLines={3}>
@@ -208,18 +208,27 @@ const styles = StyleSheet.create({
   tileOn: { borderColor: colors.accent2, backgroundColor: '#151c33' },
   tileOff: { opacity: 0.72 },
   catBar: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    paddingLeft: 10,
+    paddingRight: 8,
+    paddingVertical: 8,
+    minHeight: 44,
   },
-  catBarText: { fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 },
+  catBarText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    lineHeight: 16,
+  },
   check: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
     width: 28,
     height: 28,
     borderRadius: 14,
+    flexShrink: 0,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center',

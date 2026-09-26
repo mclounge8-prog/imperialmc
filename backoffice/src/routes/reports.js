@@ -225,6 +225,7 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo }) {
             s.opening_cash, s.closing_cash, s.closing_cash_expected,
             COALESCE(pay.cash_sales, 0) AS cash_sales,
             COALESCE(pay.card_sales, 0) AS card_sales,
+            COALESCE(pay.qr_sales, 0) AS qr_sales,
             COALESCE(pay.other_sales, 0) AS other_sales,
             COALESCE(rec.revenue_total, 0) AS revenue_total,
             COALESCE(rec.receipts_count, 0) AS receipts_count,
@@ -243,7 +244,8 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo }) {
        SELECT
          COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'cash'), 0) AS cash_sales,
          COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'card'), 0) AS card_sales,
-         COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'other'), 0) AS other_sales
+         COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'qr'), 0) AS qr_sales,
+         COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'other'), 0) AS other_sales,
        FROM receipt_payments rp
        JOIN receipts r ON r.id = rp.receipt_id
        WHERE r.shift_id = s.id AND r.status = 'paid'
@@ -286,6 +288,7 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo }) {
       openingCash,
       cashSales,
       cardSales: Number(row.card_sales || 0),
+      qrSales: Number(row.qr_sales || 0),
       otherSales: Number(row.other_sales || 0),
       deposits,
       withdrawals,
@@ -313,6 +316,7 @@ function aggregateCashByDay(shifts) {
         revenueTotal: 0,
         cashSales: 0,
         cardSales: 0,
+        qrSales: 0,
         otherSales: 0,
         deposits: 0,
         withdrawals: 0,
@@ -329,6 +333,7 @@ function aggregateCashByDay(shifts) {
     row.revenueTotal = roundMoney(row.revenueTotal + s.revenueTotal);
     row.cashSales = roundMoney(row.cashSales + s.cashSales);
     row.cardSales = roundMoney(row.cardSales + s.cardSales);
+    row.qrSales = roundMoney(row.qrSales + s.qrSales);
     row.otherSales = roundMoney(row.otherSales + s.otherSales);
     row.deposits = roundMoney(row.deposits + s.deposits);
     row.withdrawals = roundMoney(row.withdrawals + s.withdrawals);
@@ -381,7 +386,7 @@ reports.get('/cash', async (c) => {
 reports.get('/export/receipts', async (c) => {
   const { venueId, dateFrom, dateTo } = parseReportFilters(c);
   const rows = await fetchReceiptsForExport({ venueId, dateFrom, dateTo });
-  const METHOD = { cash: 'Наличные', card: 'Карта', other: 'Другое' };
+  const METHOD = { cash: 'Наличные', card: 'Карта', qr: 'QR-код', other: 'Другое' };
   const STATUS = { paid: 'Оплачен', cancelled: 'Отменён' };
   const csvRows = rows.map((r) => {
     const payments = String(r.payments || '')
@@ -468,6 +473,7 @@ reports.get('/export/cash', async (c) => {
       s.openingCash.toFixed(2),
       s.cashSales.toFixed(2),
       s.cardSales.toFixed(2),
+      s.qrSales.toFixed(2),
       s.otherSales.toFixed(2),
       s.deposits.toFixed(2),
       s.withdrawals.toFixed(2),
@@ -492,6 +498,7 @@ reports.get('/export/cash', async (c) => {
         'Начало кассы',
         'Наличные продажи',
         'Карта',
+        'QR-код',
         'Другое',
         'Внесения',
         'Инкассации',
@@ -513,6 +520,7 @@ reports.get('/export/cash', async (c) => {
     d.openingCash.toFixed(2),
     d.cashSales.toFixed(2),
     d.cardSales.toFixed(2),
+    d.qrSales.toFixed(2),
     d.otherSales.toFixed(2),
     d.deposits.toFixed(2),
     d.withdrawals.toFixed(2),
@@ -532,6 +540,7 @@ reports.get('/export/cash', async (c) => {
       'Начало кассы',
       'Наличные продажи',
       'Карта',
+      'QR-код',
       'Другое',
       'Внесения',
       'Инкассации',

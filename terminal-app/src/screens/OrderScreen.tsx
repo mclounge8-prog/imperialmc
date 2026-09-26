@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import FastImage from '@d11/react-native-fast-image';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
@@ -20,6 +21,7 @@ import CompositionModal from '../components/CompositionModal';
 import type { CompositionTarget } from '../components/CompositionModal';
 import ItemCustomizeModal from '../components/ItemCustomizeModal';
 import {
+  API_BASE_URL,
   fetchMenu,
   fetchTables,
   getOrCreateTableOrder,
@@ -110,6 +112,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   const [paymentTarget, setPaymentTarget] = useState<OrderGuest | null>(null);
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [cashEntryMode, setCashEntryMode] = useState(false);
+  const [qrPayMode, setQrPayMode] = useState(false);
   const [cashReceivedText, setCashReceivedText] = useState('');
   const [discountGuest, setDiscountGuest] = useState<OrderGuest | null>(null);
   const [discountDraft, setDiscountDraft] = useState<DiscountPercent>(0);
@@ -398,6 +401,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   const closePaymentModal = () => {
     setPaymentTarget(null);
     setCashEntryMode(false);
+    setQrPayMode(false);
     setCashReceivedText('');
   };
 
@@ -533,17 +537,25 @@ export default function OrderScreen({ route, navigation }: Props) {
   const cashReceivedAmount = parseFloat(cashReceivedText.replace(',', '.')) || 0;
   const changeAmount = cashReceivedAmount - payableAmount;
   const canConfirmCash = paymentTarget != null && cashReceivedAmount >= payableAmount - 0.001;
+  const qrDiscountPct = Number(venue?.cashlessDiscountPercent ?? 12);
+  const qrImageUrl = venue?.qrImageUrl ? `${API_BASE_URL}${venue.qrImageUrl}` : null;
+  const qrPayable =
+    paymentDiscountPct > 0
+      ? payableAmount
+      : roundMoney(paymentSubtotal - roundMoney((paymentSubtotal * qrDiscountPct) / 100));
+  const paymentDisplayAmount = qrPayMode ? qrPayable : payableAmount;
 
   const confirmPayment = async (method: PaymentMethod) => {
     if (!session || !order || !paymentTarget) return;
-    if (!(await ensureShiftOpen(payableAmount))) {
+    const amount = method === 'qr' ? qrPayable : payableAmount;
+    if (!(await ensureShiftOpen(amount))) {
       closePaymentModal();
       return;
     }
     const guest = paymentTarget;
     setPaymentBusy(true);
     try {
-      const updated = await payGuest(order.id, guest.id, method, payableAmount, session.token);
+      const updated = await payGuest(order.id, guest.id, method, amount, session.token);
       closePaymentModal();
       if (venue && payableAmount > 0.009) runPendingFiscalJobs(venue.id, session.token);
       if (updated.guests.length === 0) {
@@ -978,9 +990,19 @@ export default function OrderScreen({ route, navigation }: Props) {
       >
         <Pressable style={styles.modalBackdrop} onPress={() => !paymentBusy && closePaymentModal()}>
           <Pressable style={styles.paymentModalBox} onPress={(e) => e.stopPropagation()}>
+            <ScrollView
+              style={{ width: '100%' }}
+              contentContainerStyle={{ alignItems: 'center' }}
+              keyboardShouldPersistTaps="handled"
+            >
             <Text style={styles.modalTitle}>Оплата — {paymentTarget?.label}</Text>
-            <Text style={styles.paymentAmount}>{payableAmount.toFixed(2)} ₽</Text>
-            {paymentDiscountPct > 0 ? (
+            <Text style={styles.paymentAmount}>{paymentDisplayAmount.toFixed(2)} ₽</Text>
+            {qrPayMode && qrDiscountPct > 0 && paymentDiscountPct === 0 ? (
+              <Text style={styles.discountHint}>
+                было {paymentSubtotal.toFixed(2)} ₽ · скидка {qrDiscountPct}% за QR (−
+                {roundMoney(paymentSubtotal - qrPayable).toFixed(2)} ₽)
+              </Text>
+            ) : paymentDiscountPct > 0 ? (
               <Text style={styles.discountHint}>
                 было {paymentSubtotal.toFixed(2)} ₽ · скидка {paymentDiscountPct}% (−
                 {paymentDiscountAmount.toFixed(2)} ₽)
@@ -1029,6 +1051,31 @@ export default function OrderScreen({ route, navigation }: Props) {
                   <Text style={styles.modalCancelText}>← Назад к способу оплаты</Text>
                 </Pressable>
               </>
+            ) : qrPayMode ? (
+              <>
+                <Text style={styles.modalSubtitle}>Покажи гостю QR и подтверди перевод</Text>
+                {qrImageUrl ? (
+                  <FastImage
+                    source={{ uri: qrImageUrl }}
+                    style={styles.qrImage}
+                    resizeMode={FastImage.resizeMode.contain}
+                  />
+                ) : (
+                  <Text style={styles.discountHint}>
+                    QR для этой точки ещё не загружен в бэкофисе. Можно подтвердить, если гость уже
+                    перевёл.
+                  </Text>
+                )}
+                <Pressable
+                  style={[styles.paymentMethodButton, styles.paymentMethodQr]}
+                  onPress={() => confirmPayment('qr')}
+                >
+                  <Text style={styles.paymentMethodLabel}>Подтвердить оплату по QR</Text>
+                </Pressable>
+                <Pressable style={styles.modalCancel} onPress={() => setQrPayMode(false)}>
+                  <Text style={styles.modalCancelText}>← Назад к способу оплаты</Text>
+                </Pressable>
+              </>
             ) : paymentDiscountPct === 100 ? (
               <>
                 <Text style={styles.modalSubtitle}>Чек будет закрыт как комплимент (0 ₽)</Text>
@@ -1057,13 +1104,24 @@ export default function OrderScreen({ route, navigation }: Props) {
                   onPress={() => confirmPayment('card')}
                 >
                   <Text style={styles.paymentMethodIcon}>💳</Text>
-                  <Text style={styles.paymentMethodLabel}>Безналичный</Text>
+                  <Text style={styles.paymentMethodLabel}>Карта</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.paymentMethodButton, styles.paymentMethodQr]}
+                  onPress={() => setQrPayMode(true)}
+                >
+                  <Text style={styles.paymentMethodIcon}>▣</Text>
+                  <Text style={styles.paymentMethodLabel}>Карта — QR-код</Text>
+                  {qrDiscountPct > 0 && paymentDiscountPct === 0 ? (
+                    <Text style={styles.paymentMethodHint}>скидка {qrDiscountPct}%</Text>
+                  ) : null}
                 </Pressable>
                 <Pressable style={styles.modalCancel} onPress={closePaymentModal}>
                   <Text style={styles.modalCancelText}>Отмена</Text>
                 </Pressable>
               </>
             )}
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1492,7 +1550,8 @@ const styles = StyleSheet.create({
 
   paymentModalBox: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 400,
+    maxHeight: '90%',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1560,6 +1619,18 @@ const styles = StyleSheet.create({
   paymentMethodCard: {
     backgroundColor: 'rgba(63, 99, 230, 0.12)',
     borderColor: colors.accent2,
+  },
+  paymentMethodQr: {
+    backgroundColor: 'rgba(251, 191, 36, 0.12)',
+    borderColor: '#fbbf24',
+  },
+  paymentMethodHint: { color: colors.textMuted, fontSize: 13, fontWeight: '700' },
+  qrImage: {
+    width: '100%',
+    height: 220,
+    marginTop: 12,
+    borderRadius: 12,
+    backgroundColor: '#fff',
   },
   paymentMethodComp: {
     backgroundColor: 'rgba(230, 160, 63, 0.14)',

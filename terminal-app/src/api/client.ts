@@ -584,6 +584,7 @@ export type PaymentBreakdown = {
   cash: number;
   card: number;
   other: number;
+  qr?: number;
 };
 
 export type ShiftCash = {
