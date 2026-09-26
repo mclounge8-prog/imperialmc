@@ -2,13 +2,15 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+def buildKiosk = project.hasProperty('kiosk') && project.kiosk.toString() != 'false'
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
-    if (buildKiosk) {
-        entryFile = file("../index.kiosk.js")
+    if (project.hasProperty('kiosk') && project.kiosk.toString() != 'false') {
+        entryFile = rootProject.file("../index.kiosk.js")
     }
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
@@ -61,8 +63,6 @@ react {
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
 def enableProguardInReleaseBuilds = false
-
-def buildKiosk = project.hasProperty('kiosk') && project.kiosk.toString() != 'false'
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
