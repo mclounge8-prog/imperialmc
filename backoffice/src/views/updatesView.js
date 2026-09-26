@@ -7,6 +7,8 @@ function fileLabel(file) {
 export function renderUpdatesSection(manifest, clientPreview) {
   const apk = manifest.apk || {};
   const js = manifest.js || {};
+  const kiosk = manifest.kiosk || {};
+  const kioskUrl = clientPreview.kiosk?.url || '/updates/kiosk.apk';
 
   return `
     <header>
@@ -43,6 +45,41 @@ export function renderUpdatesSection(manifest, clientPreview) {
       <p class="muted" style="margin:.9rem 0 0;font-size:.85rem;">
         Терминал читает <code>GET /api/terminal/updates</code>. После загрузки APK/JS манифест обновляется сразу.
       </p>
+    </section>
+
+    <section class="card" style="margin-bottom: 1.25rem;">
+      <h2 style="margin:0 0 .75rem;font-size:1.05rem;">Киоск APK</h2>
+      <p class="muted" style="margin:0 0 .75rem;font-size:.9rem;">
+        Отдельное приложение <code>com.imperialmcterminal.kiosk</code> — ставится рядом с терминалом
+        на том же планшете. Регистрируется своим кодом.
+      </p>
+      <ul style="margin:.4rem 0 .75rem;padding-left:1.1rem;line-height:1.55;">
+        <li>version: <code>${escapeHtml(String(kiosk.versionName || '—'))}</code> (${escapeHtml(String(kiosk.versionCode || '—'))})</li>
+        <li>файл: ${fileLabel(kiosk.file)}</li>
+        <li>скачать: <a href="${escapeHtml(kioskUrl)}">${escapeHtml(kioskUrl)}</a></li>
+      </ul>
+      ${kiosk.notes ? `<p class="muted" style="margin:0 0 .75rem;">${escapeHtml(kiosk.notes)}</p>` : ''}
+      <form
+        hx-post="/terminal-updates/kiosk"
+        hx-encoding="multipart/form-data"
+        hx-target="#main-content"
+        hx-swap="innerHTML"
+        class="stack-form"
+      >
+        <label>Файл .apk киоска
+          <input type="file" name="apk" accept=".apk,application/vnd.android.package-archive" required />
+        </label>
+        <label>versionCode
+          <input type="number" name="versionCode" min="1" step="1" value="${escapeHtml(String((Number(kiosk.versionCode) || 0) + 1))}" required />
+        </label>
+        <label>versionName
+          <input type="text" name="versionName" value="${escapeHtml(String(kiosk.versionName || '1.0.0'))}" required />
+        </label>
+        <label>Заметки
+          <input type="text" name="notes" placeholder="Что нового в киоске" value="" />
+        </label>
+        <button type="submit">Опубликовать киоск APK</button>
+      </form>
     </section>
 
     <section class="card" style="margin-bottom: 1.25rem;">

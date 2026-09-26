@@ -62,6 +62,7 @@ function paymentLabel(methods) {
     .map((m) => {
       if (m === 'cash') return 'Нал';
       if (m === 'card') return 'Карта';
+      if (m === 'qr') return 'QR';
       if (m === 'other') return 'Другое';
       return m;
     })

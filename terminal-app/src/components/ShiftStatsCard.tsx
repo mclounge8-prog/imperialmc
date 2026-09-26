@@ -18,9 +18,10 @@ function formatDateTime(value: string | null): string {
   });
 }
 
-const PAYMENT_LABELS: Record<'cash' | 'card' | 'other', string> = {
+const PAYMENT_LABELS: Record<'cash' | 'card' | 'qr' | 'other', string> = {
   cash: 'Наличные',
   card: 'Карта',
+  qr: 'QR-код',
   other: 'Другое',
 };
 
@@ -92,10 +93,10 @@ export default function ShiftStatsCard({ shift }: { shift: Shift }) {
 
       <Text style={styles.sectionLabel}>По способу оплаты</Text>
       <View style={styles.card}>
-        {(Object.keys(PAYMENT_LABELS) as Array<'cash' | 'card' | 'other'>).map((method, idx) => (
-          <View key={method} style={[styles.paymentRow, idx < 2 && styles.paymentRowBorder]}>
+        {(Object.keys(PAYMENT_LABELS) as Array<keyof typeof PAYMENT_LABELS>).map((method, idx) => (
+          <View key={method} style={[styles.paymentRow, idx < 3 && styles.paymentRowBorder]}>
             <Text style={styles.paymentLabel}>{PAYMENT_LABELS[method]}</Text>
-            <Text style={styles.paymentValue}>{formatMoney(shift.paymentBreakdown[method])}</Text>
+            <Text style={styles.paymentValue}>{formatMoney(shift.paymentBreakdown[method] || 0)}</Text>
           </View>
         ))}
       </View>

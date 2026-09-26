@@ -8,6 +8,7 @@ export function renderVenueCard(venue, assignedNames) {
     : 'Сотрудники не назначены';
   const precheckOn = !!venue.precheck_enabled;
   const tobaccoOn = !!venue.tobacco_accounting_enabled;
+  const kioskOn = !!venue.kiosk_enabled;
 
   return `
     <div class="venue-card" id="venue-card-${venue.id}">
@@ -15,16 +16,28 @@ export function renderVenueCard(venue, assignedNames) {
         <div class="venue-info">
           <div class="venue-name">${safeName}</div>
           <div class="venue-address">${safeAddress}</div>
-          <label class="venue-precheck-toggle">
-            <input
-              type="checkbox"
-              ${precheckOn ? 'checked' : ''}
-              hx-post="/venues/${venue.id}/precheck-toggle"
-              hx-target="#venue-card-${venue.id}"
-              hx-swap="outerHTML"
-            >
-            <span>Режим пречека${precheckOn ? ' · включён' : ''}</span>
-          </label>
+          <div class="venue-flag-toggles">
+            <label class="venue-precheck-toggle">
+              <input
+                type="checkbox"
+                ${precheckOn ? 'checked' : ''}
+                hx-post="/venues/${venue.id}/precheck-toggle"
+                hx-target="#venue-card-${venue.id}"
+                hx-swap="outerHTML"
+              >
+              <span>Режим пречека${precheckOn ? ' · включён' : ''}</span>
+            </label>
+            <label class="venue-precheck-toggle">
+              <input
+                type="checkbox"
+                ${kioskOn ? 'checked' : ''}
+                hx-post="/venues/${venue.id}/kiosk-toggle"
+                hx-target="#venue-card-${venue.id}"
+                hx-swap="outerHTML"
+              >
+              <span>Киоск самообслуживания${kioskOn ? ' · включён' : ''}</span>
+            </label>
+          </div>
           ${
             tobaccoOn
               ? `<div class="venue-flag-hint">Учёт табака · вкл · погрешность ${Number(venue.tobacco_tolerance_g ?? 100)} г</div>`
@@ -36,6 +49,7 @@ export function renderVenueCard(venue, assignedNames) {
           <button hx-get="/venues/${venue.id}/staff" hx-target="#venue-staff-panel-${venue.id}" hx-swap="innerHTML">Сотрудники</button>
           <button hx-get="/venues/${venue.id}/atol" hx-target="#venue-atol-panel-${venue.id}" hx-swap="innerHTML">Касса АТОЛ</button>
           <button hx-get="/venues/${venue.id}/tobacco" hx-target="#venue-tobacco-panel-${venue.id}" hx-swap="innerHTML">Учёт табака</button>
+          <button hx-get="/venues/${venue.id}/kiosk-pay" hx-target="#venue-kiosk-pay-panel-${venue.id}" hx-swap="innerHTML">Киоск: оплата</button>
           <button hx-get="/venues/${venue.id}/edit" hx-target="#venue-card-${venue.id}" hx-swap="outerHTML">Изменить</button>
           <button class="danger" hx-delete="/venues/${venue.id}" hx-target="#venue-card-${venue.id}" hx-swap="outerHTML" hx-confirm="Удалить заведение «${safeName}»? Это затронет всё, что к нему привязано.">Удалить</button>
         </div>
@@ -43,6 +57,45 @@ export function renderVenueCard(venue, assignedNames) {
       <div id="venue-staff-panel-${venue.id}" class="venue-staff-panel"></div>
       <div id="venue-atol-panel-${venue.id}" class="venue-atol-panel"></div>
       <div id="venue-tobacco-panel-${venue.id}" class="venue-tobacco-panel-host"></div>
+      <div id="venue-kiosk-pay-panel-${venue.id}" class="venue-kiosk-pay-host"></div>
+    </div>
+  `;
+}
+
+export function renderVenueKioskPayPanel(venue, errorMsg = null) {
+  const discount = Number(venue.kiosk_cashless_discount_percent ?? 12);
+  const qrUrl = venue.kiosk_qr_image_url || '';
+  const errorHtml = errorMsg ? `<div class="field-error">${escapeHtml(errorMsg)}</div>` : '';
+  const preview = qrUrl
+    ? `<img class="kiosk-qr-preview" src="${escapeHtml(qrUrl)}" alt="QR оплаты">`
+    : '<p class="empty-hint">QR ещё не загружен</p>';
+
+  return `
+    <div class="venue-kiosk-pay-panel" id="venue-kiosk-pay-panel-${venue.id}">
+      <div class="venue-tobacco-head">
+        <strong>Киоск: оплата</strong>
+      </div>
+      <form
+        class="venue-tobacco-form"
+        hx-post="/venues/${venue.id}/kiosk-pay"
+        hx-encoding="multipart/form-data"
+        hx-target="#venue-kiosk-pay-panel-${venue.id}"
+        hx-swap="outerHTML"
+      >
+        ${errorHtml}
+        <label class="field-block">
+          <span>Скидка только на QR-код, %</span>
+          <input type="number" name="discount_percent" value="${discount}" min="0" max="100" step="1" required>
+        </label>
+        <label class="field-block">
+          <span>QR код для перевода (PNG)</span>
+          <input type="file" name="qr_image" accept="image/png">
+        </label>
+        ${preview}
+        <div class="venue-actions">
+          <button type="submit">Сохранить</button>
+        </div>
+      </form>
     </div>
   `;
 }
@@ -262,7 +315,7 @@ export function renderVenuesSection(venueCards) {
   return `
     <header>
       <h1>Заведения</h1>
-      <p>Точки продаж — у каждой свой склад, свои столы и назначенные сотрудники</p>
+      <p>Точки продаж — у каждой свой склад, свои столы и назначенные сотрудники. Киоск — отдельное APK (ставится рядом с терминалом на том же планшете), включается чекбоксом на карточке. Скачать: <a href="/updates/kiosk.apk">киоск APK</a></p>
     </header>
 
     <form

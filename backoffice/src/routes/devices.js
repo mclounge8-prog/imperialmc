@@ -25,7 +25,7 @@ async function fetchVenuesList() {
 
 async function fetchDevice(id) {
   const { rows } = await pool.query(
-    'SELECT id, name, venue_id, is_active, last_seen_at FROM devices WHERE id = $1',
+    "SELECT id, name, venue_id, is_active, last_seen_at, COALESCE(kind, 'staff') AS kind FROM devices WHERE id = $1",
     [id]
   );
   return rows[0] || null;
@@ -36,7 +36,7 @@ async function fetchDevice(id) {
 // появляется в бэкофисе само, без обновления страницы админом.
 devices.get('/list', async (c) => {
   const { rows: deviceRows } = await pool.query(
-    'SELECT id, name, venue_id, is_active, last_seen_at FROM devices ORDER BY registered_at DESC'
+    "SELECT id, name, venue_id, is_active, last_seen_at, COALESCE(kind, 'staff') AS kind FROM devices ORDER BY registered_at DESC"
   );
   const venues = await fetchVenuesList();
   return c.html(renderDeviceListInner(deviceRows, venues));
@@ -60,6 +60,18 @@ devices.put('/:id/name', async (c) => {
   const name = String(body.name || '').trim();
 
   await pool.query('UPDATE devices SET name = $1 WHERE id = $2', [name || null, id]);
+
+  const device = await fetchDevice(id);
+  const venues = await fetchVenuesList();
+  return c.html(renderDeviceRow(device, venues));
+});
+
+devices.put('/:id/kind', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.parseBody();
+  const kind = String(body.kind || '') === 'kiosk' ? 'kiosk' : 'staff';
+
+  await pool.query('UPDATE devices SET kind = $1 WHERE id = $2', [kind, id]);
 
   const device = await fetchDevice(id);
   const venues = await fetchVenuesList();

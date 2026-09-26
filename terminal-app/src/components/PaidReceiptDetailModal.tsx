@@ -18,6 +18,7 @@ import { formatVenueDateTime } from '../utils/timezone';
 const METHOD_LABELS: Record<string, string> = {
   cash: 'Наличные',
   card: 'Безнал',
+  qr: 'QR-код',
   other: 'Другое',
 };
 

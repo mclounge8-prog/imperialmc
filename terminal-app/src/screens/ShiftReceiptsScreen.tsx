@@ -7,7 +7,7 @@ import { useDevice } from '../context/DeviceContext';
 import { fetchShiftReceipts } from '../api/client';
 import type { ShiftReceipt } from '../api/client';
 
-const METHOD_LABELS: Record<string, string> = { cash: 'Наличные', card: 'Карта', other: 'Другое' };
+const METHOD_LABELS: Record<string, string> = { cash: 'Наличные', card: 'Карта', qr: 'QR-код', other: 'Другое' };
 const STATUS_LABELS: Record<string, string> = {
   paid: 'Оплачен',
   cancelled: 'Отменён',

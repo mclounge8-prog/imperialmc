@@ -1,3 +1,3 @@
 <resources>
-    <string name="app_name">ImperialMcTerminal</string>
+    <!-- app_name задаётся resValue в build.gradle (терминал / киоск) -->
 </resources>

@@ -4,11 +4,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { registerDevice as apiRegisterDevice, fetchDeviceStatus } from '../api/client';
 import type { DeviceStatus } from '../api/client';
 
-const STORAGE_KEY = 'imperial-mc:device-token';
+const STAFF_STORAGE_KEY = 'imperial-mc:device-token';
+const KIOSK_STORAGE_KEY = 'imperial-mc:kiosk-device-token';
+
+type DeviceKind = 'staff' | 'kiosk';
 
 type DeviceContextValue = {
   deviceToken: string | null;
   status: DeviceStatus | null;
+  kind: DeviceKind;
   loading: boolean;
   error: string | null;
   register: (code: string) => Promise<void>;
@@ -27,18 +31,25 @@ function isDeviceGoneError(error: unknown): boolean {
   return msg.includes('удален') || msg.includes('не найден');
 }
 
-export function DeviceProvider({ children }: { children: ReactNode }) {
+export function DeviceProvider({
+  children,
+  kind = 'staff',
+}: {
+  children: ReactNode;
+  kind?: DeviceKind;
+}) {
+  const storageKey = kind === 'kiosk' ? KIOSK_STORAGE_KEY : STAFF_STORAGE_KEY;
   const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const [status, setStatus] = useState<DeviceStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const clearRegistration = useCallback(async () => {
-    await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+    await AsyncStorage.removeItem(storageKey).catch(() => {});
     setDeviceToken(null);
     setStatus(null);
     setError(null);
-  }, []);
+  }, [storageKey]);
 
   const checkStatus = useCallback(
     async (token: string) => {
@@ -56,13 +67,13 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
         setError(e instanceof Error ? e.message : 'Не удалось проверить статус устройства');
       }
     },
-    [clearRegistration]
+    [clearRegistration, storageKey]
   );
 
   useEffect(() => {
     let isMounted = true;
 
-    AsyncStorage.getItem(STORAGE_KEY)
+    AsyncStorage.getItem(storageKey)
       .then(async (raw) => {
         if (!isMounted || !raw) return;
         setDeviceToken(raw);
@@ -79,17 +90,17 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, [checkStatus]);
+  }, [checkStatus, storageKey]);
 
   const register = useCallback(
     async (code: string) => {
-      const { token } = await apiRegisterDevice(code);
-      await AsyncStorage.setItem(STORAGE_KEY, token);
+      const { token } = await apiRegisterDevice(code, kind);
+      await AsyncStorage.setItem(storageKey, token);
       setError(null);
       setDeviceToken(token);
       await checkStatus(token);
     },
-    [checkStatus]
+    [checkStatus, kind, storageKey]
   );
 
   const refresh = useCallback(async () => {
@@ -102,6 +113,7 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
       value={{
         deviceToken,
         status,
+        kind,
         loading,
         error,
         register,

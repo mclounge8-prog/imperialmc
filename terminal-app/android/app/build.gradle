@@ -2,11 +2,16 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+def buildKiosk = project.hasProperty('kiosk') && project.kiosk.toString() != 'false'
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
+    if (project.hasProperty('kiosk') && project.kiosk.toString() != 'false') {
+        entryFile = rootProject.file("../index.kiosk.js")
+    }
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
     // root = file("../../")
@@ -85,12 +90,17 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.imperialmcterminal"
+    buildFeatures {
+        buildConfig true
+    }
     defaultConfig {
-        applicationId "com.imperialmcterminal"
+        applicationId buildKiosk ? "com.imperialmcterminal.kiosk" : "com.imperialmcterminal"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 6
-        versionName "1.0.5"
+        versionCode buildKiosk ? (project.hasProperty('kioskVersionCode') ? kioskVersionCode.toInteger() : 14) : 6
+        versionName buildKiosk ? (project.hasProperty('kioskVersionName') ? kioskVersionName.toString() : '1.13.0') : "1.0.5"
+        buildConfigField "boolean", "IS_KIOSK", buildKiosk ? "true" : "false"
+        resValue "string", "app_name", buildKiosk ? "Kebab King" : "ImperialMcTerminal"
     }
     signingConfigs {
         debug {

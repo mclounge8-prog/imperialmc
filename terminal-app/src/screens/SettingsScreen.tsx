@@ -11,7 +11,7 @@ import type { RootStackParamList } from '../../App';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-type SettingsTarget = 'XReport' | 'Cash' | 'ShiftReceipts' | 'TobaccoAccounting';
+type SettingsTarget = 'XReport' | 'Cash' | 'ShiftReceipts' | 'TobaccoAccounting' | 'KioskKitchen';
 
 type SettingsRow = {
   key: SettingsTarget;
@@ -30,19 +30,28 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { status } = useDevice();
   const tobaccoEnabled = Boolean(status?.venue?.tobaccoAccountingEnabled);
+  const kioskEnabled = Boolean(status?.venue?.kioskEnabled);
 
   const rows = useMemo(() => {
-    if (!tobaccoEnabled) return BASE_ROWS;
-    return [
-      ...BASE_ROWS,
-      {
-        key: 'TobaccoAccounting' as const,
+    const extra: SettingsRow[] = [];
+    if (tobaccoEnabled) {
+      extra.push({
+        key: 'TobaccoAccounting',
         icon: '🍃',
         title: 'Учёт',
         subtitle: 'Тара и подсчёт чистого табака по смене',
-      },
-    ];
-  }, [tobaccoEnabled]);
+      });
+    }
+    if (kioskEnabled) {
+      extra.push({
+        key: 'KioskKitchen',
+        icon: '🍽',
+        title: 'Киоск',
+        subtitle: 'Самообслуживание: оформлен / изготавливается / готов',
+      });
+    }
+    return extra.length ? [...BASE_ROWS, ...extra] : BASE_ROWS;
+  }, [tobaccoEnabled, kioskEnabled]);
 
   return (
     <ScreenSwipeHost screen="Settings">

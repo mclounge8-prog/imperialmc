@@ -21,9 +21,10 @@ import { CHECK_UPDATES_EVENT } from '../services/updateEvents';
 type Props = {
   /** Автопроверка при монтировании */
   autoCheck?: boolean;
+  channel?: 'staff' | 'kiosk';
 };
 
-export default function AppUpdateGate({ autoCheck = true }: Props) {
+export default function AppUpdateGate({ autoCheck = true, channel = 'staff' }: Props) {
   const [plan, setPlan] = useState<UpdatePlan | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -36,7 +37,7 @@ export default function AppUpdateGate({ autoCheck = true }: Props) {
     checkingRef.current = true;
     setError(null);
     try {
-      const next = await planUpdate();
+      const next = await planUpdate(channel);
       setPlan(next);
       setDismissed(false);
     } catch (e) {
@@ -45,7 +46,7 @@ export default function AppUpdateGate({ autoCheck = true }: Props) {
     } finally {
       checkingRef.current = false;
     }
-  }, []);
+  }, [channel]);
 
   useEffect(() => {
     if (autoCheck) {

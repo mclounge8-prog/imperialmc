@@ -72,14 +72,27 @@ export async function loginWithPin(pin: string, deviceToken: string): Promise<St
 
 export type DeviceStatus = {
   active: boolean;
-  venue: { id: number; name: string; precheckEnabled?: boolean; tobaccoAccountingEnabled?: boolean; tobaccoToleranceG?: number } | null;
+  kind?: 'staff' | 'kiosk';
+  venue: {
+    id: number;
+    name: string;
+    precheckEnabled?: boolean;
+    tobaccoAccountingEnabled?: boolean;
+    tobaccoToleranceG?: number;
+    kioskEnabled?: boolean;
+    cashlessDiscountPercent?: number;
+    qrImageUrl?: string;
+  } | null;
 };
 
-export async function registerDevice(code: string): Promise<{ token: string }> {
+export async function registerDevice(
+  code: string,
+  kind: 'staff' | 'kiosk' = 'staff'
+): Promise<{ token: string }> {
   const response = await fetch(`${API_BASE_URL}/api/devices/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code, kind }),
   });
 
   const data = await parseJsonResponse(response);
@@ -393,7 +406,7 @@ export async function removeOrderItem(
   return order;
 }
 
-export type PaymentMethod = 'cash' | 'card';
+export type PaymentMethod = 'cash' | 'card' | 'qr';
 
 export async function payGuest(
   orderId: number,
@@ -571,6 +584,7 @@ export type PaymentBreakdown = {
   cash: number;
   card: number;
   other: number;
+  qr?: number;
 };
 
 export type ShiftCash = {
@@ -931,4 +945,143 @@ export async function deleteFiscalJob(jobId: number, venueId: number, token: str
   await authorizedRequest(`/api/fiscal/jobs/${jobId}?venueId=${venueId}`, token, {
     method: 'DELETE',
   });
+}
+
+export type KioskTicketStatus = 'new' | 'payment' | 'cooking' | 'ready' | 'issued' | 'cancelled';
+
+export type KioskTicketModifier = {
+  name: string;
+  price: number;
+  qty: number;
+  unit: string | null;
+  unitLabel: string | null;
+};
+
+export type KioskTicketItem = {
+  id: number;
+  name: string;
+  qty: number;
+  price: number;
+  modifiers: KioskTicketModifier[];
+};
+
+export type KioskPaymentMethod = 'cash' | 'card' | 'qr';
+
+export type KioskTicket = {
+  id: number;
+  number: number;
+  status: KioskTicketStatus;
+  guestName: string | null;
+  comment: string | null;
+  paymentMethod?: KioskPaymentMethod | null;
+  paymentStatus?: 'unpaid' | 'paid';
+  discountPercent?: number;
+  subtotal?: number;
+  orderId?: number | null;
+  guestId?: number | null;
+  total: number;
+  createdAt: string;
+  cookingAt: string | null;
+  readyAt: string | null;
+  issuedAt: string | null;
+  cancelledAt: string | null;
+  items: KioskTicketItem[];
+};
+
+export async function fetchKioskTickets(
+  venueId: number,
+  token: string
+): Promise<{ tickets: KioskTicket[]; shiftOpen: boolean }> {
+  return authorizedRequest(`/api/kiosk/tickets?venueId=${venueId}`, token);
+}
+
+export async function setKioskTicketStatus(
+  ticketId: number,
+  status: KioskTicketStatus,
+  token: string
+): Promise<{ ticket: KioskTicket }> {
+  return authorizedRequest(`/api/kiosk/tickets/${ticketId}/status`, token, {
+    method: 'POST',
+    body: { status },
+  });
+}
+
+export type KioskBootstrap = {
+  active: boolean;
+  kind: 'staff' | 'kiosk';
+  venue: {
+    id: number;
+    name: string;
+    kioskEnabled: boolean;
+    cashlessDiscountPercent?: number;
+    qrImageUrl?: string;
+  } | null;
+  shiftOpen: boolean;
+  ready: boolean;
+};
+
+async function deviceRequest<T>(
+  path: string,
+  deviceToken: string,
+  options: { method?: string; body?: unknown } = {}
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: options.method || 'GET',
+    headers: {
+      Authorization: `Bearer ${deviceToken}`,
+      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+  const data = await parseJsonResponse(response);
+  if (!response.ok) {
+    const body = data as ApiErrorBody;
+    throw new ApiRequestError(body.error || 'Ошибка запроса', {
+      status: response.status,
+      code: body.code,
+    });
+  }
+  return data as T;
+}
+
+export async function fetchKioskBootstrap(deviceToken: string): Promise<KioskBootstrap> {
+  return deviceRequest('/api/kiosk/bootstrap', deviceToken);
+}
+
+export async function fetchKioskMenu(deviceToken: string): Promise<MenuResponse> {
+  return deviceRequest('/api/kiosk/menu', deviceToken);
+}
+
+export async function createKioskTicket(
+  deviceToken: string,
+  items: { menuItemId: number; qty: number; modifierIds: number[] }[],
+  paymentMethod: KioskPaymentMethod
+): Promise<{ ticket: KioskTicket }> {
+  return deviceRequest('/api/kiosk/tickets', deviceToken, {
+    method: 'POST',
+    body: { items, paymentMethod },
+  });
+}
+
+export async function closeKioskTicket(
+  ticketId: number,
+  token: string
+): Promise<{ ticket: KioskTicket }> {
+  return authorizedRequest(`/api/kiosk/tickets/${ticketId}/close`, token, {
+    method: 'POST',
+    body: {},
+  });
+}
+
+export async function fetchKioskTicket(
+  deviceToken: string,
+  ticketId: number
+): Promise<{ ticket: KioskTicket }> {
+  return deviceRequest(`/api/kiosk/tickets/${ticketId}`, deviceToken);
+}
+
+export async function fetchMyKioskTickets(
+  deviceToken: string
+): Promise<{ tickets: KioskTicket[] }> {
+  return deviceRequest('/api/kiosk/mine', deviceToken);
 }

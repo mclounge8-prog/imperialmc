@@ -198,6 +198,7 @@ export function buildPrecheckPayload({
   guestLabel,
   operatorName,
   venueName,
+  footerText,
 }) {
   const lines = [];
   lines.push({ type: 'text', text: '=== ПРЕДЧЕК ===', alignment: 'center' });
@@ -230,7 +231,11 @@ export function buildPrecheckPayload({
     alignment: 'right',
   });
   lines.push({ type: 'text', text: ' ' });
-  lines.push({ type: 'text', text: 'Ожидает оплату', alignment: 'center' });
+  lines.push({
+    type: 'text',
+    text: footerText || 'Ожидает оплату',
+    alignment: 'center',
+  });
 
   return {
     type: 'nonFiscal',
@@ -251,6 +256,7 @@ export async function enqueuePrecheckFiscalJob(
     guestLabel,
     operatorName,
     venueName,
+    footerText,
   }
 ) {
   if (!venueId) return null;
@@ -271,6 +277,7 @@ export async function enqueuePrecheckFiscalJob(
     guestLabel,
     operatorName,
     venueName,
+    footerText,
   });
   const { rows } = await client.query(
     `INSERT INTO fiscal_jobs (venue_id, type, payload) VALUES ($1, 'precheck', $2) RETURNING id`,
@@ -287,6 +294,12 @@ export async function enqueueReceiptFiscalJob(
   // Нулевая сумма (100% скидка) — фискальный sell не печатаем.
   if (Number(total) <= 0.009) {
     await client.query("UPDATE receipts SET fiscal_status = NULL WHERE id = $1", [receiptId]);
+    return;
+  }
+  const onlyQr =
+    Array.isArray(payments) && payments.length > 0 && payments.every((p) => p.method === 'qr');
+  if (onlyQr) {
+    await client.query('UPDATE receipts SET fiscal_status = NULL WHERE id = $1', [receiptId]);
     return;
   }
   const enabled = await isAtolEnabledForVenue(client, venueId);
@@ -357,7 +370,7 @@ export async function enqueueCashFiscalJob(client, { venueId, shiftId, type, amo
   );
 }
 
-const METHOD_LABELS = { cash: 'Наличные', card: 'Безнал', other: 'Другое' };
+const METHOD_LABELS = { cash: 'Наличные', card: 'Безнал', qr: 'QR-код', other: 'Другое' };
 
 /** Нефискальная копия оплаченного чека (расшифровка как на фискальном). */
 export function buildReceiptCopyPayload({

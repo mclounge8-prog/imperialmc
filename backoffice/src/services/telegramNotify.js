@@ -364,7 +364,7 @@ export function buildDiscountPaymentMessage({
   when,
 }) {
   const where = [tableName ? `стол ${tableName}` : 'быстрый заказ', guestLabel].filter(Boolean).join(' · ');
-  const methodLabels = { cash: 'наличные', card: 'безнал', other: 'прочее' };
+  const methodLabels = { cash: 'наличные', card: 'безнал', other: 'прочее', qr: 'QR-код' };
   const payLines = (payments || [])
     .filter((p) => Number(p.amount) > 0.009)
     .map(
@@ -396,7 +396,7 @@ export function buildReceiptRefundMessage({
   when,
 }) {
   const where = [tableName ? `стол ${tableName}` : 'быстрый заказ', guestLabel].filter(Boolean).join(' · ');
-  const methodLabels = { cash: 'наличные', card: 'безнал', other: 'прочее' };
+  const methodLabels = { cash: 'наличные', card: 'безнал', other: 'прочее', qr: 'QR-код' };
   const payLines = (payments || [])
     .filter((p) => Number(p.amount) > 0.009)
     .map(
@@ -451,6 +451,8 @@ export function buildShiftCloseMessage({
   revenueTotal,
   cashSales,
   cardSales,
+  qrSales = 0,
+  otherSales = 0,
   receiptsCount,
   deposits,
   withdrawals,
@@ -465,7 +467,9 @@ export function buildShiftCloseMessage({
     expectedCash != null ? `Ожидалось по учёту: ${escapeHtml(formatMoney(expectedCash))}` : null,
     `Выручка: <b>${escapeHtml(formatMoney(revenueTotal))}</b>`,
     `Наличные оплаты: ${escapeHtml(formatMoney(cashSales))}`,
-    `Безналичные оплаты: ${escapeHtml(formatMoney(cardSales))}`,
+    `Карта: ${escapeHtml(formatMoney(cardSales))}`,
+    `QR-код: ${escapeHtml(formatMoney(qrSales))}`,
+    Number(otherSales) > 0.009 ? `Прочее: ${escapeHtml(formatMoney(otherSales))}` : null,
     `Чеков: ${escapeHtml(String(receiptsCount ?? 0))}`,
     `Инкассации: ${escapeHtml(formatMoney(withdrawals))}`,
     `Внесения: ${escapeHtml(formatMoney(deposits))}`,

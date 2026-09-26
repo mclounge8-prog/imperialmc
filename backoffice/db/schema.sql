@@ -768,3 +768,74 @@ CREATE INDEX IF NOT EXISTS idx_tobacco_stock_writeoffs_venue
   ON tobacco_stock_writeoffs(venue_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tobacco_stock_writeoff_lines_writeoff
   ON tobacco_stock_writeoff_lines(writeoff_id);
+
+-- ============================================================
+-- Киоск самообслуживания. Включается per-venue (kiosk_enabled).
+-- Заявки киоска — отдельные от столов официанта. Оплаты и фискализации
+-- в v1 нет: гость собирает заказ, кухня ведёт статусы на терминале.
+-- devices.kind: staff (планшет официанта) | kiosk (киоск).
+-- ============================================================
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS kiosk_enabled BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS kind VARCHAR(16) NOT NULL DEFAULT 'staff';
+
+CREATE TABLE IF NOT EXISTS kiosk_tickets (
+  id          SERIAL PRIMARY KEY,
+  venue_id    INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  device_id   INT REFERENCES devices(id) ON DELETE SET NULL,
+  shift_id    INT REFERENCES shifts(id) ON DELETE SET NULL,
+  number      INT NOT NULL,
+  status      VARCHAR(16) NOT NULL DEFAULT 'new',
+  guest_name  VARCHAR(80),
+  comment     TEXT,
+  total       NUMERIC(12,2) NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  cooking_at  TIMESTAMPTZ,
+  ready_at    TIMESTAMPTZ,
+  issued_at   TIMESTAMPTZ,
+  cancelled_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS kiosk_ticket_items (
+  id           SERIAL PRIMARY KEY,
+  ticket_id    INT NOT NULL REFERENCES kiosk_tickets(id) ON DELETE CASCADE,
+  menu_item_id INT REFERENCES menu_items(id) ON DELETE SET NULL,
+  name         VARCHAR(200) NOT NULL,
+  qty          INT NOT NULL DEFAULT 1,
+  price        NUMERIC(12,2) NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS kiosk_ticket_item_modifiers (
+  id                SERIAL PRIMARY KEY,
+  ticket_item_id    INT NOT NULL REFERENCES kiosk_ticket_items(id) ON DELETE CASCADE,
+  modifier_id       INT REFERENCES modifiers(id) ON DELETE SET NULL,
+  name              VARCHAR(200) NOT NULL,
+  price             NUMERIC(12,2) NOT NULL DEFAULT 0,
+  warehouse_item_id INT REFERENCES warehouse_items(id) ON DELETE SET NULL,
+  qty               NUMERIC(10,3) NOT NULL DEFAULT 0,
+  unit              VARCHAR(20)
+);
+
+CREATE INDEX IF NOT EXISTS idx_kiosk_tickets_venue_created
+  ON kiosk_tickets(venue_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_kiosk_tickets_venue_status
+  ON kiosk_tickets(venue_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_kiosk_tickets_venue_shift_number
+  ON kiosk_tickets(venue_id, shift_id, number);
+CREATE INDEX IF NOT EXISTS idx_kiosk_ticket_items_ticket
+  ON kiosk_ticket_items(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_kiosk_ticket_item_modifiers_item
+  ON kiosk_ticket_item_modifiers(ticket_item_id);
+
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS kiosk_cashless_discount_percent NUMERIC(5,2) NOT NULL DEFAULT 12;
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS kiosk_qr_image_url TEXT;
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS source VARCHAR(16) NOT NULL DEFAULT 'staff';
+
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS payment_method VARCHAR(16);
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS payment_status VARCHAR(16) NOT NULL DEFAULT 'unpaid';
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS subtotal NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS order_id INT REFERENCES orders(id) ON DELETE SET NULL;
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS guest_id INT REFERENCES order_guests(id) ON DELETE SET NULL;
+ALTER TABLE kiosk_tickets ADD COLUMN IF NOT EXISTS receipt_id INT REFERENCES receipts(id) ON DELETE SET NULL;

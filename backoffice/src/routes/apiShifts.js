@@ -21,7 +21,7 @@ import {
 const apiShifts = new Hono();
 apiShifts.use('*', requireStaffToken);
 
-const PAYMENT_METHODS = ['cash', 'card', 'other'];
+const PAYMENT_METHODS = ['cash', 'card', 'other', 'qr'];
 
 function roundMoney(value) {
   return Math.round(Number(value) * 100) / 100;
@@ -63,7 +63,7 @@ async function fetchShiftStats(shift) {
      GROUP BY rp.method`,
     [shiftId]
   );
-  const paymentBreakdown = { cash: 0, card: 0, other: 0 };
+  const paymentBreakdown = { cash: 0, card: 0, other: 0, qr: 0 };
   for (const row of paymentRows) {
     if (PAYMENT_METHODS.includes(row.method)) {
       paymentBreakdown[row.method] = Number(row.amount);
@@ -381,7 +381,9 @@ apiShifts.post('/close', async (c) => {
           expectedCash,
           revenueTotal: stats.revenueTotal,
           cashSales: stats.paymentBreakdown.cash,
-          cardSales: stats.paymentBreakdown.card + stats.paymentBreakdown.other,
+          cardSales: stats.paymentBreakdown.card,
+          qrSales: stats.paymentBreakdown.qr,
+          otherSales: stats.paymentBreakdown.other,
           receiptsCount: stats.receiptsCount,
           deposits: stats.cash.deposits,
           withdrawals: stats.cash.withdrawals,

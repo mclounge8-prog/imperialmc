@@ -9,9 +9,13 @@ import {
 } from 'react-native';
 import { colors } from '../theme/colors';
 import { useDevice } from '../context/DeviceContext';
+import BrandMark from '../kiosk/BrandMark';
+import { VenueSecretTitle } from '../kiosk/KioskChrome';
+import { kk } from '../kiosk/theme';
 
 export default function DeviceRegistrationScreen() {
-  const { register } = useDevice();
+  const { register, kind } = useDevice();
+  const isKiosk = kind === 'kiosk';
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +36,13 @@ export default function DeviceRegistrationScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Регистрация устройства</Text>
+    <View style={[styles.container, isKiosk && styles.kioskContainer]}>
+      {isKiosk ? <BrandMark size="lg" /> : <Text style={styles.title}>Регистрация устройства</Text>}
+      {isKiosk ? <VenueSecretTitle name="Регистрация киоска" style={styles.kioskTitle} /> : null}
       <Text style={styles.subtitle}>
-        Получи код в бэкофисе (раздел «Устройства» → «Сгенерировать код регистрации») и введи его
-        здесь.
+        {isKiosk
+          ? 'Новый код из бэкофиса → Устройства. Не тот же, что у терминала на этом планшете — киоск регистрируется отдельно и ставится рядом.'
+          : 'Получи код в бэкофисе (раздел «Устройства» → «Сгенерировать код регистрации») и введи его здесь.'}
       </Text>
 
       <TextInput
@@ -53,20 +59,28 @@ export default function DeviceRegistrationScreen() {
 
       <View style={styles.errorSlot}>
         {loading ? (
-          <ActivityIndicator color={colors.accent2} />
+          <ActivityIndicator color={isKiosk ? kk.gold : colors.accent2} />
         ) : error ? (
           <Text style={styles.errorText}>{error}</Text>
         ) : null}
       </View>
 
-      <Pressable style={styles.button} disabled={loading || !code.trim()} onPress={handleSubmit}>
-        <Text style={styles.buttonText}>Зарегистрировать</Text>
+      <Pressable
+        style={[styles.button, isKiosk && styles.kioskButton]}
+        disabled={loading || !code.trim()}
+        onPress={handleSubmit}
+      >
+        <Text style={[styles.buttonText, isKiosk && styles.kioskButtonText]}>Зарегистрировать</Text>
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  kioskTitle: { color: kk.gold, fontSize: 20, fontWeight: '800', marginTop: 8 },
+  kioskContainer: { backgroundColor: kk.bg },
+  kioskButton: { backgroundColor: kk.gold },
+  kioskButtonText: { color: kk.ink, fontWeight: '800' },
   container: {
     flex: 1,
     backgroundColor: colors.bg,

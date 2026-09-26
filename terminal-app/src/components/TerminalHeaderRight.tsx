@@ -24,7 +24,9 @@ export default function TerminalHeaderRight() {
 
   if (!session) return null;
 
+  const kioskEnabled = Boolean(venue?.kioskEnabled);
   const showReferenceButton = route.name !== 'MenuReference';
+  const showKioskButton = kioskEnabled && route.name !== 'KioskKitchen';
   const showSettingsButton = ![
     'Settings',
     'XReport',
@@ -32,6 +34,7 @@ export default function TerminalHeaderRight() {
     'AtolStatus',
     'Cash',
     'TobaccoAccounting',
+    'KioskKitchen',
   ].includes(route.name);
   const onStatusScreen = route.name === 'AtolStatus';
 
@@ -89,6 +92,15 @@ export default function TerminalHeaderRight() {
         </Pressable>
       ) : null}
 
+      {showKioskButton && (
+        <Pressable
+          style={styles.referenceButton}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => navigation.navigate('KioskKitchen')}
+        >
+          <Text style={styles.referenceButtonText}>🍽 Киоск</Text>
+        </Pressable>
+      )}
       {showReferenceButton && (
         <Pressable
           style={styles.referenceButton}
@@ -134,7 +146,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginRight: 8,
-    maxWidth: 620,
+    maxWidth: 720,
   },
   statusChip: {
     maxWidth: 150,

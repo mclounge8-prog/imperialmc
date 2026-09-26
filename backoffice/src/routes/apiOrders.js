@@ -27,6 +27,12 @@ function parseDiscountPercent(raw) {
   return n;
 }
 
+function clampDiscountPercent(value) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n) || n < 0 || n > 100) return 0;
+  return n;
+}
+
 async function fetchGuestPrecheckState(clientOrPool, guestId) {
   const { rows } = await clientOrPool.query(
     'SELECT precheck_printed_at FROM order_guests WHERE id = $1',
@@ -66,6 +72,7 @@ apiOrders.get('/orders/open', requireStaffToken, async (c) => {
      FROM orders o
      LEFT JOIN tables t ON t.id = o.table_id
      WHERE o.venue_id = $1 AND o.status = 'open'
+       AND COALESCE(o.source, 'staff') <> 'kiosk'
      ORDER BY o.opened_at DESC`,
     [venueId]
   );
@@ -144,9 +151,7 @@ async function fetchOrderDetail(orderId) {
   const guests = guestRows.map((g) => {
     const guestItems = itemsById.filter((i) => i.guestId === g.id);
     const subtotal = roundMoney(guestItems.reduce((sum, i) => sum + i.lineTotal, 0));
-    const discountPercent = ALLOWED_DISCOUNT_PERCENTS.has(Number(g.discount_percent))
-      ? Number(g.discount_percent)
-      : 0;
+    const discountPercent = clampDiscountPercent(g.discount_percent);
     const discountAmount = roundMoney((subtotal * discountPercent) / 100);
     const total = roundMoney(subtotal - discountAmount);
     return {
@@ -185,6 +190,9 @@ async function createDefaultGuest(orderId) {
 // весь заказ (и стол, если был) закрывается сам. paid, если хотя бы один гость
 // реально оплатил, иначе cancelled (все ушли без оплаты).
 async function maybeCloseOrderIfAllGuestsSettled(orderId) {
+  const { rows: sourceRows } = await pool.query('SELECT source FROM orders WHERE id = $1', [orderId]);
+  if (sourceRows[0]?.source === 'kiosk') return;
+
   const { rows: openGuests } = await pool.query(
     "SELECT id FROM order_guests WHERE order_id = $1 AND status = 'open'",
     [orderId]
@@ -304,13 +312,14 @@ apiOrders.post('/orders/:orderId/guests', requireStaffToken, async (c) => {
   return c.json({ order });
 });
 
-const PAYMENT_METHODS = ['cash', 'card', 'other'];
+const PAYMENT_METHODS = ['cash', 'card', 'other', 'qr'];
 
 async function fetchGuestForSettlement(orderId, guestId, client) {
   const { rows } = await client.query(
     `SELECT og.id, og.label, og.order_id, og.precheck_printed_at, og.discount_percent,
             o.venue_id, o.table_id, o.opened_at, t.name AS table_name,
             COALESCE(v.precheck_enabled, false) AS precheck_enabled,
+            COALESCE(o.source, 'staff') AS source,
             v.name AS venue_name
      FROM order_guests og
      JOIN orders o ON o.id = og.order_id
@@ -384,9 +393,7 @@ async function createReceipt(
   { guest, staff, status, items, payments, cancelComment = null, discountPercent = 0 }
 ) {
   const subtotal = roundMoney(items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0));
-  const pct = ALLOWED_DISCOUNT_PERCENTS.has(Number(discountPercent))
-    ? Number(discountPercent)
-    : 0;
+  const pct = clampDiscountPercent(discountPercent);
   const discount = status === 'paid' ? roundMoney((subtotal * pct) / 100) : 0;
   const total = roundMoney(subtotal - discount);
 
@@ -514,18 +521,54 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       return c.json({ error: 'Гость не найден или уже закрыт' });
     }
 
-    // Скидка уже назначена на гостя (отдельное меню), не в момент оплаты.
-    const discountPercent = ALLOWED_DISCOUNT_PERCENTS.has(Number(guest.discount_percent))
-      ? Number(guest.discount_percent)
-      : 0;
+    const { rows: kioskPaidRows } = await client.query(
+      'SELECT id, payment_status, payment_method FROM kiosk_tickets WHERE order_id = $1 FOR UPDATE',
+      [orderId]
+    );
+    if (kioskPaidRows[0]?.payment_status === 'paid') {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({ error: 'Оплата уже проведена, тип оплаты менять нельзя', code: 'ALREADY_PAID' });
+    }
 
     // В режиме пречека оплату разрешаем только после печати пречека (кроме 0 ₽).
     const items = await fetchGuestItemsSnapshot(guestId, client);
     const subtotal = roundMoney(items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0));
+
+    let discountPercent = clampDiscountPercent(guest.discount_percent);
+    const chosen =
+      payments && PAYMENT_METHODS.includes(payments[0]?.method) ? payments[0].method : null;
+    if (chosen === 'qr' || kioskPaidRows[0]) {
+      const { rows: venueDisc } = await client.query(
+        'SELECT COALESCE(kiosk_cashless_discount_percent, 12) AS pct FROM venues WHERE id = $1',
+        [guest.venue_id]
+      );
+      const qrPct = Math.max(0, Math.min(100, Number(venueDisc[0]?.pct || 12)));
+      if (kioskPaidRows[0] && chosen) {
+        discountPercent = chosen === 'qr' ? qrPct : 0;
+      } else if (chosen === 'qr' && discountPercent === 0) {
+        discountPercent = qrPct;
+      }
+      const nextTotal = roundMoney(subtotal - roundMoney((subtotal * discountPercent) / 100));
+      await client.query('UPDATE order_guests SET discount_percent = $2 WHERE id = $1', [guestId, discountPercent]);
+      if (kioskPaidRows[0] && chosen) {
+        await client.query(
+          `UPDATE kiosk_tickets
+           SET payment_method = $2, discount_percent = $3, total = $4
+           WHERE id = $1`,
+          [kioskPaidRows[0].id, chosen, discountPercent, nextTotal]
+        );
+      }
+    }
     const discount = roundMoney((subtotal * discountPercent) / 100);
     const payable = roundMoney(subtotal - discount);
 
-    if (guest.precheck_enabled && subtotal > 0.009 && !guest.precheck_printed_at) {
+    if (
+      guest.precheck_enabled &&
+      guest.source !== 'kiosk' &&
+      subtotal > 0.009 &&
+      !guest.precheck_printed_at
+    ) {
       await client.query('ROLLBACK');
       c.status(409);
       return c.json({
@@ -573,6 +616,32 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       discountPercent,
     });
     await client.query("UPDATE order_guests SET status = 'paid' WHERE id = $1", [guestId]);
+    if (kioskPaidRows[0]) {
+      await client.query(
+        `UPDATE kiosk_tickets
+         SET payment_status = 'paid',
+             receipt_id = $2,
+             status = CASE WHEN status IN ('new', 'payment') THEN 'cooking' ELSE status END,
+             cooking_at = COALESCE(cooking_at, now())
+         WHERE id = $1`,
+        [kioskPaidRows[0].id, receiptMeta.receiptId]
+      );
+      if (normalizedPayments.some((p) => p.method === 'qr')) {
+        await enqueuePrecheckFiscalJob(client, {
+          venueId: guest.venue_id,
+          items,
+          subtotal,
+          discountPercent,
+          discountAmount: discount,
+          total: payable,
+          tableName: guest.table_name,
+          guestLabel: guest.label,
+          operatorName: staff.name,
+          venueName: guest.venue_name,
+          footerText: 'Оплачено по QR · перевод подтвердил сотрудник',
+        });
+      }
+    }
 
     await client.query('COMMIT');
     paidNotify = {
@@ -774,9 +843,7 @@ apiOrders.post('/orders/:orderId/guests/:guestId/precheck', requireStaffToken, a
       return c.json({ error: 'Нельзя напечатать пречек на пустой чек' });
     }
 
-    const discountPercent = ALLOWED_DISCOUNT_PERCENTS.has(Number(guest.discount_percent))
-      ? Number(guest.discount_percent)
-      : 0;
+    const discountPercent = clampDiscountPercent(guest.discount_percent);
     const discountAmount = roundMoney((subtotal * discountPercent) / 100);
     const payable = roundMoney(subtotal - discountAmount);
 
