@@ -536,7 +536,7 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
     const subtotal = roundMoney(items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0));
 
     let discountPercent = clampDiscountPercent(guest.discount_percent);
-    if (kioskPaidRows[0] && payments && payments[0]?.method) {
+    if (kioskPaidRows[0] && payments && PAYMENT_METHODS.includes(payments[0]?.method)) {
       const chosen = payments[0].method;
       const { rows: venueDisc } = await client.query(
         'SELECT COALESCE(kiosk_cashless_discount_percent, 12) AS pct FROM venues WHERE id = $1',
