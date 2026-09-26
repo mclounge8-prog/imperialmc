@@ -312,7 +312,6 @@ export default function KioskOrderScreen() {
                 <Text style={[styles.ticketStatus, { color: guestStatusTint(ticket.status) }]}>
                   {guestStatusLabel(ticket.status)}
                 </Text>
-                <Text style={styles.ticketSum}>{Math.round(ticket.total)} ₽</Text>
               </View>
             ))
           )}
@@ -714,7 +713,6 @@ const styles = StyleSheet.create({
   ticketRowReady: { borderColor: kk.gold, backgroundColor: '#2a210c' },
   ticketNum: { color: kk.cream, fontSize: 24, fontWeight: '800', minWidth: 90 },
   ticketStatus: { flex: 1, fontSize: 20, fontWeight: '800' },
-  ticketSum: { color: kk.gold, fontSize: 18, fontWeight: '800' },
   error: { color: kk.red, textAlign: 'center', fontSize: 15 },
   ghost: {
     borderWidth: 1,
