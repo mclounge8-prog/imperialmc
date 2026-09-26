@@ -34,7 +34,7 @@ type CartLine = {
   qty: number;
 };
 
-type PayStep = null | 'type' | 'cashless' | 'qr';
+type PayStep = null | 'type' | 'offer' | 'cashless' | 'qr';
 
 function flattenCats(cats: MenuCategory[], acc: MenuCategory[] = []): MenuCategory[] {
   for (const cat of cats) {
@@ -514,10 +514,21 @@ export default function KioskOrderScreen() {
           error={error}
           onBack={() => {
             bumpActivity();
-            setPayStep(payStep === 'type' ? null : payStep === 'qr' ? 'cashless' : 'type');
+            if (payStep === 'type') setPayStep(null);
+            else if (payStep === 'offer') setPayStep('type');
+            else if (payStep === 'cashless') setPayStep(discountPct > 0 ? 'offer' : 'type');
+            else setPayStep(discountPct > 0 ? 'offer' : 'cashless');
           }}
           onCash={() => void submit('cash')}
           onCashless={() => {
+            bumpActivity();
+            setPayStep(discountPct > 0 ? 'offer' : 'cashless');
+          }}
+          onAcceptOffer={() => {
+            bumpActivity();
+            setPayStep('qr');
+          }}
+          onThinkLater={() => {
             bumpActivity();
             setPayStep('cashless');
           }}

@@ -22,7 +22,7 @@ export type CheckoutCartLine = {
   qty: number;
 };
 
-type PayStep = 'type' | 'cashless' | 'qr';
+type PayStep = 'type' | 'offer' | 'cashless' | 'qr';
 
 type Props = {
   cart: CheckoutCartLine[];
@@ -35,6 +35,8 @@ type Props = {
   onBack: () => void;
   onCash: () => void;
   onCashless: () => void;
+  onAcceptOffer: () => void;
+  onThinkLater: () => void;
   onCard: () => void;
   onOpenQr: () => void;
   onConfirmQr: () => void;
@@ -52,6 +54,7 @@ function extrasOf(item: MenuItem, ids: number[]): { name: string; price: number 
 }
 
 function titleFor(step: PayStep, discountPct: number): string {
+  if (step === 'offer') return 'Уникальное предложение';
   if (step === 'cashless') return 'Безналичная оплата';
   if (step === 'qr') return `Оплата по QR · скидка ${discountPct}%`;
   return 'Выбор способа оплаты';
@@ -110,6 +113,8 @@ export default function KioskCheckoutPanel({
   onBack,
   onCash,
   onCashless,
+  onAcceptOffer,
+  onThinkLater,
   onCard,
   onOpenQr,
   onConfirmQr,
@@ -266,6 +271,40 @@ export default function KioskCheckoutPanel({
           {busy && step !== 'qr' ? <ActivityIndicator color={colors.accent2} style={{ marginTop: 12 }} /> : null}
         </View>
       </View>
+
+      {step === 'offer' ? (
+        <Pressable style={styles.offerWrap} onPress={onBack}>
+          <Pressable style={styles.offerCard} onPress={(e) => e.stopPropagation()}>
+            <LinearGradient
+              colors={['#4a3410', '#2a1e0c', '#16140f']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.offerInner}
+            >
+              <View style={styles.offerBadge}>
+                <Text style={styles.offerBadgeText}>Уникальное предложение</Text>
+              </View>
+              <Text style={styles.offerKicker}>Оплата переводом по QR</Text>
+              <Text style={styles.offerHero}>−{discountPct}%</Text>
+              <Text style={styles.offerSave}>выгода {money(qrOff)}</Text>
+              <Text style={styles.offerCopy}>
+                Если оплатите заказ переводом по QR-коду, вы поможете нам становиться лучше — и получите скидку{' '}
+                {discountPct}% на этот заказ. К оплате {money(qrPayable)} вместо {money(total)}.
+              </Text>
+              <Pressable
+                style={({ pressed }) => [styles.offerCta, pressed && styles.pressed]}
+                disabled={busy}
+                onPress={onAcceptOffer}
+              >
+                <Text style={styles.offerCtaText}>Воспользоваться предложением</Text>
+              </Pressable>
+              <Pressable style={styles.offerLater} disabled={busy} onPress={onThinkLater}>
+                <Text style={styles.offerLaterText}>Я подумаю</Text>
+              </Pressable>
+            </LinearGradient>
+          </Pressable>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -403,4 +442,68 @@ const styles = StyleSheet.create({
   confirmOff: { opacity: 0.4 },
   confirmText: { color: '#111', fontSize: 24, fontWeight: '800' },
   error: { color: colors.danger, textAlign: 'center', fontSize: 16, fontWeight: '700' },
+  offerWrap: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(6, 8, 12, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    zIndex: 30,
+  },
+  offerCard: {
+    width: '100%',
+    maxWidth: 560,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: '#fbbf24',
+    overflow: 'hidden',
+    shadowColor: '#fbbf24',
+    shadowOpacity: 0.35,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12,
+  },
+  offerInner: {
+    paddingHorizontal: 28,
+    paddingVertical: 32,
+    alignItems: 'center',
+    gap: 10,
+  },
+  offerBadge: {
+    backgroundColor: '#fbbf24',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginBottom: 6,
+  },
+  offerBadgeText: {
+    color: '#111',
+    fontWeight: '800',
+    fontSize: 13,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  offerKicker: { color: '#fde68a', fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  offerHero: { color: '#fbbf24', fontSize: 72, fontWeight: '800', lineHeight: 78 },
+  offerSave: { color: '#fff', fontSize: 22, fontWeight: '800' },
+  offerCopy: {
+    color: '#e7e5e4',
+    fontSize: 18,
+    lineHeight: 26,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  offerCta: {
+    alignSelf: 'stretch',
+    backgroundColor: '#fbbf24',
+    minHeight: 76,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  offerCtaText: { color: '#111', fontSize: 22, fontWeight: '800', textAlign: 'center' },
+  offerLater: { paddingVertical: 14, paddingHorizontal: 18 },
+  offerLaterText: { color: '#d6d3d1', fontSize: 18, fontWeight: '700' },
 });
