@@ -54,6 +54,34 @@ routes.post('/apk', async (c) => {
   return c.html(await renderPage(c));
 });
 
+routes.post('/kiosk', async (c) => {
+  const body = await c.req.parseBody({ all: true });
+  const file = body.apk;
+  if (!file || typeof file === 'string') {
+    c.status(400);
+    return c.html('<p>Выберите файл APK киоска</p>');
+  }
+
+  const versionCode = Number(body.versionCode) || 1;
+  const versionName = String(body.versionName || '').trim() || '1.0.0';
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const filename = `kiosk-v${versionCode}-${Date.now()}.apk`;
+  const saved = await saveUpdateFile(filename, buffer);
+  await saveUpdateFile('kiosk.apk', buffer);
+  const digest = await sha256Buffer(buffer);
+
+  const manifest = await readManifest();
+  manifest.kiosk = {
+    versionCode,
+    versionName,
+    file: saved,
+    sha256: digest,
+    notes: String(body.notes || '').trim(),
+  };
+  await writeManifest(manifest);
+  return c.html(await renderPage(c));
+});
+
 routes.post('/js', async (c) => {
   const body = await c.req.parseBody({ all: true });
   const file = body.bundle;

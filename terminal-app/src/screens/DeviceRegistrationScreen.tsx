@@ -11,7 +11,8 @@ import { colors } from '../theme/colors';
 import { useDevice } from '../context/DeviceContext';
 
 export default function DeviceRegistrationScreen() {
-  const { register } = useDevice();
+  const { register, kind } = useDevice();
+  const isKiosk = kind === 'kiosk';
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,10 +34,11 @@ export default function DeviceRegistrationScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Регистрация устройства</Text>
+      <Text style={styles.title}>{isKiosk ? 'Регистрация киоска' : 'Регистрация устройства'}</Text>
       <Text style={styles.subtitle}>
-        Получи код в бэкофисе (раздел «Устройства» → «Сгенерировать код регистрации») и введи его
-        здесь.
+        {isKiosk
+          ? 'Новый код из бэкофиса → Устройства. Не тот же, что у терминала на этом планшете — киоск регистрируется отдельно и ставится рядом.'
+          : 'Получи код в бэкофисе (раздел «Устройства» → «Сгенерировать код регистрации») и введи его здесь.'}
       </Text>
 
       <TextInput

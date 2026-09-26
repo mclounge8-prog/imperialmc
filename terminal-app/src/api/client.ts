@@ -83,11 +83,14 @@ export type DeviceStatus = {
   } | null;
 };
 
-export async function registerDevice(code: string): Promise<{ token: string }> {
+export async function registerDevice(
+  code: string,
+  kind: 'staff' | 'kiosk' = 'staff'
+): Promise<{ token: string }> {
   const response = await fetch(`${API_BASE_URL}/api/devices/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code, kind }),
   });
 
   const data = await parseJsonResponse(response);
@@ -990,4 +993,61 @@ export async function setKioskTicketStatus(
     method: 'POST',
     body: { status },
   });
+}
+
+export type KioskBootstrap = {
+  active: boolean;
+  kind: 'staff' | 'kiosk';
+  venue: { id: number; name: string; kioskEnabled: boolean } | null;
+  shiftOpen: boolean;
+  ready: boolean;
+};
+
+async function deviceRequest<T>(
+  path: string,
+  deviceToken: string,
+  options: { method?: string; body?: unknown } = {}
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: options.method || 'GET',
+    headers: {
+      Authorization: `Bearer ${deviceToken}`,
+      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+  const data = await parseJsonResponse(response);
+  if (!response.ok) {
+    const body = data as ApiErrorBody;
+    throw new ApiRequestError(body.error || 'Ошибка запроса', {
+      status: response.status,
+      code: body.code,
+    });
+  }
+  return data as T;
+}
+
+export async function fetchKioskBootstrap(deviceToken: string): Promise<KioskBootstrap> {
+  return deviceRequest('/api/kiosk/bootstrap', deviceToken);
+}
+
+export async function fetchKioskMenu(deviceToken: string): Promise<MenuResponse> {
+  return deviceRequest('/api/kiosk/menu', deviceToken);
+}
+
+export async function createKioskTicket(
+  deviceToken: string,
+  items: { menuItemId: number; qty: number; modifierIds: number[] }[]
+): Promise<{ ticket: KioskTicket }> {
+  return deviceRequest('/api/kiosk/tickets', deviceToken, {
+    method: 'POST',
+    body: { items },
+  });
+}
+
+export async function fetchKioskTicket(
+  deviceToken: string,
+  ticketId: number
+): Promise<{ ticket: KioskTicket }> {
+  return deviceRequest(`/api/kiosk/tickets/${ticketId}`, deviceToken);
 }

@@ -15,7 +15,8 @@ class MainApplication : Application(), ReactApplication {
   override val reactHost: ReactHost by lazy {
     // В debug всегда Metro. В release — OTA-бандл, если он есть и совместим с APK.
     val otaBundle =
-      if (BuildConfig.DEBUG) null else UpdateModule.resolveJsBundlePath(applicationContext)
+      if (BuildConfig.DEBUG || BuildConfig.IS_KIOSK) null
+      else UpdateModule.resolveJsBundlePath(applicationContext)
 
     getDefaultReactHost(
       context = applicationContext,

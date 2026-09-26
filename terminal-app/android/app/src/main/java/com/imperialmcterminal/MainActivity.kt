@@ -16,7 +16,8 @@ class MainActivity : ReactActivity() {
    * Returns the name of the main component registered from JavaScript. This is used to schedule
    * rendering of the component.
    */
-  override fun getMainComponentName(): String = "ImperialMcTerminal"
+  override fun getMainComponentName(): String =
+      if (BuildConfig.IS_KIOSK) "ImperialMcKiosk" else "ImperialMcTerminal"
 
   /**
    * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]
@@ -27,6 +28,9 @@ class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    if (BuildConfig.IS_KIOSK) {
+      window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
     hideSystemNavigation()
   }
 

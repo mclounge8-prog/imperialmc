@@ -4,7 +4,8 @@ import { colors } from '../theme/colors';
 import { useDevice } from '../context/DeviceContext';
 
 export default function DeviceStatusScreen() {
-  const { status, error, refresh, clearRegistration } = useDevice();
+  const { status, error, refresh, clearRegistration, kind } = useDevice();
+  const isKiosk = kind === 'kiosk';
   const [refreshing, setRefreshing] = useState(false);
   const [clearing, setClearing] = useState(false);
 
@@ -56,9 +57,9 @@ export default function DeviceStatusScreen() {
         )}
       </Pressable>
       <Text style={styles.hint}>
-        Чтобы сменить точку, в бэкофисе достаточно выбрать другое заведение у этого устройства —
-        удалять его не обязательно. Если устройство уже удалили — нажми «Зарегистрировать заново» и
-        введи новый код.
+        {isKiosk
+          ? 'Киоск — отдельное устройство в бэкофисе. Терминал на этом планшете не сбрасывается. Назначь заведение и включи киоск на карточке точки.'
+          : 'Чтобы сменить точку, в бэкофисе достаточно выбрать другое заведение у этого устройства — удалять его не обязательно. Если устройство уже удалили — нажми «Зарегистрировать заново» и введи новый код.'}
       </Text>
     </View>
   );

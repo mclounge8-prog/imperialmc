@@ -20,6 +20,12 @@ const DEFAULT_MANIFEST = {
     mandatory: false,
     notes: '',
   },
+  kiosk: {
+    versionCode: 1,
+    versionName: '1.0.0',
+    file: null,
+    notes: '',
+  },
 };
 
 export async function ensureUpdatesDir() {
@@ -39,6 +45,7 @@ export async function readManifest() {
     return {
       apk: { ...DEFAULT_MANIFEST.apk, ...(parsed.apk || {}) },
       js: { ...DEFAULT_MANIFEST.js, ...(parsed.js || {}) },
+      kiosk: { ...DEFAULT_MANIFEST.kiosk, ...(parsed.kiosk || {}) },
     };
   } catch {
     return structuredClone(DEFAULT_MANIFEST);
@@ -61,6 +68,7 @@ export function publicBaseUrl(c) {
 export function manifestForClient(manifest, baseUrl) {
   const apkFile = manifest.apk?.file;
   const jsFile = manifest.js?.file;
+  const kioskFile = manifest.kiosk?.file;
   return {
     apk: {
       versionCode: Number(manifest.apk?.versionCode) || 1,
@@ -77,6 +85,13 @@ export function manifestForClient(manifest, baseUrl) {
       mandatory: Boolean(manifest.js?.mandatory),
       notes: String(manifest.js?.notes || ''),
       sha256: manifest.js?.sha256 || null,
+    },
+    kiosk: {
+      versionCode: Number(manifest.kiosk?.versionCode) || 1,
+      versionName: String(manifest.kiosk?.versionName || '1.0.0'),
+      url: kioskFile ? `${baseUrl}/updates/${kioskFile}` : `${baseUrl}/updates/kiosk.apk`,
+      notes: String(manifest.kiosk?.notes || ''),
+      sha256: manifest.kiosk?.sha256 || null,
     },
   };
 }
