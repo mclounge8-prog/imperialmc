@@ -13,7 +13,7 @@ class KioskLockModule(reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun startLock(promise: Promise) {
-    val activity = currentActivity
+    val activity = reactApplicationContext.currentActivity
     if (activity == null) {
       promise.reject("NO_ACTIVITY", "Нет Activity")
       return
@@ -35,14 +35,18 @@ class KioskLockModule(reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun stopLock(promise: Promise) {
-    val activity = currentActivity
+    val activity = reactApplicationContext.currentActivity
     if (activity == null) {
       promise.reject("NO_ACTIVITY", "Нет Activity")
       return
     }
     activity.runOnUiThread {
       try {
-        activity.stopLockTask()
+        try {
+          activity.stopLockTask()
+        } catch (_: Exception) {
+          // Уже не в lock task.
+        }
         (activity as? MainActivity)?.setKioskLocked(false)
         promise.resolve(true)
       } catch (e: Exception) {
