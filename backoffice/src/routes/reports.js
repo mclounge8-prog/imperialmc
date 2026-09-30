@@ -261,7 +261,7 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo }) {
          COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'cash'), 0) AS cash_sales,
          COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'card'), 0) AS card_sales,
          COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'qr'), 0) AS qr_sales,
-         COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'other'), 0) AS other_sales,
+         COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'other'), 0) AS other_sales
        FROM receipt_payments rp
        JOIN receipts r ON r.id = rp.receipt_id
        WHERE r.shift_id = s.id AND r.status = 'paid'
