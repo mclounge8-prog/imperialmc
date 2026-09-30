@@ -1,0 +1,6601 @@
+{
+  "VENUES": [
+    {
+      "id": 5,
+      "name": "Kebab King Карла"
+    },
+    {
+      "id": 4,
+      "name": "Kebab King Октябрьская"
+    },
+    {
+      "id": 2,
+      "name": "MC Lounge Puff"
+    },
+    {
+      "id": 1,
+      "name": "MC Lounge Роза"
+    },
+    {
+      "id": 6,
+      "name": "MC Гранд"
+    }
+  ],
+  "BY_VENUE": [
+    {
+      "id": 4,
+      "name": "Kebab King Октябрьская",
+      "paid_receipts": "1790",
+      "cancelled_receipts": "56",
+      "refunded_receipts": "1",
+      "paid_total": "1015823.00",
+      "discount_total": "1253.00",
+      "subtotal": "1017076.00"
+    },
+    {
+      "id": 5,
+      "name": "Kebab King Карла",
+      "paid_receipts": "1026",
+      "cancelled_receipts": "21",
+      "refunded_receipts": "5",
+      "paid_total": "540219.00",
+      "discount_total": "150.00",
+      "subtotal": "540369.00"
+    },
+    {
+      "id": 1,
+      "name": "MC Lounge Роза",
+      "paid_receipts": "142",
+      "cancelled_receipts": "41",
+      "refunded_receipts": "6",
+      "paid_total": "117780.00",
+      "discount_total": "57210.00",
+      "subtotal": "174990.00"
+    },
+    {
+      "id": 6,
+      "name": "MC Гранд",
+      "paid_receipts": "192",
+      "cancelled_receipts": "52",
+      "refunded_receipts": "0",
+      "paid_total": "108270.00",
+      "discount_total": "16430.00",
+      "subtotal": "124700.00"
+    },
+    {
+      "id": 2,
+      "name": "MC Lounge Puff",
+      "paid_receipts": "17",
+      "cancelled_receipts": "4",
+      "refunded_receipts": "0",
+      "paid_total": "27000.00",
+      "discount_total": "0.00",
+      "subtotal": "27000.00"
+    }
+  ],
+  "PAYMENTS": [
+    {
+      "venue": "Kebab King Карла",
+      "method": "card",
+      "amount": "449769.00",
+      "n": "818"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "method": "cash",
+      "amount": "90450.00",
+      "n": "207"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "method": "card",
+      "amount": "884015.00",
+      "n": "1560"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "method": "cash",
+      "amount": "131808.00",
+      "n": "227"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "method": "card",
+      "amount": "21000.00",
+      "n": "14"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "method": "cash",
+      "amount": "6000.00",
+      "n": "3"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "method": "card",
+      "amount": "75655.50",
+      "n": "67"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "method": "cash",
+      "amount": "42124.50",
+      "n": "40"
+    },
+    {
+      "venue": "MC Гранд",
+      "method": "card",
+      "amount": "90750.00",
+      "n": "150"
+    },
+    {
+      "venue": "MC Гранд",
+      "method": "cash",
+      "amount": "17520.00",
+      "n": "23"
+    }
+  ],
+  "BY_DAY": [
+    {
+      "day": "2026-09-01T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "33",
+      "revenue": "17355.00"
+    },
+    {
+      "day": "2026-09-01T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "68",
+      "revenue": "40364.00"
+    },
+    {
+      "day": "2026-09-01T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "2",
+      "revenue": "977.50"
+    },
+    {
+      "day": "2026-09-02T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "36",
+      "revenue": "16180.00"
+    },
+    {
+      "day": "2026-09-02T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "53",
+      "revenue": "34914.00"
+    },
+    {
+      "day": "2026-09-02T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "2",
+      "revenue": "2275.00"
+    },
+    {
+      "day": "2026-09-03T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "35",
+      "revenue": "17035.00"
+    },
+    {
+      "day": "2026-09-03T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "61",
+      "revenue": "31732.00"
+    },
+    {
+      "day": "2026-09-03T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "6",
+      "revenue": "5574.00"
+    },
+    {
+      "day": "2026-09-04T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "25",
+      "revenue": "13525.00"
+    },
+    {
+      "day": "2026-09-04T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "62",
+      "revenue": "30280.00"
+    },
+    {
+      "day": "2026-09-04T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "1",
+      "revenue": "1035.00"
+    },
+    {
+      "day": "2026-09-05T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "28",
+      "revenue": "18200.00"
+    },
+    {
+      "day": "2026-09-05T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "72",
+      "revenue": "38310.00"
+    },
+    {
+      "day": "2026-09-05T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "8",
+      "revenue": "5780.00"
+    },
+    {
+      "day": "2026-09-06T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "26",
+      "revenue": "14730.00"
+    },
+    {
+      "day": "2026-09-06T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "59",
+      "revenue": "32900.00"
+    },
+    {
+      "day": "2026-09-06T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "8",
+      "revenue": "4230.00"
+    },
+    {
+      "day": "2026-09-07T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "30",
+      "revenue": "16144.00"
+    },
+    {
+      "day": "2026-09-07T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "62",
+      "revenue": "32180.00"
+    },
+    {
+      "day": "2026-09-07T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "10",
+      "revenue": "9270.00"
+    },
+    {
+      "day": "2026-09-08T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "39",
+      "revenue": "19730.00"
+    },
+    {
+      "day": "2026-09-08T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "42",
+      "revenue": "22910.00"
+    },
+    {
+      "day": "2026-09-08T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "3",
+      "revenue": "1985.00"
+    },
+    {
+      "day": "2026-09-09T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "32",
+      "revenue": "16280.00"
+    },
+    {
+      "day": "2026-09-09T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "62",
+      "revenue": "30915.00"
+    },
+    {
+      "day": "2026-09-09T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "3",
+      "revenue": "2950.00"
+    },
+    {
+      "day": "2026-09-10T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "24",
+      "revenue": "10910.00"
+    },
+    {
+      "day": "2026-09-10T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "75",
+      "revenue": "39800.00"
+    },
+    {
+      "day": "2026-09-10T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "11",
+      "revenue": "9272.50"
+    },
+    {
+      "day": "2026-09-11T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "40",
+      "revenue": "22430.00"
+    },
+    {
+      "day": "2026-09-11T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "55",
+      "revenue": "34555.00"
+    },
+    {
+      "day": "2026-09-11T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "4",
+      "revenue": "3010.00"
+    },
+    {
+      "day": "2026-09-12T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "49",
+      "revenue": "27840.00"
+    },
+    {
+      "day": "2026-09-12T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "78",
+      "revenue": "47015.00"
+    },
+    {
+      "day": "2026-09-13T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "34",
+      "revenue": "16800.00"
+    },
+    {
+      "day": "2026-09-13T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "62",
+      "revenue": "38990.00"
+    },
+    {
+      "day": "2026-09-13T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "3",
+      "revenue": "3150.00"
+    },
+    {
+      "day": "2026-09-14T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "33",
+      "revenue": "19470.00"
+    },
+    {
+      "day": "2026-09-14T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "47",
+      "revenue": "27985.00"
+    },
+    {
+      "day": "2026-09-14T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "3",
+      "revenue": "3250.00"
+    },
+    {
+      "day": "2026-09-15T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "39",
+      "revenue": "20490.00"
+    },
+    {
+      "day": "2026-09-15T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "63",
+      "revenue": "38445.00"
+    },
+    {
+      "day": "2026-09-15T00:00:00.000Z",
+      "venue": "MC Lounge Puff",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "day": "2026-09-15T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "4",
+      "revenue": "1500.00"
+    },
+    {
+      "day": "2026-09-15T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "2",
+      "revenue": "1470.00"
+    },
+    {
+      "day": "2026-09-16T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "34",
+      "revenue": "17090.00"
+    },
+    {
+      "day": "2026-09-16T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "41",
+      "revenue": "21005.00"
+    },
+    {
+      "day": "2026-09-16T00:00:00.000Z",
+      "venue": "MC Lounge Puff",
+      "receipts": "3",
+      "revenue": "4500.00"
+    },
+    {
+      "day": "2026-09-16T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "7",
+      "revenue": "2541.00"
+    },
+    {
+      "day": "2026-09-16T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "10",
+      "revenue": "5090.00"
+    },
+    {
+      "day": "2026-09-17T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "36",
+      "revenue": "20045.00"
+    },
+    {
+      "day": "2026-09-17T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "68",
+      "revenue": "34144.00"
+    },
+    {
+      "day": "2026-09-17T00:00:00.000Z",
+      "venue": "MC Lounge Puff",
+      "receipts": "2",
+      "revenue": "3000.00"
+    },
+    {
+      "day": "2026-09-17T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "5",
+      "revenue": "5260.00"
+    },
+    {
+      "day": "2026-09-17T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "15",
+      "revenue": "6580.00"
+    },
+    {
+      "day": "2026-09-18T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "44",
+      "revenue": "23485.00"
+    },
+    {
+      "day": "2026-09-18T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "79",
+      "revenue": "43110.00"
+    },
+    {
+      "day": "2026-09-18T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "4",
+      "revenue": "4200.00"
+    },
+    {
+      "day": "2026-09-18T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "14",
+      "revenue": "6990.00"
+    },
+    {
+      "day": "2026-09-19T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "55",
+      "revenue": "25955.00"
+    },
+    {
+      "day": "2026-09-19T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "40",
+      "revenue": "26475.00"
+    },
+    {
+      "day": "2026-09-19T00:00:00.000Z",
+      "venue": "MC Lounge Puff",
+      "receipts": "4",
+      "revenue": "6000.00"
+    },
+    {
+      "day": "2026-09-19T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "4",
+      "revenue": "6189.00"
+    },
+    {
+      "day": "2026-09-19T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "8",
+      "revenue": "3770.00"
+    },
+    {
+      "day": "2026-09-20T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "28",
+      "revenue": "16990.00"
+    },
+    {
+      "day": "2026-09-20T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "45",
+      "revenue": "27710.00"
+    },
+    {
+      "day": "2026-09-20T00:00:00.000Z",
+      "venue": "MC Lounge Puff",
+      "receipts": "2",
+      "revenue": "3000.00"
+    },
+    {
+      "day": "2026-09-20T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "5",
+      "revenue": "7500.00"
+    },
+    {
+      "day": "2026-09-20T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "8",
+      "revenue": "5510.00"
+    },
+    {
+      "day": "2026-09-21T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "23",
+      "revenue": "9800.00"
+    },
+    {
+      "day": "2026-09-21T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "66",
+      "revenue": "31985.00"
+    },
+    {
+      "day": "2026-09-21T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "3",
+      "revenue": "1500.00"
+    },
+    {
+      "day": "2026-09-21T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "13",
+      "revenue": "5220.00"
+    },
+    {
+      "day": "2026-09-22T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "26",
+      "revenue": "13060.00"
+    },
+    {
+      "day": "2026-09-22T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "54",
+      "revenue": "26820.00"
+    },
+    {
+      "day": "2026-09-22T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "1",
+      "revenue": "0.00"
+    },
+    {
+      "day": "2026-09-22T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "15",
+      "revenue": "7830.00"
+    },
+    {
+      "day": "2026-09-23T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "46",
+      "revenue": "26190.00"
+    },
+    {
+      "day": "2026-09-23T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "58",
+      "revenue": "37004.00"
+    },
+    {
+      "day": "2026-09-23T00:00:00.000Z",
+      "venue": "MC Lounge Puff",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "day": "2026-09-23T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "4",
+      "revenue": "3150.00"
+    },
+    {
+      "day": "2026-09-23T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "12",
+      "revenue": "5760.00"
+    },
+    {
+      "day": "2026-09-24T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "43",
+      "revenue": "21795.00"
+    },
+    {
+      "day": "2026-09-24T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "66",
+      "revenue": "37165.00"
+    },
+    {
+      "day": "2026-09-24T00:00:00.000Z",
+      "venue": "MC Lounge Puff",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "day": "2026-09-24T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "3",
+      "revenue": "4200.00"
+    },
+    {
+      "day": "2026-09-24T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "11",
+      "revenue": "5350.00"
+    },
+    {
+      "day": "2026-09-25T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "27",
+      "revenue": "13740.00"
+    },
+    {
+      "day": "2026-09-25T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "76",
+      "revenue": "49920.00"
+    },
+    {
+      "day": "2026-09-25T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "4",
+      "revenue": "3185.00"
+    },
+    {
+      "day": "2026-09-25T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "14",
+      "revenue": "10670.00"
+    },
+    {
+      "day": "2026-09-26T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "24",
+      "revenue": "11820.00"
+    },
+    {
+      "day": "2026-09-26T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "61",
+      "revenue": "37490.00"
+    },
+    {
+      "day": "2026-09-26T00:00:00.000Z",
+      "venue": "MC Lounge Puff",
+      "receipts": "4",
+      "revenue": "6000.00"
+    },
+    {
+      "day": "2026-09-26T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "9",
+      "revenue": "4447.00"
+    },
+    {
+      "day": "2026-09-26T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "20",
+      "revenue": "17060.00"
+    },
+    {
+      "day": "2026-09-27T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "38",
+      "revenue": "19370.00"
+    },
+    {
+      "day": "2026-09-27T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "51",
+      "revenue": "33400.00"
+    },
+    {
+      "day": "2026-09-27T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "9",
+      "revenue": "7574.00"
+    },
+    {
+      "day": "2026-09-27T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "9",
+      "revenue": "8600.00"
+    },
+    {
+      "day": "2026-09-28T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "34",
+      "revenue": "20340.00"
+    },
+    {
+      "day": "2026-09-28T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "43",
+      "revenue": "26600.00"
+    },
+    {
+      "day": "2026-09-28T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "5",
+      "revenue": "5400.00"
+    },
+    {
+      "day": "2026-09-28T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "13",
+      "revenue": "4860.00"
+    },
+    {
+      "day": "2026-09-29T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "31",
+      "revenue": "13920.00"
+    },
+    {
+      "day": "2026-09-29T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "51",
+      "revenue": "24260.00"
+    },
+    {
+      "day": "2026-09-29T00:00:00.000Z",
+      "venue": "MC Lounge Puff",
+      "receipts": "1",
+      "revenue": "3000.00"
+    },
+    {
+      "day": "2026-09-29T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "8",
+      "revenue": "5270.00"
+    },
+    {
+      "day": "2026-09-29T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "13",
+      "revenue": "5940.00"
+    },
+    {
+      "day": "2026-09-30T00:00:00.000Z",
+      "venue": "Kebab King Карла",
+      "receipts": "34",
+      "revenue": "19500.00"
+    },
+    {
+      "day": "2026-09-30T00:00:00.000Z",
+      "venue": "Kebab King Октябрьская",
+      "receipts": "70",
+      "revenue": "37440.00"
+    },
+    {
+      "day": "2026-09-30T00:00:00.000Z",
+      "venue": "MC Lounge Роза",
+      "receipts": "3",
+      "revenue": "3105.00"
+    },
+    {
+      "day": "2026-09-30T00:00:00.000Z",
+      "venue": "MC Гранд",
+      "receipts": "15",
+      "revenue": "7570.00"
+    }
+  ],
+  "SHIFTS": [
+    {
+      "id": 35,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-01T06:00:50.079Z",
+      "closed_at": "2026-09-01T20:44:06.502Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "17605.00",
+      "opening_cash": "7049.00",
+      "closing_cash": "6144.00",
+      "closing_cash_expected": "6144.00"
+    },
+    {
+      "id": 38,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-02T05:52:24.772Z",
+      "closed_at": "2026-09-02T20:36:40.246Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "16030.00",
+      "opening_cash": "6310.00",
+      "closing_cash": "9600.00",
+      "closing_cash_expected": "9600.00"
+    },
+    {
+      "id": 41,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-03T05:55:44.420Z",
+      "closed_at": "2026-09-03T20:57:39.812Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "17260.00",
+      "opening_cash": "9560.00",
+      "closing_cash": "12500.00",
+      "closing_cash_expected": "12500.00"
+    },
+    {
+      "id": 44,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-04T05:49:26.612Z",
+      "closed_at": "2026-09-04T20:51:34.043Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "14760.00",
+      "opening_cash": "12500.00",
+      "closing_cash": "13500.00",
+      "closing_cash_expected": "13500.00"
+    },
+    {
+      "id": 47,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-05T05:55:06.487Z",
+      "closed_at": "2026-09-05T20:10:15.012Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "19110.00",
+      "opening_cash": "13540.00",
+      "closing_cash": "15810.00",
+      "closing_cash_expected": "15810.00"
+    },
+    {
+      "id": 50,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-06T06:56:40.669Z",
+      "closed_at": "2026-09-06T19:50:41.266Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "13200.00",
+      "opening_cash": "15810.00",
+      "closing_cash": "18450.00",
+      "closing_cash_expected": "18450.00"
+    },
+    {
+      "id": 53,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-07T05:44:38.217Z",
+      "closed_at": "2026-09-07T20:51:13.106Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "15204.00",
+      "opening_cash": "18440.00",
+      "closing_cash": "19620.00",
+      "closing_cash_expected": "19620.00"
+    },
+    {
+      "id": 56,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-08T05:45:42.166Z",
+      "closed_at": "2026-09-08T20:52:58.452Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "20760.00",
+      "opening_cash": "23120.00",
+      "closing_cash": "26600.00",
+      "closing_cash_expected": "26600.00"
+    },
+    {
+      "id": 59,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-09T06:02:01.314Z",
+      "closed_at": "2026-09-09T20:32:17.335Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "15250.00",
+      "opening_cash": "21820.00",
+      "closing_cash": "4800.00",
+      "closing_cash_expected": "4800.00"
+    },
+    {
+      "id": 62,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-10T05:58:24.079Z",
+      "closed_at": "2026-09-10T20:29:57.268Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "10910.00",
+      "opening_cash": "4800.00",
+      "closing_cash": "5555.00",
+      "closing_cash_expected": "5555.00"
+    },
+    {
+      "id": 65,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-11T05:42:40.304Z",
+      "closed_at": "2026-09-11T20:52:08.967Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "24920.00",
+      "opening_cash": "5555.00",
+      "closing_cash": "9320.00",
+      "closing_cash_expected": "9320.00"
+    },
+    {
+      "id": 68,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-12T05:43:51.693Z",
+      "closed_at": "2026-09-12T20:53:34.381Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "30250.00",
+      "opening_cash": "9320.00",
+      "closing_cash": "11870.00",
+      "closing_cash_expected": "11870.00"
+    },
+    {
+      "id": 71,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-13T06:52:25.312Z",
+      "closed_at": "2026-09-13T19:49:32.767Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "12400.00",
+      "opening_cash": "11870.00",
+      "closing_cash": "15810.00",
+      "closing_cash_expected": "15810.00"
+    },
+    {
+      "id": 74,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-14T05:43:34.133Z",
+      "closed_at": "2026-09-14T20:50:23.099Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "19020.00",
+      "opening_cash": "15560.00",
+      "closing_cash": "4550.00",
+      "closing_cash_expected": "4550.00"
+    },
+    {
+      "id": 77,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-15T05:52:34.321Z",
+      "closed_at": "2026-09-15T20:50:32.758Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "20440.00",
+      "opening_cash": "4800.00",
+      "closing_cash": "8620.00",
+      "closing_cash_expected": "8620.00"
+    },
+    {
+      "id": 83,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-16T05:50:38.339Z",
+      "closed_at": "2026-09-16T20:50:08.453Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "18320.00",
+      "opening_cash": "8610.00",
+      "closing_cash": "11830.00",
+      "closing_cash_expected": "11830.00"
+    },
+    {
+      "id": 88,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-17T05:36:44.231Z",
+      "closed_at": "2026-09-17T21:01:19.843Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "23245.00",
+      "opening_cash": "11826.00",
+      "closing_cash": "16461.00",
+      "closing_cash_expected": "16461.00"
+    },
+    {
+      "id": 93,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-18T05:42:52.608Z",
+      "closed_at": "2026-09-18T20:50:50.910Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "23305.00",
+      "opening_cash": "16461.00",
+      "closing_cash": "9681.00",
+      "closing_cash_expected": "9681.00"
+    },
+    {
+      "id": 98,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-19T05:42:57.727Z",
+      "closed_at": "2026-09-19T20:51:59.939Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "22605.00",
+      "opening_cash": "9681.00",
+      "closing_cash": "14566.00",
+      "closing_cash_expected": "14566.00"
+    },
+    {
+      "id": 103,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-20T06:49:26.171Z",
+      "closed_at": "2026-09-20T19:46:43.895Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "16090.00",
+      "opening_cash": "14566.00",
+      "closing_cash": "16573.00",
+      "closing_cash_expected": "16573.00"
+    },
+    {
+      "id": 108,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-21T05:54:15.830Z",
+      "closed_at": "2026-09-21T12:17:44.784Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "6280.00",
+      "opening_cash": "16573.00",
+      "closing_cash": "19703.00",
+      "closing_cash_expected": "19703.00"
+    },
+    {
+      "id": 111,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-21T12:18:57.466Z",
+      "closed_at": "2026-09-21T20:50:22.490Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "3520.00",
+      "opening_cash": "19703.00",
+      "closing_cash": "20553.00",
+      "closing_cash_expected": "20553.00"
+    },
+    {
+      "id": 114,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-22T05:48:39.705Z",
+      "closed_at": "2026-09-22T19:51:48.037Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "15610.00",
+      "opening_cash": "20553.00",
+      "closing_cash": "4763.00",
+      "closing_cash_expected": "4763.00"
+    },
+    {
+      "id": 119,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-23T05:43:47.823Z",
+      "closed_at": "2026-09-23T20:50:19.896Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "24000.00",
+      "opening_cash": "4763.00",
+      "closing_cash": "7823.00",
+      "closing_cash_expected": "7823.00"
+    },
+    {
+      "id": 124,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-24T05:48:50.621Z",
+      "closed_at": "2026-09-24T20:50:27.482Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "22575.00",
+      "opening_cash": "7823.00",
+      "closing_cash": "5738.00",
+      "closing_cash_expected": "5738.00"
+    },
+    {
+      "id": 131,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-25T12:33:55.261Z",
+      "closed_at": "2026-09-25T20:50:29.625Z",
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": "Егор Алексеевич",
+      "revenue_total": "13260.00",
+      "opening_cash": "5738.00",
+      "closing_cash": "7168.00",
+      "closing_cash_expected": "7168.00"
+    },
+    {
+      "id": 134,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-26T05:57:17.076Z",
+      "closed_at": "2026-09-26T20:43:46.901Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "12020.00",
+      "opening_cash": "7462.00",
+      "closing_cash": "7798.00",
+      "closing_cash_expected": "7798.00"
+    },
+    {
+      "id": 139,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-27T06:39:14.204Z",
+      "closed_at": "2026-09-27T19:47:41.667Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "18510.00",
+      "opening_cash": "7798.00",
+      "closing_cash": "2508.00",
+      "closing_cash_expected": "2508.00"
+    },
+    {
+      "id": 144,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-28T05:46:48.779Z",
+      "closed_at": "2026-09-28T20:47:50.093Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "21050.00",
+      "opening_cash": "2508.00",
+      "closing_cash": "3888.00",
+      "closing_cash_expected": "3888.00"
+    },
+    {
+      "id": 148,
+      "venue": "Kebab King Карла",
+      "status": "closed",
+      "opened_at": "2026-09-29T05:34:12.470Z",
+      "closed_at": "2026-09-29T20:46:12.975Z",
+      "opened_by_name": "Андрей Косенков",
+      "closed_by_name": "Андрей Косенков",
+      "revenue_total": "13210.00",
+      "opening_cash": "3888.00",
+      "closing_cash": "6338.00",
+      "closing_cash_expected": "6338.00"
+    },
+    {
+      "id": 153,
+      "venue": "Kebab King Карла",
+      "status": "open",
+      "opened_at": "2026-09-30T05:50:33.072Z",
+      "closed_at": null,
+      "opened_by_name": "Егор Алексеевич",
+      "closed_by_name": null,
+      "revenue_total": null,
+      "opening_cash": "6338.00",
+      "closing_cash": null,
+      "closing_cash_expected": null
+    },
+    {
+      "id": 34,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-01T03:42:07.687Z",
+      "closed_at": "2026-09-01T18:59:33.977Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "40364.00",
+      "opening_cash": "0.00",
+      "closing_cash": "13329.00",
+      "closing_cash_expected": "13329.00"
+    },
+    {
+      "id": 37,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-02T03:53:19.453Z",
+      "closed_at": "2026-09-02T18:53:34.455Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "34914.00",
+      "opening_cash": "13329.00",
+      "closing_cash": "21473.00",
+      "closing_cash_expected": "21473.00"
+    },
+    {
+      "id": 40,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-03T03:58:39.016Z",
+      "closed_at": "2026-09-03T18:52:30.128Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "31732.00",
+      "opening_cash": "0.00",
+      "closing_cash": "2330.00",
+      "closing_cash_expected": "2330.00"
+    },
+    {
+      "id": 43,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-04T03:58:05.670Z",
+      "closed_at": "2026-09-04T18:54:17.158Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "30280.00",
+      "opening_cash": "2330.00",
+      "closing_cash": "3830.00",
+      "closing_cash_expected": "3830.00"
+    },
+    {
+      "id": 46,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-05T03:40:06.167Z",
+      "closed_at": "2026-09-05T18:52:02.111Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "38310.00",
+      "opening_cash": "3830.00",
+      "closing_cash": "11140.00",
+      "closing_cash_expected": "11140.00"
+    },
+    {
+      "id": 49,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-06T04:59:04.449Z",
+      "closed_at": "2026-09-06T17:52:09.215Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "32900.00",
+      "opening_cash": "11840.00",
+      "closing_cash": "18450.00",
+      "closing_cash_expected": "18450.00"
+    },
+    {
+      "id": 52,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-07T03:56:48.720Z",
+      "closed_at": "2026-09-07T18:51:31.946Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "32180.00",
+      "opening_cash": "18450.00",
+      "closing_cash": "3190.00",
+      "closing_cash_expected": "3190.00"
+    },
+    {
+      "id": 55,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-08T03:58:22.939Z",
+      "closed_at": "2026-09-08T18:51:45.878Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "22910.00",
+      "opening_cash": "3190.00",
+      "closing_cash": "5510.00",
+      "closing_cash_expected": "5510.00"
+    },
+    {
+      "id": 58,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-09T03:50:56.694Z",
+      "closed_at": "2026-09-09T18:48:37.133Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "30915.00",
+      "opening_cash": "5510.00",
+      "closing_cash": "11460.00",
+      "closing_cash_expected": "11460.00"
+    },
+    {
+      "id": 61,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-10T03:50:39.137Z",
+      "closed_at": "2026-09-10T18:54:02.537Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "39800.00",
+      "opening_cash": "11460.00",
+      "closing_cash": "2880.00",
+      "closing_cash_expected": "2880.00"
+    },
+    {
+      "id": 64,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-11T04:01:36.509Z",
+      "closed_at": "2026-09-11T18:51:11.809Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "34555.00",
+      "opening_cash": "2880.00",
+      "closing_cash": "4520.00",
+      "closing_cash_expected": "4520.00"
+    },
+    {
+      "id": 67,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-12T04:01:17.034Z",
+      "closed_at": "2026-09-12T18:52:48.141Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "47015.00",
+      "opening_cash": "4520.00",
+      "closing_cash": "9660.00",
+      "closing_cash_expected": "9660.00"
+    },
+    {
+      "id": 70,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-13T04:57:13.127Z",
+      "closed_at": "2026-09-13T17:49:00.108Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "38990.00",
+      "opening_cash": "9660.00",
+      "closing_cash": "18430.00",
+      "closing_cash_expected": "18430.00"
+    },
+    {
+      "id": 73,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-14T03:59:05.270Z",
+      "closed_at": "2026-09-14T18:50:37.227Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "27985.00",
+      "opening_cash": "18430.00",
+      "closing_cash": "4370.00",
+      "closing_cash_expected": "4370.00"
+    },
+    {
+      "id": 76,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-15T03:49:45.630Z",
+      "closed_at": "2026-09-15T18:51:10.515Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "38445.00",
+      "opening_cash": "4370.00",
+      "closing_cash": "7670.00",
+      "closing_cash_expected": "7670.00"
+    },
+    {
+      "id": 81,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-16T03:43:38.239Z",
+      "closed_at": "2026-09-16T18:51:42.180Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "21005.00",
+      "opening_cash": "7670.00",
+      "closing_cash": "6630.00",
+      "closing_cash_expected": "6630.00"
+    },
+    {
+      "id": 86,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-17T03:35:22.245Z",
+      "closed_at": "2026-09-17T18:49:43.014Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "34144.00",
+      "opening_cash": "6630.00",
+      "closing_cash": "10410.00",
+      "closing_cash_expected": "10410.00"
+    },
+    {
+      "id": 91,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-18T03:35:27.393Z",
+      "closed_at": "2026-09-18T18:48:30.496Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "43110.00",
+      "opening_cash": "10410.00",
+      "closing_cash": "15240.00",
+      "closing_cash_expected": "15240.00"
+    },
+    {
+      "id": 97,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-19T03:55:41.663Z",
+      "closed_at": "2026-09-19T18:51:28.969Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "26475.00",
+      "opening_cash": "15240.00",
+      "closing_cash": "17470.00",
+      "closing_cash_expected": "17470.00"
+    },
+    {
+      "id": 102,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-20T05:01:05.603Z",
+      "closed_at": "2026-09-20T17:51:47.385Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "27710.00",
+      "opening_cash": "17470.00",
+      "closing_cash": "2680.00",
+      "closing_cash_expected": "2680.00"
+    },
+    {
+      "id": 106,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-21T03:29:38.675Z",
+      "closed_at": "2026-09-21T18:51:09.013Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "31985.00",
+      "opening_cash": "2680.00",
+      "closing_cash": "9165.00",
+      "closing_cash_expected": "9165.00"
+    },
+    {
+      "id": 113,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-22T03:43:29.912Z",
+      "closed_at": "2026-09-22T18:49:13.757Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "26820.00",
+      "opening_cash": "9165.00",
+      "closing_cash": "2295.00",
+      "closing_cash_expected": "2295.00"
+    },
+    {
+      "id": 118,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-23T04:01:28.227Z",
+      "closed_at": "2026-09-23T18:50:21.615Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "37004.00",
+      "opening_cash": "2295.00",
+      "closing_cash": "6885.00",
+      "closing_cash_expected": "6885.00"
+    },
+    {
+      "id": 123,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-24T03:58:38.171Z",
+      "closed_at": "2026-09-24T18:52:46.953Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "37165.00",
+      "opening_cash": "6885.00",
+      "closing_cash": "3745.00",
+      "closing_cash_expected": "3745.00"
+    },
+    {
+      "id": 127,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-25T03:38:03.628Z",
+      "closed_at": "2026-09-25T18:54:26.273Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "49920.00",
+      "opening_cash": "3745.00",
+      "closing_cash": "10785.00",
+      "closing_cash_expected": "10785.00"
+    },
+    {
+      "id": 133,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-26T04:01:15.021Z",
+      "closed_at": "2026-09-26T18:51:50.845Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "37490.00",
+      "opening_cash": "10785.00",
+      "closing_cash": "16105.00",
+      "closing_cash_expected": "16105.00"
+    },
+    {
+      "id": 138,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-27T04:54:54.792Z",
+      "closed_at": "2026-09-27T17:51:36.413Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "33400.00",
+      "opening_cash": "16105.00",
+      "closing_cash": "1855.00",
+      "closing_cash_expected": "1855.00"
+    },
+    {
+      "id": 142,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-28T03:59:27.092Z",
+      "closed_at": "2026-09-28T18:51:37.516Z",
+      "opened_by_name": "Умида Раджапова",
+      "closed_by_name": "Умида Раджапова",
+      "revenue_total": "26600.00",
+      "opening_cash": "1855.00",
+      "closing_cash": "2045.00",
+      "closing_cash_expected": "2045.00"
+    },
+    {
+      "id": 146,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-29T03:35:10.402Z",
+      "closed_at": "2026-09-29T18:52:15.478Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "24260.00",
+      "opening_cash": "2045.00",
+      "closing_cash": "8635.00",
+      "closing_cash_expected": "8635.00"
+    },
+    {
+      "id": 151,
+      "venue": "Kebab King Октябрьская",
+      "status": "closed",
+      "opened_at": "2026-09-30T03:22:36.789Z",
+      "closed_at": "2026-09-30T18:50:57.406Z",
+      "opened_by_name": "Алена Аленовна",
+      "closed_by_name": "Алена Аленовна",
+      "revenue_total": "37440.00",
+      "opening_cash": "8635.00",
+      "closing_cash": "5825.00",
+      "closing_cash_expected": "5825.00"
+    },
+    {
+      "id": 80,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-15T17:06:13.069Z",
+      "closed_at": "2026-09-15T18:10:49.034Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "0.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 84,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-16T11:31:25.573Z",
+      "closed_at": "2026-09-16T18:30:22.583Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "4500.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 90,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-17T12:17:09.396Z",
+      "closed_at": "2026-09-17T17:58:23.520Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "3000.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 94,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-18T11:51:34.285Z",
+      "closed_at": "2026-09-18T20:05:41.272Z",
+      "opened_by_name": "Никитосик",
+      "closed_by_name": "Никитосик",
+      "revenue_total": "0.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 100,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-19T16:21:30.758Z",
+      "closed_at": "2026-09-19T20:34:36.147Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "6000.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 105,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-20T13:54:21.383Z",
+      "closed_at": "2026-09-20T18:07:24.630Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "3000.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 109,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-21T12:00:15.897Z",
+      "closed_at": "2026-09-21T18:12:05.732Z",
+      "opened_by_name": "Никитосик",
+      "closed_by_name": "Никитосик",
+      "revenue_total": "0.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 116,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-22T12:02:15.139Z",
+      "closed_at": "2026-09-22T18:06:19.736Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "0.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 121,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-23T12:03:16.793Z",
+      "closed_at": "2026-09-23T18:01:31.676Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "1500.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 126,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-24T11:49:41.788Z",
+      "closed_at": "2026-09-24T18:03:38.740Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "0.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 130,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-25T12:04:00.849Z",
+      "closed_at": "2026-09-25T20:00:08.675Z",
+      "opened_by_name": "Никитосик",
+      "closed_by_name": "Никитосик",
+      "revenue_total": "0.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 136,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-26T12:07:23.380Z",
+      "closed_at": "2026-09-26T19:53:00.872Z",
+      "opened_by_name": "Никитосик",
+      "closed_by_name": "Никитосик",
+      "revenue_total": "6000.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 140,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-27T11:58:43.513Z",
+      "closed_at": "2026-09-27T17:56:25.675Z",
+      "opened_by_name": "Никитосик",
+      "closed_by_name": "Никитосик",
+      "revenue_total": "0.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 150,
+      "venue": "MC Lounge Puff",
+      "status": "closed",
+      "opened_at": "2026-09-29T16:50:05.974Z",
+      "closed_at": "2026-09-29T18:47:51.651Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "3000.00",
+      "opening_cash": "0.00",
+      "closing_cash": "0.00",
+      "closing_cash_expected": "0.00"
+    },
+    {
+      "id": 36,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-01T13:38:33.327Z",
+      "closed_at": "2026-09-01T18:45:29.545Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "977.50",
+      "opening_cash": "12500.00",
+      "closing_cash": "12500.00",
+      "closing_cash_expected": "12500.00"
+    },
+    {
+      "id": 39,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-02T11:10:49.028Z",
+      "closed_at": "2026-09-02T19:13:44.411Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "3775.00",
+      "opening_cash": "12500.00",
+      "closing_cash": "12500.00",
+      "closing_cash_expected": "12500.00"
+    },
+    {
+      "id": 42,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-03T11:10:52.887Z",
+      "closed_at": "2026-09-03T19:09:12.283Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "5109.00",
+      "opening_cash": "12500.00",
+      "closing_cash": "12500.00",
+      "closing_cash_expected": "12500.00"
+    },
+    {
+      "id": 45,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-04T11:58:01.967Z",
+      "closed_at": "2026-09-04T20:17:39.350Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "3620.00",
+      "opening_cash": "12500.00",
+      "closing_cash": "12250.00",
+      "closing_cash_expected": "12250.00"
+    },
+    {
+      "id": 48,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-05T11:58:42.515Z",
+      "closed_at": "2026-09-05T19:44:10.845Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "3070.00",
+      "opening_cash": "13300.00",
+      "closing_cash": "13300.00",
+      "closing_cash_expected": "13300.00"
+    },
+    {
+      "id": 51,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-06T11:59:02.682Z",
+      "closed_at": "2026-09-06T19:35:04.397Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "5970.00",
+      "opening_cash": "13300.00",
+      "closing_cash": "14000.00",
+      "closing_cash_expected": "14000.00"
+    },
+    {
+      "id": 54,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-07T12:08:27.845Z",
+      "closed_at": "2026-09-07T18:53:39.865Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "6620.00",
+      "opening_cash": "14000.00",
+      "closing_cash": "14000.00",
+      "closing_cash_expected": "14000.00"
+    },
+    {
+      "id": 57,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-08T13:45:59.115Z",
+      "closed_at": "2026-09-08T20:20:00.618Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "3035.00",
+      "opening_cash": "11900.00",
+      "closing_cash": "9800.00",
+      "closing_cash_expected": "9800.00"
+    },
+    {
+      "id": 60,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-09T14:38:16.962Z",
+      "closed_at": "2026-09-09T19:26:34.737Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "2650.00",
+      "opening_cash": "10300.00",
+      "closing_cash": "11450.00",
+      "closing_cash_expected": "11450.00"
+    },
+    {
+      "id": 63,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-10T11:32:41.568Z",
+      "closed_at": "2026-09-10T20:31:20.842Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "8522.50",
+      "opening_cash": "11450.00",
+      "closing_cash": "10100.00",
+      "closing_cash_expected": "10100.00"
+    },
+    {
+      "id": 66,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-11T11:56:42.379Z",
+      "closed_at": "2026-09-11T18:58:24.793Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "3010.00",
+      "opening_cash": "10100.00",
+      "closing_cash": "6100.00",
+      "closing_cash_expected": "6100.00"
+    },
+    {
+      "id": 69,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-12T18:10:27.862Z",
+      "closed_at": "2026-09-12T19:20:10.780Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "0.00",
+      "opening_cash": "6100.00",
+      "closing_cash": "6100.00",
+      "closing_cash_expected": "6100.00"
+    },
+    {
+      "id": 72,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-13T11:30:36.915Z",
+      "closed_at": "2026-09-13T19:26:43.438Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "4800.00",
+      "opening_cash": "6100.00",
+      "closing_cash": "6100.00",
+      "closing_cash_expected": "6100.00"
+    },
+    {
+      "id": 75,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-14T12:19:33.292Z",
+      "closed_at": "2026-09-14T19:45:05.235Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "1600.00",
+      "opening_cash": "6100.00",
+      "closing_cash": "6350.00",
+      "closing_cash_expected": "6350.00"
+    },
+    {
+      "id": 78,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-15T11:40:10.670Z",
+      "closed_at": "2026-09-15T19:18:19.010Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "1500.00",
+      "opening_cash": "6350.00",
+      "closing_cash": "4150.00",
+      "closing_cash_expected": "4150.00"
+    },
+    {
+      "id": 85,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-16T11:55:03.266Z",
+      "closed_at": "2026-09-16T18:59:35.506Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "2541.00",
+      "opening_cash": "4150.00",
+      "closing_cash": "2900.00",
+      "closing_cash_expected": "2900.00"
+    },
+    {
+      "id": 89,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-17T11:44:15.100Z",
+      "closed_at": "2026-09-17T19:03:15.127Z",
+      "opened_by_name": "Никитосик",
+      "closed_by_name": "Никитосик",
+      "revenue_total": "5260.00",
+      "opening_cash": "2900.00",
+      "closing_cash": "3500.00",
+      "closing_cash_expected": "3500.00"
+    },
+    {
+      "id": 95,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-18T12:20:45.840Z",
+      "closed_at": "2026-09-18T20:12:12.415Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "4200.00",
+      "opening_cash": "3450.00",
+      "closing_cash": "5500.00",
+      "closing_cash_expected": "5500.00"
+    },
+    {
+      "id": 99,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-19T11:54:14.207Z",
+      "closed_at": "2026-09-19T21:56:57.660Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "12939.00",
+      "opening_cash": "5500.00",
+      "closing_cash": "11100.00",
+      "closing_cash_expected": "11100.00"
+    },
+    {
+      "id": 104,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-20T12:35:01.768Z",
+      "closed_at": "2026-09-20T18:23:26.658Z",
+      "opened_by_name": "Никитосик",
+      "closed_by_name": "Никитосик",
+      "revenue_total": "750.00",
+      "opening_cash": "11100.00",
+      "closing_cash": "10900.00",
+      "closing_cash_expected": "10900.00"
+    },
+    {
+      "id": 110,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-21T12:00:23.640Z",
+      "closed_at": "2026-09-21T19:03:24.677Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "1500.00",
+      "opening_cash": "10900.00",
+      "closing_cash": "10900.00",
+      "closing_cash_expected": "10900.00"
+    },
+    {
+      "id": 115,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-22T11:34:51.984Z",
+      "closed_at": "2026-09-22T19:51:11.654Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "0.00",
+      "opening_cash": "10900.00",
+      "closing_cash": "10900.00",
+      "closing_cash_expected": "10900.00"
+    },
+    {
+      "id": 120,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-23T12:02:24.629Z",
+      "closed_at": "2026-09-23T18:41:09.469Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "3150.00",
+      "opening_cash": "10900.00",
+      "closing_cash": "9350.00",
+      "closing_cash_expected": "9350.00"
+    },
+    {
+      "id": 125,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-24T11:22:08.481Z",
+      "closed_at": "2026-09-24T20:11:55.872Z",
+      "opened_by_name": "Никитосик",
+      "closed_by_name": "Никитосик",
+      "revenue_total": "4200.00",
+      "opening_cash": "9350.00",
+      "closing_cash": "9350.00",
+      "closing_cash_expected": "9350.00"
+    },
+    {
+      "id": 129,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-25T11:59:39.927Z",
+      "closed_at": "2026-09-25T20:10:17.093Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "3745.00",
+      "opening_cash": "9350.00",
+      "closing_cash": "9350.00",
+      "closing_cash_expected": "9350.00"
+    },
+    {
+      "id": 135,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-26T11:41:58.001Z",
+      "closed_at": "2026-09-26T20:40:40.174Z",
+      "opened_by_name": "Тимур Аббасов",
+      "closed_by_name": "Тимур Аббасов",
+      "revenue_total": "6987.00",
+      "opening_cash": "9350.00",
+      "closing_cash": "10950.00",
+      "closing_cash_expected": "10950.00"
+    },
+    {
+      "id": 141,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-27T12:19:40.206Z",
+      "closed_at": "2026-09-27T19:29:26.435Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "4474.00",
+      "opening_cash": "10950.00",
+      "closing_cash": "11600.00",
+      "closing_cash_expected": "11600.00"
+    },
+    {
+      "id": 145,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-28T12:02:01.442Z",
+      "closed_at": "2026-09-28T19:10:02.516Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "5400.00",
+      "opening_cash": "11600.00",
+      "closing_cash": "11600.00",
+      "closing_cash_expected": "11600.00"
+    },
+    {
+      "id": 149,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-29T11:24:31.598Z",
+      "closed_at": "2026-09-29T18:57:40.007Z",
+      "opened_by_name": "Никитосик",
+      "closed_by_name": "Никитосик",
+      "revenue_total": "5270.00",
+      "opening_cash": "11600.00",
+      "closing_cash": "11600.00",
+      "closing_cash_expected": "11600.00"
+    },
+    {
+      "id": 154,
+      "venue": "MC Lounge Роза",
+      "status": "closed",
+      "opened_at": "2026-09-30T12:13:02.972Z",
+      "closed_at": "2026-09-30T19:20:11.653Z",
+      "opened_by_name": "Дарья Аверина",
+      "closed_by_name": "Дарья Аверина",
+      "revenue_total": "3605.00",
+      "opening_cash": "11600.00",
+      "closing_cash": "10250.00",
+      "closing_cash_expected": "10250.00"
+    },
+    {
+      "id": 79,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-15T14:11:04.324Z",
+      "closed_at": "2026-09-15T15:09:10.420Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "1470.00",
+      "opening_cash": "4050.00",
+      "closing_cash": "4050.00",
+      "closing_cash_expected": "4050.00"
+    },
+    {
+      "id": 82,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-16T03:45:30.135Z",
+      "closed_at": "2026-09-16T14:53:16.947Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "5090.00",
+      "opening_cash": "4050.00",
+      "closing_cash": "2820.00",
+      "closing_cash_expected": "2820.00"
+    },
+    {
+      "id": 87,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-17T03:56:07.639Z",
+      "closed_at": "2026-09-17T14:54:17.144Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "6580.00",
+      "opening_cash": "2820.00",
+      "closing_cash": "3040.00",
+      "closing_cash_expected": "3040.00"
+    },
+    {
+      "id": 92,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-18T03:37:37.445Z",
+      "closed_at": "2026-09-18T14:54:12.096Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "6990.00",
+      "opening_cash": "3040.00",
+      "closing_cash": "5130.00",
+      "closing_cash_expected": "5130.00"
+    },
+    {
+      "id": 96,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-19T03:50:20.906Z",
+      "closed_at": "2026-09-19T14:51:03.574Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "3770.00",
+      "opening_cash": "5130.00",
+      "closing_cash": "4735.00",
+      "closing_cash_expected": "4735.00"
+    },
+    {
+      "id": 101,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-20T03:56:08.929Z",
+      "closed_at": "2026-09-20T14:51:36.343Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "5510.00",
+      "opening_cash": "4735.00",
+      "closing_cash": "5765.00",
+      "closing_cash_expected": "5765.00"
+    },
+    {
+      "id": 107,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-21T03:41:59.455Z",
+      "closed_at": "2026-09-21T14:57:59.032Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "5220.00",
+      "opening_cash": "5765.00",
+      "closing_cash": "4845.00",
+      "closing_cash_expected": "4845.00"
+    },
+    {
+      "id": 112,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-22T03:42:46.431Z",
+      "closed_at": "2026-09-22T14:50:57.902Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "7830.00",
+      "opening_cash": "4845.00",
+      "closing_cash": "5385.00",
+      "closing_cash_expected": "5385.00"
+    },
+    {
+      "id": 117,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-23T03:31:57.213Z",
+      "closed_at": "2026-09-23T14:59:57.986Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "5760.00",
+      "opening_cash": "4405.00",
+      "closing_cash": "6645.00",
+      "closing_cash_expected": "6645.00"
+    },
+    {
+      "id": 122,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-24T03:43:01.334Z",
+      "closed_at": "2026-09-24T14:55:11.758Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "5350.00",
+      "opening_cash": "6645.00",
+      "closing_cash": "1845.00",
+      "closing_cash_expected": "1845.00"
+    },
+    {
+      "id": 128,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-25T03:58:49.491Z",
+      "closed_at": "2026-09-25T15:23:56.108Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "10670.00",
+      "opening_cash": "1845.00",
+      "closing_cash": "4235.00",
+      "closing_cash_expected": "4235.00"
+    },
+    {
+      "id": 132,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-26T03:58:16.185Z",
+      "closed_at": "2026-09-26T14:55:39.919Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "17060.00",
+      "opening_cash": "4235.00",
+      "closing_cash": "7425.00",
+      "closing_cash_expected": "7425.00"
+    },
+    {
+      "id": 137,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-27T04:29:47.603Z",
+      "closed_at": "2026-09-27T14:57:27.683Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "8600.00",
+      "opening_cash": "7425.00",
+      "closing_cash": "8425.00",
+      "closing_cash_expected": "8425.00"
+    },
+    {
+      "id": 143,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-28T04:11:37.745Z",
+      "closed_at": "2026-09-28T14:57:22.268Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "4860.00",
+      "opening_cash": "8425.00",
+      "closing_cash": "8425.00",
+      "closing_cash_expected": "8425.00"
+    },
+    {
+      "id": 147,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-29T03:43:06.639Z",
+      "closed_at": "2026-09-29T14:57:43.396Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "5940.00",
+      "opening_cash": "8425.00",
+      "closing_cash": "9395.00",
+      "closing_cash_expected": "9395.00"
+    },
+    {
+      "id": 152,
+      "venue": "MC Гранд",
+      "status": "closed",
+      "opened_at": "2026-09-30T03:48:42.073Z",
+      "closed_at": "2026-09-30T14:53:44.289Z",
+      "opened_by_name": "Демкина Надежда Э.",
+      "closed_by_name": "Демкина Надежда Э.",
+      "revenue_total": "7570.00",
+      "opening_cash": "9405.00",
+      "closing_cash": "1405.00",
+      "closing_cash_expected": "1405.00"
+    }
+  ],
+  "ITEMS": [
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Шаурма",
+      "name": "Шаурма Стандарт с курицей",
+      "qty": "321",
+      "revenue": "100885.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Шаурма",
+      "name": "Шаурма Большая со свининой",
+      "qty": "174",
+      "revenue": "62315.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Шаурма",
+      "name": "Шаурма Большая с курицей",
+      "qty": "166",
+      "revenue": "59375.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Шаурма",
+      "name": "Шаурма Стандарт со свининой",
+      "qty": "184",
+      "revenue": "57929.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Шаурма",
+      "name": "Шаурма Мини с курицей",
+      "qty": "168",
+      "revenue": "42515.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Закуски и гарниры",
+      "name": "Картофель фри",
+      "qty": "235",
+      "revenue": "39950.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Шаурма",
+      "name": "Шаурма Мини со свининой",
+      "qty": "91",
+      "revenue": "22980.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Чикенбургер",
+      "qty": "66",
+      "revenue": "21780.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Чизбургер",
+      "qty": "50",
+      "revenue": "18550.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Гамбургер",
+      "qty": "56",
+      "revenue": "17360.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Шаурма",
+      "name": "Шаурма в Пите с курицей",
+      "qty": "43",
+      "revenue": "15810.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Роллы и хот-доги",
+      "name": "Френч-Дог",
+      "qty": "34",
+      "revenue": "8500.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Кебаб Бургер",
+      "qty": "21",
+      "revenue": "8190.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Роллы и хот-доги",
+      "name": "Цезарь Ролл",
+      "qty": "26",
+      "revenue": "7540.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Двойной Чизбургер",
+      "qty": "15",
+      "revenue": "6450.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Шаурма",
+      "name": "Шаурма в Пите со свининой",
+      "qty": "17",
+      "revenue": "6120.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Дип-Пот",
+      "name": "Дип пот Сырный",
+      "qty": "86",
+      "revenue": "4300.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Напитки КК",
+      "name": "Кофе 3 в 1",
+      "qty": "78",
+      "revenue": "3900.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Панини Классика",
+      "qty": "12",
+      "revenue": "3360.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Роллы и хот-доги",
+      "name": "Хот-Дог",
+      "qty": "13",
+      "revenue": "3120.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Панини мясная с курицей",
+      "qty": "9",
+      "revenue": "3060.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Чай бутилированный",
+      "name": "Липтон черный 0.5",
+      "qty": "19",
+      "revenue": "2850.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Закуски и гарниры",
+      "name": "Крылышки 5шт",
+      "qty": "8",
+      "revenue": "2720.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Чай бутилированный",
+      "name": "Липтон зеленый 0.5",
+      "qty": "17",
+      "revenue": "2550.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Закуски и гарниры",
+      "name": "Луковые кольца 7шт",
+      "qty": "16",
+      "revenue": "2400.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Напитки КК",
+      "name": "Фреш Бар",
+      "qty": "19",
+      "revenue": "2090.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Закуски и гарниры",
+      "name": "Крылышки 3шт",
+      "qty": "10",
+      "revenue": "2000.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Кола",
+      "name": "Кола Classic 0.5",
+      "qty": "18",
+      "revenue": "1800.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Напитки КК",
+      "name": "Кофе черный",
+      "qty": "33",
+      "revenue": "1320.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Соки",
+      "name": "Сок любимый 1л",
+      "qty": "6",
+      "revenue": "1260.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Энергетики",
+      "name": "Энергетик Drive",
+      "qty": "7",
+      "revenue": "1050.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Панини мясная со свининой",
+      "qty": "3",
+      "revenue": "1020.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Бургер",
+      "qty": "4",
+      "revenue": "1000.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Дип-Пот",
+      "name": "Дип пот Кетчуп",
+      "qty": "17",
+      "revenue": "850.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Напитки КК",
+      "name": "Чай",
+      "qty": "27",
+      "revenue": "810.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Дип-Пот",
+      "name": "Дип пот Сливочно-чесночный",
+      "qty": "14",
+      "revenue": "700.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Вода",
+      "name": "Вода Черноголовка 0.5",
+      "qty": "7",
+      "revenue": "490.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Соки",
+      "name": "Сок Любимый Тропический микс 0.2",
+      "qty": "7",
+      "revenue": "490.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Дип-Пот",
+      "name": "Дип пот Барбекю",
+      "qty": "8",
+      "revenue": "400.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Кола",
+      "name": "Кола Литр Classic",
+      "qty": "2",
+      "revenue": "300.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Соки",
+      "name": "Сок Любимый Яблоко 0.2",
+      "qty": "4",
+      "revenue": "280.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Шаурма",
+      "name": "Шаурма Стандарт с курицей",
+      "qty": "520",
+      "revenue": "163975.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Шаурма",
+      "name": "Шаурма Большая со свининой",
+      "qty": "339",
+      "revenue": "121880.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Шаурма",
+      "name": "Шаурма Большая с курицей",
+      "qty": "339",
+      "revenue": "120985.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Шаурма",
+      "name": "Шаурма Стандарт со свининой",
+      "qty": "266",
+      "revenue": "83761.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Закуски и гарниры",
+      "name": "Картофель фри",
+      "qty": "401",
+      "revenue": "68170.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Шаурма",
+      "name": "Шаурма Мини с курицей",
+      "qty": "262",
+      "revenue": "66265.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Чикенбургер",
+      "qty": "125",
+      "revenue": "41250.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Чизбургер",
+      "qty": "106",
+      "revenue": "39220.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Гамбургер",
+      "qty": "112",
+      "revenue": "34720.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Шаурма",
+      "name": "Шаурма Мини со свининой",
+      "qty": "131",
+      "revenue": "33105.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Шаурма",
+      "name": "Шаурма в Пите с курицей",
+      "qty": "73",
+      "revenue": "26900.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Шаурма",
+      "name": "Шаурма в Пите со свининой",
+      "qty": "54",
+      "revenue": "19885.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Роллы и хот-доги",
+      "name": "Хот-Дог",
+      "qty": "82",
+      "revenue": "19680.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Двойной Чизбургер",
+      "qty": "45",
+      "revenue": "19350.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Кебаб Бургер",
+      "qty": "37",
+      "revenue": "14430.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Роллы и хот-доги",
+      "name": "Цезарь Ролл",
+      "qty": "46",
+      "revenue": "13340.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Панини Классика",
+      "qty": "39",
+      "revenue": "10920.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Кола",
+      "name": "Кола Classic 0.5",
+      "qty": "104",
+      "revenue": "10400.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Напитки КК",
+      "name": "Фреш Бар",
+      "qty": "89",
+      "revenue": "9790.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Бургер",
+      "qty": "33",
+      "revenue": "8250.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Роллы и хот-доги",
+      "name": "Френч-Дог",
+      "qty": "30",
+      "revenue": "7500.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Дип-Пот",
+      "name": "Дип пот Сырный",
+      "qty": "143",
+      "revenue": "7150.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Чай бутилированный",
+      "name": "Липтон черный 0.5",
+      "qty": "46",
+      "revenue": "6900.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Панини мясная со свининой",
+      "qty": "20",
+      "revenue": "6800.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Чай бутилированный",
+      "name": "Липтон зеленый 0.5",
+      "qty": "43",
+      "revenue": "6450.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Комбо-наборы",
+      "name": "Комбо Шаурма стандарт",
+      "qty": "10",
+      "revenue": "5500.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Закуски и гарниры",
+      "name": "Крылышки 5шт",
+      "qty": "16",
+      "revenue": "5440.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Бургеры и сэндвичи",
+      "name": "Панини мясная с курицей",
+      "qty": "15",
+      "revenue": "5100.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Кола",
+      "name": "Кола Литр Classic",
+      "qty": "26",
+      "revenue": "3900.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Закуски и гарниры",
+      "name": "Луковые кольца 7шт",
+      "qty": "25",
+      "revenue": "3750.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Энергетики",
+      "name": "Энергетик Drive",
+      "qty": "25",
+      "revenue": "3750.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Кофе в кофемашине",
+      "name": "Кофе Капучино",
+      "qty": "36",
+      "revenue": "3600.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Кофе в кофемашине",
+      "name": "Кофе Латте",
+      "qty": "30",
+      "revenue": "3600.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Закуски и гарниры",
+      "name": "Крылышки 3шт",
+      "qty": "14",
+      "revenue": "2800.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Дип-Пот",
+      "name": "Дип пот Кетчуп",
+      "qty": "54",
+      "revenue": "2700.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Напитки КК",
+      "name": "Кофе 3 в 1",
+      "qty": "50",
+      "revenue": "2500.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Вода",
+      "name": "Вода Черноголовка 0.5",
+      "qty": "32",
+      "revenue": "2240.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Напитки КК",
+      "name": "Чай",
+      "qty": "64",
+      "revenue": "1920.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Кофе в кофемашине",
+      "name": "Кофе Американо",
+      "qty": "18",
+      "revenue": "1800.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Соки",
+      "name": "Сок Любимый Яблоко 0.2",
+      "qty": "20",
+      "revenue": "1400.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Кола",
+      "name": "Кола Два Литра Classic",
+      "qty": "6",
+      "revenue": "1260.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Дип-Пот",
+      "name": "Дип пот Сливочно-чесночный",
+      "qty": "17",
+      "revenue": "850.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Соки",
+      "name": "Сок Любимый Тропический микс 0.2",
+      "qty": "11",
+      "revenue": "770.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Напитки КК",
+      "name": "Кофе черный",
+      "qty": "19",
+      "revenue": "760.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Вода",
+      "name": "Вода Черноголовка 1л",
+      "qty": "7",
+      "revenue": "700.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Дип-Пот",
+      "name": "Дип пот Барбекю",
+      "qty": "13",
+      "revenue": "650.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Напитки КК",
+      "name": "Согревающий чай",
+      "qty": "5",
+      "revenue": "600.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Дополнения",
+      "name": "Халапенье (доп)",
+      "qty": "3",
+      "revenue": "250.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Дополнения",
+      "name": "Морковь по корейски (доп)",
+      "qty": "1",
+      "revenue": "100.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Дополнения",
+      "name": "Стаканчик с крышкой под чай",
+      "qty": "4",
+      "revenue": "60.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "cat": "Мангалы Puff",
+      "name": "Кальян классический",
+      "qty": "18",
+      "revenue": "27000.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Мангалы",
+      "name": "Кальян классический",
+      "qty": "67",
+      "revenue": "77050.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Кальяны постоянникам",
+      "name": "Кальян классический",
+      "qty": "38",
+      "revenue": "28500.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Стафф",
+      "name": "Кальян Персонал",
+      "qty": "85",
+      "revenue": "23800.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Пиво",
+      "name": "Пиво Stella Artois 0,45",
+      "qty": "18",
+      "revenue": "5040.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Услуги",
+      "name": "Аренда VIP Комнаты",
+      "qty": "9",
+      "revenue": "4500.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Улун",
+      "name": "Чай - Да Хун Пау",
+      "qty": "7",
+      "revenue": "3850.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Услуги",
+      "name": "Сервисный сбор",
+      "qty": "32",
+      "revenue": "3200.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Пиво",
+      "name": "Пиво Хугарден 0.45",
+      "qty": "11",
+      "revenue": "3080.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Пиво",
+      "name": "Пиво Ловенбрау  0,45",
+      "qty": "10",
+      "revenue": "2800.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Красный чай",
+      "name": "Наглый фрукт",
+      "qty": "6",
+      "revenue": "2700.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Услуги",
+      "name": "Сервисный сбор Премиум",
+      "qty": "9",
+      "revenue": "2700.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Игры",
+      "name": "Аренда PS 4 PRO",
+      "qty": "6",
+      "revenue": "2100.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Улун",
+      "name": "Чай - Те Гуань Инь 1 кат.",
+      "qty": "4",
+      "revenue": "2000.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Премиум Напитки",
+      "name": "Сэт Дубовый резерв",
+      "qty": "1",
+      "revenue": "1800.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Пиво",
+      "name": "Пиво Эль Капулько 0,4",
+      "qty": "5",
+      "revenue": "1750.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Пиво",
+      "name": "Пиво Kozel темн. 0.45",
+      "qty": "4",
+      "revenue": "1120.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Улун",
+      "name": "Чай - Молочный улун",
+      "qty": "2",
+      "revenue": "900.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Лимонады",
+      "name": "Лимонад на выбор 1л.",
+      "qty": "1",
+      "revenue": "750.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Премиум Напитки",
+      "name": "Напиток Лаймовый бриз",
+      "qty": "2",
+      "revenue": "700.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Черный чай",
+      "name": "Чай - Таёжный с мятой",
+      "qty": "1",
+      "revenue": "450.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Зеленый чай",
+      "name": "Чай - Тайский синий",
+      "qty": "1",
+      "revenue": "450.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Пуэр",
+      "name": "Шен-Пуэр",
+      "qty": "1",
+      "revenue": "450.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Черный чай",
+      "name": "Чай - Таёжный с ягодами",
+      "qty": "1",
+      "revenue": "450.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Пуэр",
+      "name": "Чай - Шу Пуэр Дворцовый",
+      "qty": "1",
+      "revenue": "450.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Премиум Напитки",
+      "name": "Напиток Арктическая мята",
+      "qty": "1",
+      "revenue": "400.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Премиум Напитки",
+      "name": "Напиток Солнечный импульс",
+      "qty": "2",
+      "revenue": "400.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Лимонады",
+      "name": "Лимонад Классический Мохито",
+      "qty": "1",
+      "revenue": "380.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Премиум Напитки",
+      "name": "Напиток Горизонт событий",
+      "qty": "1",
+      "revenue": "350.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Лимонады",
+      "name": "Клубничный мохито",
+      "qty": "1",
+      "revenue": "350.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Зеленый чай",
+      "name": "Чай - Белый пион",
+      "qty": "1",
+      "revenue": "350.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Шаурма",
+      "name": "Шаурма Большая с курицей",
+      "qty": "1",
+      "revenue": "350.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Премиум Напитки",
+      "name": "Напиток Алая ночь",
+      "qty": "1",
+      "revenue": "350.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Улун",
+      "name": "Чай - Шоколадный улун",
+      "qty": "1",
+      "revenue": "350.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Премиум Напитки",
+      "name": "Напиток Испанская фиеста",
+      "qty": "1",
+      "revenue": "320.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Черный чай",
+      "name": "Чай - Фруктовый гламур",
+      "qty": "1",
+      "revenue": "300.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Премиум Напитки",
+      "name": "Напиток Лазурный берег",
+      "qty": "1",
+      "revenue": "300.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Пиво Б/А",
+      "name": "Пиво Stella Artois 0,45 Б/А",
+      "qty": "1",
+      "revenue": "200.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Блюда и закуски",
+      "name": "Паста карбонара",
+      "qty": "48",
+      "revenue": "17760.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Салаты",
+      "name": "Цезарь с курицей",
+      "qty": "24",
+      "revenue": "8640.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Кофе",
+      "name": "Капучино",
+      "qty": "44",
+      "revenue": "7920.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Салаты",
+      "name": "Цезарь с тигровыми креветками",
+      "qty": "16",
+      "revenue": "6880.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Кофе",
+      "name": "Американо",
+      "qty": "40",
+      "revenue": "6000.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Завтраки",
+      "name": "Яичница-глазунья, тост с ветчиной и сыром, чай",
+      "qty": "19",
+      "revenue": "5320.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Блюда и закуски",
+      "name": "Паста фетучини с курицей и грибами",
+      "qty": "12",
+      "revenue": "5040.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Пицца",
+      "name": "Мясная",
+      "qty": "6",
+      "revenue": "4740.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Кофе",
+      "name": "Латте",
+      "qty": "21",
+      "revenue": "3990.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Салаты",
+      "name": "Греческий",
+      "qty": "11",
+      "revenue": "3630.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Лимонады",
+      "name": "Мохито",
+      "qty": "12",
+      "revenue": "3600.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Авторский чай",
+      "name": "Облепиховый с имбирем",
+      "qty": "9",
+      "revenue": "3150.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Пицца",
+      "name": "Хачапури по-аджарски",
+      "qty": "6",
+      "revenue": "3000.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Салаты",
+      "name": "Французский",
+      "qty": "7",
+      "revenue": "2450.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Блюда и закуски",
+      "name": "Нагетсы",
+      "qty": "9",
+      "revenue": "2430.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Десерты",
+      "name": "Чизкейк Фисташковый",
+      "qty": "10",
+      "revenue": "2200.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Милкшейки",
+      "name": "Ванильная жвачка",
+      "qty": "6",
+      "revenue": "1920.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Милкшейки",
+      "name": "Snickers",
+      "qty": "5",
+      "revenue": "1900.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Лимонады",
+      "name": "Апельсин-манго",
+      "qty": "7",
+      "revenue": "1890.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Завтраки",
+      "name": "Сэндвич с курицей, беконом и свежими овощами",
+      "qty": "7",
+      "revenue": "1750.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Завтраки",
+      "name": "Омлет классический, тост с ветчиной, чай",
+      "qty": "7",
+      "revenue": "1750.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Кофе",
+      "name": "Раф Лавандовый",
+      "qty": "8",
+      "revenue": "1680.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Завтраки",
+      "name": "Омлет с зеленью, сыром Моцарелла и черри, тост, чай",
+      "qty": "6",
+      "revenue": "1680.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Лимонады",
+      "name": "Румба",
+      "qty": "6",
+      "revenue": "1620.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Блюда и закуски",
+      "name": "Картофель фри",
+      "qty": "8",
+      "revenue": "1600.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Пицца",
+      "name": "Пицца Цыпленок Ранч",
+      "qty": "2",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Пицца",
+      "name": "Пепперони",
+      "qty": "2",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Десерты",
+      "name": "Чизкейк Нью-Йорк",
+      "qty": "7",
+      "revenue": "1470.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Десерты",
+      "name": "Чизкейк Сникерс",
+      "qty": "6",
+      "revenue": "1380.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Кофе",
+      "name": "Горячий Шоколад",
+      "qty": "7",
+      "revenue": "1260.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Чай 1л",
+      "name": "Лимонник",
+      "qty": "5",
+      "revenue": "1250.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Чай 1л",
+      "name": "Грезы султана",
+      "qty": "5",
+      "revenue": "1250.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Блюда и закуски",
+      "name": "Долма говядиной",
+      "qty": "5",
+      "revenue": "1250.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Завтраки",
+      "name": "Сэндвич с ветчиной, сыром и свежими овощами",
+      "qty": "5",
+      "revenue": "1100.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Блюда и закуски",
+      "name": "Онигири со снежным крабом",
+      "qty": "6",
+      "revenue": "1080.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Кофе",
+      "name": "Раф Bubble gum",
+      "qty": "4",
+      "revenue": "840.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Чай 1л",
+      "name": "Глинтвейн",
+      "qty": "2",
+      "revenue": "840.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Лимонады",
+      "name": "Клубничная-жвачка",
+      "qty": "3",
+      "revenue": "750.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "name": "Мэйсон",
+      "qty": "4",
+      "revenue": "680.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Милкшейки",
+      "name": "Пина колада",
+      "qty": "2",
+      "revenue": "660.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "name": "Пульс АП",
+      "qty": "5",
+      "revenue": "600.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "name": "Газ вода 0.33",
+      "qty": "6",
+      "revenue": "540.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Чай 1л",
+      "name": "Таежный",
+      "qty": "2",
+      "revenue": "500.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Авторский чай",
+      "name": "Клюквенный с тимьяном",
+      "qty": "1",
+      "revenue": "390.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Милкшейки",
+      "name": "M&MS",
+      "qty": "1",
+      "revenue": "380.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Милкшейки",
+      "name": "Bounty",
+      "qty": "1",
+      "revenue": "380.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Авторский чай",
+      "name": "Ромашковый с медовым персиком",
+      "qty": "1",
+      "revenue": "350.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "name": "Ла Коста",
+      "qty": "2",
+      "revenue": "300.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Лимонады",
+      "name": "Электро-Колада",
+      "qty": "1",
+      "revenue": "290.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Лимонады",
+      "name": "Тропический",
+      "qty": "1",
+      "revenue": "270.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "name": "Fresh Bar Cola",
+      "qty": "3",
+      "revenue": "240.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Кофе",
+      "name": "Флэт Уайт",
+      "qty": "1",
+      "revenue": "190.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "name": "Чай пакетированный",
+      "qty": "6",
+      "revenue": "180.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "name": "Компот",
+      "qty": "4",
+      "revenue": "160.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Кофе",
+      "name": "Эспрессо",
+      "qty": "1",
+      "revenue": "140.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "name": "Вулкан",
+      "qty": "1",
+      "revenue": "140.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "name": "Вода Черноголовка негаз 0.5л",
+      "qty": "2",
+      "revenue": "140.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "name": "Сок в стакане",
+      "qty": "2",
+      "revenue": "80.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "name": "Экспорт Стайл Кола 0.5л",
+      "qty": "1",
+      "revenue": "80.00"
+    }
+  ],
+  "CATS": [
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Шаурма",
+      "qty": "1164",
+      "revenue": "367929.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Бургеры и сэндвичи",
+      "qty": "236",
+      "revenue": "80770.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Закуски и гарниры",
+      "qty": "269",
+      "revenue": "47070.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Роллы и хот-доги",
+      "qty": "73",
+      "revenue": "19160.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Напитки КК",
+      "qty": "157",
+      "revenue": "8120.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Дип-Пот",
+      "qty": "125",
+      "revenue": "6250.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Чай бутилированный",
+      "qty": "36",
+      "revenue": "5400.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Кола",
+      "qty": "20",
+      "revenue": "2100.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Соки",
+      "qty": "17",
+      "revenue": "2030.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Энергетики",
+      "qty": "7",
+      "revenue": "1050.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "cat": "Вода",
+      "qty": "7",
+      "revenue": "490.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Шаурма",
+      "qty": "1984",
+      "revenue": "636756.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Бургеры и сэндвичи",
+      "qty": "532",
+      "revenue": "180040.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Закуски и гарниры",
+      "qty": "456",
+      "revenue": "80160.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Роллы и хот-доги",
+      "qty": "158",
+      "revenue": "40520.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Напитки КК",
+      "qty": "227",
+      "revenue": "15570.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Кола",
+      "qty": "136",
+      "revenue": "15560.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Чай бутилированный",
+      "qty": "89",
+      "revenue": "13350.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Дип-Пот",
+      "qty": "227",
+      "revenue": "11350.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Кофе в кофемашине",
+      "qty": "84",
+      "revenue": "9000.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Комбо-наборы",
+      "qty": "10",
+      "revenue": "5500.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Энергетики",
+      "qty": "25",
+      "revenue": "3750.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Вода",
+      "qty": "39",
+      "revenue": "2940.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Соки",
+      "qty": "31",
+      "revenue": "2170.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "cat": "Дополнения",
+      "qty": "8",
+      "revenue": "410.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "cat": "Мангалы Puff",
+      "qty": "18",
+      "revenue": "27000.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Мангалы",
+      "qty": "67",
+      "revenue": "77050.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Кальяны постоянникам",
+      "qty": "38",
+      "revenue": "28500.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Стафф",
+      "qty": "85",
+      "revenue": "23800.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Пиво",
+      "qty": "48",
+      "revenue": "13790.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Услуги",
+      "qty": "50",
+      "revenue": "10400.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Улун",
+      "qty": "14",
+      "revenue": "7100.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Премиум Напитки",
+      "qty": "10",
+      "revenue": "4620.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Красный чай",
+      "qty": "6",
+      "revenue": "2700.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Игры",
+      "qty": "6",
+      "revenue": "2100.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Лимонады",
+      "qty": "3",
+      "revenue": "1480.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Черный чай",
+      "qty": "3",
+      "revenue": "1200.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Пуэр",
+      "qty": "2",
+      "revenue": "900.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Зеленый чай",
+      "qty": "2",
+      "revenue": "800.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Шаурма",
+      "qty": "1",
+      "revenue": "350.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "cat": "Пиво Б/А",
+      "qty": "1",
+      "revenue": "200.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Блюда и закуски",
+      "qty": "88",
+      "revenue": "29160.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Кофе",
+      "qty": "126",
+      "revenue": "22020.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Салаты",
+      "qty": "58",
+      "revenue": "21600.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Завтраки",
+      "qty": "44",
+      "revenue": "11600.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Пицца",
+      "qty": "16",
+      "revenue": "10740.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Лимонады",
+      "qty": "30",
+      "revenue": "8420.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Милкшейки",
+      "qty": "15",
+      "revenue": "5240.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Десерты",
+      "qty": "23",
+      "revenue": "5050.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Авторский чай",
+      "qty": "11",
+      "revenue": "3890.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Чай 1л",
+      "qty": "14",
+      "revenue": "3840.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "cat": "Напитки ГРАНТ",
+      "qty": "36",
+      "revenue": "3140.00"
+    }
+  ],
+  "HOUR": [
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "0",
+      "receipts": "12",
+      "revenue": "6420.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "1",
+      "receipts": "4",
+      "revenue": "2710.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "12",
+      "receipts": "11",
+      "revenue": "6020.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "13",
+      "receipts": "5",
+      "revenue": "2810.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "14",
+      "receipts": "5",
+      "revenue": "2630.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "15",
+      "receipts": "10",
+      "revenue": "6190.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "16",
+      "receipts": "8",
+      "revenue": "4400.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "17",
+      "receipts": "11",
+      "revenue": "4140.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "18",
+      "receipts": "9",
+      "revenue": "4160.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "19",
+      "receipts": "11",
+      "revenue": "9670.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "20",
+      "receipts": "14",
+      "revenue": "4900.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "21",
+      "receipts": "12",
+      "revenue": "6210.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "22",
+      "receipts": "7",
+      "revenue": "4240.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "0",
+      "hour": "23",
+      "receipts": "7",
+      "revenue": "3390.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "0",
+      "receipts": "4",
+      "revenue": "1440.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "10",
+      "receipts": "1",
+      "revenue": "400.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "11",
+      "receipts": "9",
+      "revenue": "5190.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "12",
+      "receipts": "2",
+      "revenue": "810.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "13",
+      "receipts": "7",
+      "revenue": "5240.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "14",
+      "receipts": "14",
+      "revenue": "6450.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "15",
+      "receipts": "9",
+      "revenue": "5610.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "16",
+      "receipts": "4",
+      "revenue": "2730.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "17",
+      "receipts": "7",
+      "revenue": "3770.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "18",
+      "receipts": "12",
+      "revenue": "7040.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "19",
+      "receipts": "12",
+      "revenue": "6230.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "20",
+      "receipts": "10",
+      "revenue": "4520.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "21",
+      "receipts": "16",
+      "revenue": "8654.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "22",
+      "receipts": "2",
+      "revenue": "840.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "1",
+      "hour": "23",
+      "receipts": "11",
+      "revenue": "6830.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "0",
+      "receipts": "2",
+      "revenue": "760.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "1",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "10",
+      "receipts": "2",
+      "revenue": "600.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "11",
+      "receipts": "8",
+      "revenue": "3950.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "12",
+      "receipts": "10",
+      "revenue": "3640.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "13",
+      "receipts": "11",
+      "revenue": "5150.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "14",
+      "receipts": "12",
+      "revenue": "6320.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "15",
+      "receipts": "7",
+      "revenue": "2240.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "16",
+      "receipts": "12",
+      "revenue": "6810.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "17",
+      "receipts": "25",
+      "revenue": "13650.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "18",
+      "receipts": "15",
+      "revenue": "6500.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "19",
+      "receipts": "15",
+      "revenue": "8590.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "20",
+      "receipts": "15",
+      "revenue": "9350.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "21",
+      "receipts": "10",
+      "revenue": "4845.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "22",
+      "receipts": "14",
+      "revenue": "6410.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "2",
+      "hour": "23",
+      "receipts": "10",
+      "revenue": "5740.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "0",
+      "receipts": "7",
+      "revenue": "3110.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "1",
+      "receipts": "1",
+      "revenue": "720.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "10",
+      "receipts": "2",
+      "revenue": "1020.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "11",
+      "receipts": "12",
+      "revenue": "5130.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "12",
+      "receipts": "9",
+      "revenue": "5640.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "13",
+      "receipts": "16",
+      "revenue": "8720.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "14",
+      "receipts": "8",
+      "revenue": "3390.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "15",
+      "receipts": "12",
+      "revenue": "6320.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "16",
+      "receipts": "17",
+      "revenue": "8830.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "17",
+      "receipts": "11",
+      "revenue": "4610.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "18",
+      "receipts": "20",
+      "revenue": "10550.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "19",
+      "receipts": "14",
+      "revenue": "8630.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "20",
+      "receipts": "17",
+      "revenue": "10240.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "21",
+      "receipts": "15",
+      "revenue": "6090.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "22",
+      "receipts": "14",
+      "revenue": "6780.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "3",
+      "hour": "23",
+      "receipts": "7",
+      "revenue": "5460.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "0",
+      "receipts": "1",
+      "revenue": "360.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "1",
+      "receipts": "2",
+      "revenue": "1330.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "10",
+      "receipts": "1",
+      "revenue": "250.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "11",
+      "receipts": "6",
+      "revenue": "2740.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "12",
+      "receipts": "11",
+      "revenue": "6060.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "13",
+      "receipts": "7",
+      "revenue": "3330.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "14",
+      "receipts": "6",
+      "revenue": "4100.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "15",
+      "receipts": "7",
+      "revenue": "3660.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "16",
+      "receipts": "12",
+      "revenue": "6290.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "17",
+      "receipts": "13",
+      "revenue": "5220.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "18",
+      "receipts": "12",
+      "revenue": "5860.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "19",
+      "receipts": "11",
+      "revenue": "6375.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "20",
+      "receipts": "10",
+      "revenue": "5530.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "21",
+      "receipts": "11",
+      "revenue": "5540.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "22",
+      "receipts": "15",
+      "revenue": "7610.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "4",
+      "hour": "23",
+      "receipts": "13",
+      "revenue": "5530.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "0",
+      "receipts": "4",
+      "revenue": "2395.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "1",
+      "receipts": "4",
+      "revenue": "3500.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "10",
+      "receipts": "1",
+      "revenue": "310.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "11",
+      "receipts": "5",
+      "revenue": "2940.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "12",
+      "receipts": "7",
+      "revenue": "5580.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "13",
+      "receipts": "6",
+      "revenue": "2840.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "14",
+      "receipts": "3",
+      "revenue": "1250.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "15",
+      "receipts": "8",
+      "revenue": "4160.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "16",
+      "receipts": "4",
+      "revenue": "1785.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "17",
+      "receipts": "11",
+      "revenue": "6440.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "18",
+      "receipts": "16",
+      "revenue": "7400.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "19",
+      "receipts": "11",
+      "revenue": "5450.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "20",
+      "receipts": "19",
+      "revenue": "10000.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "21",
+      "receipts": "10",
+      "revenue": "4765.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "22",
+      "receipts": "12",
+      "revenue": "7390.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "5",
+      "hour": "23",
+      "receipts": "15",
+      "revenue": "6975.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "0",
+      "receipts": "5",
+      "revenue": "3710.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "1",
+      "receipts": "9",
+      "revenue": "5250.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "11",
+      "receipts": "12",
+      "revenue": "6820.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "12",
+      "receipts": "5",
+      "revenue": "1580.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "13",
+      "receipts": "15",
+      "revenue": "6910.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "14",
+      "receipts": "6",
+      "revenue": "2900.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "15",
+      "receipts": "11",
+      "revenue": "6320.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "16",
+      "receipts": "10",
+      "revenue": "6520.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "17",
+      "receipts": "11",
+      "revenue": "5970.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "18",
+      "receipts": "9",
+      "revenue": "5340.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "19",
+      "receipts": "18",
+      "revenue": "8655.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "20",
+      "receipts": "18",
+      "revenue": "9840.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "21",
+      "receipts": "3",
+      "revenue": "1020.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "22",
+      "receipts": "10",
+      "revenue": "5040.00"
+    },
+    {
+      "venue": "Kebab King Карла",
+      "dow": "6",
+      "hour": "23",
+      "receipts": "14",
+      "revenue": "7940.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "10",
+      "receipts": "11",
+      "revenue": "7110.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "11",
+      "receipts": "7",
+      "revenue": "5400.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "12",
+      "receipts": "19",
+      "revenue": "12930.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "13",
+      "receipts": "25",
+      "revenue": "19030.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "14",
+      "receipts": "10",
+      "revenue": "8710.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "15",
+      "receipts": "21",
+      "revenue": "13890.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "16",
+      "receipts": "27",
+      "revenue": "14620.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "17",
+      "receipts": "13",
+      "revenue": "7080.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "18",
+      "receipts": "17",
+      "revenue": "8540.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "19",
+      "receipts": "19",
+      "revenue": "10780.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "20",
+      "receipts": "33",
+      "revenue": "18620.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "21",
+      "receipts": "7",
+      "revenue": "3230.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "0",
+      "hour": "22",
+      "receipts": "8",
+      "revenue": "3060.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "9",
+      "receipts": "6",
+      "revenue": "3860.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "10",
+      "receipts": "12",
+      "revenue": "7295.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "11",
+      "receipts": "7",
+      "revenue": "4380.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "12",
+      "receipts": "20",
+      "revenue": "8400.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "13",
+      "receipts": "9",
+      "revenue": "3360.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "14",
+      "receipts": "19",
+      "revenue": "9150.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "15",
+      "receipts": "18",
+      "revenue": "12695.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "16",
+      "receipts": "21",
+      "revenue": "11800.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "17",
+      "receipts": "16",
+      "revenue": "9640.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "18",
+      "receipts": "16",
+      "revenue": "9110.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "19",
+      "receipts": "30",
+      "revenue": "17400.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "20",
+      "receipts": "16",
+      "revenue": "7965.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "21",
+      "receipts": "18",
+      "revenue": "9695.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "22",
+      "receipts": "7",
+      "revenue": "2660.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "1",
+      "hour": "23",
+      "receipts": "3",
+      "revenue": "1340.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "8",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "9",
+      "receipts": "10",
+      "revenue": "5790.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "10",
+      "receipts": "15",
+      "revenue": "7300.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "11",
+      "receipts": "11",
+      "revenue": "7055.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "12",
+      "receipts": "25",
+      "revenue": "12080.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "13",
+      "receipts": "15",
+      "revenue": "6790.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "14",
+      "receipts": "14",
+      "revenue": "8200.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "15",
+      "receipts": "23",
+      "revenue": "14290.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "16",
+      "receipts": "18",
+      "revenue": "9730.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "17",
+      "receipts": "20",
+      "revenue": "10860.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "18",
+      "receipts": "31",
+      "revenue": "16369.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "19",
+      "receipts": "19",
+      "revenue": "10500.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "20",
+      "receipts": "27",
+      "revenue": "15335.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "21",
+      "receipts": "17",
+      "revenue": "11090.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "22",
+      "receipts": "22",
+      "revenue": "12130.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "2",
+      "hour": "23",
+      "receipts": "11",
+      "revenue": "5280.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "9",
+      "receipts": "9",
+      "revenue": "3260.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "10",
+      "receipts": "15",
+      "revenue": "9820.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "11",
+      "receipts": "14",
+      "revenue": "6020.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "12",
+      "receipts": "23",
+      "revenue": "15244.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "13",
+      "receipts": "30",
+      "revenue": "17770.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "14",
+      "receipts": "8",
+      "revenue": "4955.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "15",
+      "receipts": "18",
+      "revenue": "10310.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "16",
+      "receipts": "23",
+      "revenue": "12649.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "17",
+      "receipts": "18",
+      "revenue": "11650.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "18",
+      "receipts": "27",
+      "revenue": "12015.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "19",
+      "receipts": "25",
+      "revenue": "16400.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "20",
+      "receipts": "33",
+      "revenue": "16850.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "21",
+      "receipts": "19",
+      "revenue": "9055.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "22",
+      "receipts": "7",
+      "revenue": "5140.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "3",
+      "hour": "23",
+      "receipts": "15",
+      "revenue": "10140.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "8",
+      "receipts": "1",
+      "revenue": "40.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "9",
+      "receipts": "7",
+      "revenue": "4340.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "10",
+      "receipts": "12",
+      "revenue": "6820.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "11",
+      "receipts": "12",
+      "revenue": "6420.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "12",
+      "receipts": "24",
+      "revenue": "11710.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "13",
+      "receipts": "19",
+      "revenue": "8570.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "14",
+      "receipts": "20",
+      "revenue": "10040.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "15",
+      "receipts": "21",
+      "revenue": "13130.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "16",
+      "receipts": "19",
+      "revenue": "10760.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "17",
+      "receipts": "17",
+      "revenue": "8882.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "18",
+      "receipts": "25",
+      "revenue": "14639.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "19",
+      "receipts": "16",
+      "revenue": "7070.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "20",
+      "receipts": "30",
+      "revenue": "15760.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "21",
+      "receipts": "26",
+      "revenue": "14100.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "22",
+      "receipts": "16",
+      "revenue": "7880.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "4",
+      "hour": "23",
+      "receipts": "5",
+      "revenue": "2680.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "8",
+      "receipts": "1",
+      "revenue": "1520.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "9",
+      "receipts": "9",
+      "revenue": "3970.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "10",
+      "receipts": "21",
+      "revenue": "9485.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "11",
+      "receipts": "15",
+      "revenue": "7330.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "12",
+      "receipts": "17",
+      "revenue": "8875.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "13",
+      "receipts": "27",
+      "revenue": "13200.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "14",
+      "receipts": "21",
+      "revenue": "14340.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "15",
+      "receipts": "20",
+      "revenue": "10580.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "16",
+      "receipts": "16",
+      "revenue": "11670.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "17",
+      "receipts": "23",
+      "revenue": "13180.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "18",
+      "receipts": "15",
+      "revenue": "10350.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "19",
+      "receipts": "25",
+      "revenue": "15060.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "20",
+      "receipts": "17",
+      "revenue": "14210.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "21",
+      "receipts": "17",
+      "revenue": "9945.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "22",
+      "receipts": "19",
+      "revenue": "7760.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "5",
+      "hour": "23",
+      "receipts": "9",
+      "revenue": "6390.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "9",
+      "receipts": "8",
+      "revenue": "4635.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "10",
+      "receipts": "13",
+      "revenue": "6510.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "11",
+      "receipts": "12",
+      "revenue": "6680.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "12",
+      "receipts": "24",
+      "revenue": "11850.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "13",
+      "receipts": "29",
+      "revenue": "20005.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "14",
+      "receipts": "27",
+      "revenue": "18795.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "15",
+      "receipts": "25",
+      "revenue": "16470.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "16",
+      "receipts": "15",
+      "revenue": "8430.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "17",
+      "receipts": "7",
+      "revenue": "4520.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "18",
+      "receipts": "16",
+      "revenue": "9730.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "19",
+      "receipts": "18",
+      "revenue": "9560.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "20",
+      "receipts": "10",
+      "revenue": "7830.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "21",
+      "receipts": "18",
+      "revenue": "8990.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "22",
+      "receipts": "21",
+      "revenue": "9720.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "dow": "6",
+      "hour": "23",
+      "receipts": "8",
+      "revenue": "5565.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "0",
+      "hour": "19",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "0",
+      "hour": "21",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "2",
+      "hour": "19",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "2",
+      "hour": "23",
+      "receipts": "1",
+      "revenue": "3000.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "3",
+      "hour": "16",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "3",
+      "hour": "20",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "3",
+      "hour": "21",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "3",
+      "hour": "22",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "4",
+      "hour": "16",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "4",
+      "hour": "20",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "4",
+      "hour": "22",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "6",
+      "hour": "18",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "6",
+      "hour": "19",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "6",
+      "hour": "20",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "6",
+      "hour": "21",
+      "receipts": "3",
+      "revenue": "4500.00"
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "dow": "6",
+      "hour": "22",
+      "receipts": "2",
+      "revenue": "3000.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "0",
+      "hour": "0",
+      "receipts": "6",
+      "revenue": "3660.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "0",
+      "hour": "1",
+      "receipts": "4",
+      "revenue": "7100.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "0",
+      "hour": "19",
+      "receipts": "1",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "0",
+      "hour": "21",
+      "receipts": "2",
+      "revenue": "1780.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "0",
+      "hour": "22",
+      "receipts": "2",
+      "revenue": "560.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "0",
+      "hour": "23",
+      "receipts": "10",
+      "revenue": "7854.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "1",
+      "hour": "0",
+      "receipts": "5",
+      "revenue": "4300.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "1",
+      "hour": "17",
+      "receipts": "1",
+      "revenue": "1600.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "1",
+      "hour": "19",
+      "receipts": "1",
+      "revenue": "1150.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "1",
+      "hour": "20",
+      "receipts": "1",
+      "revenue": "1200.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "1",
+      "hour": "21",
+      "receipts": "3",
+      "revenue": "4360.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "1",
+      "hour": "22",
+      "receipts": "3",
+      "revenue": "2500.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "1",
+      "hour": "23",
+      "receipts": "7",
+      "revenue": "4310.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "2",
+      "hour": "0",
+      "receipts": "2",
+      "revenue": "0.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "2",
+      "hour": "16",
+      "receipts": "1",
+      "revenue": "0.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "2",
+      "hour": "20",
+      "receipts": "1",
+      "revenue": "280.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "2",
+      "hour": "21",
+      "receipts": "4",
+      "revenue": "3530.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "2",
+      "hour": "22",
+      "receipts": "3",
+      "revenue": "3445.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "2",
+      "hour": "23",
+      "receipts": "7",
+      "revenue": "2477.50"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "3",
+      "hour": "0",
+      "receipts": "1",
+      "revenue": "0.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "3",
+      "hour": "1",
+      "receipts": "1",
+      "revenue": "1050.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "3",
+      "hour": "16",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "3",
+      "hour": "19",
+      "receipts": "2",
+      "revenue": "2185.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "3",
+      "hour": "20",
+      "receipts": "1",
+      "revenue": "0.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "3",
+      "hour": "21",
+      "receipts": "4",
+      "revenue": "4605.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "3",
+      "hour": "22",
+      "receipts": "2",
+      "revenue": "1900.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "3",
+      "hour": "23",
+      "receipts": "8",
+      "revenue": "4281.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "4",
+      "hour": "0",
+      "receipts": "4",
+      "revenue": "2250.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "4",
+      "hour": "16",
+      "receipts": "1",
+      "revenue": "560.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "4",
+      "hour": "17",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "4",
+      "hour": "20",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "4",
+      "hour": "21",
+      "receipts": "5",
+      "revenue": "4985.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "4",
+      "hour": "22",
+      "receipts": "5",
+      "revenue": "4902.50"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "4",
+      "hour": "23",
+      "receipts": "10",
+      "revenue": "11609.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "5",
+      "hour": "0",
+      "receipts": "2",
+      "revenue": "1035.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "5",
+      "hour": "1",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "5",
+      "hour": "18",
+      "receipts": "1",
+      "revenue": "350.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "5",
+      "hour": "19",
+      "receipts": "2",
+      "revenue": "1335.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "5",
+      "hour": "20",
+      "receipts": "1",
+      "revenue": "1035.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "5",
+      "hour": "21",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "5",
+      "hour": "22",
+      "receipts": "2",
+      "revenue": "3030.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "5",
+      "hour": "23",
+      "receipts": "5",
+      "revenue": "4645.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "6",
+      "hour": "0",
+      "receipts": "7",
+      "revenue": "4180.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "6",
+      "hour": "1",
+      "receipts": "1",
+      "revenue": "0.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "6",
+      "hour": "16",
+      "receipts": "2",
+      "revenue": "900.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "6",
+      "hour": "18",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "6",
+      "hour": "19",
+      "receipts": "1",
+      "revenue": "1287.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "6",
+      "hour": "20",
+      "receipts": "2",
+      "revenue": "560.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "6",
+      "hour": "21",
+      "receipts": "4",
+      "revenue": "4900.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "6",
+      "hour": "22",
+      "receipts": "2",
+      "revenue": "2289.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "dow": "6",
+      "hour": "23",
+      "receipts": "2",
+      "revenue": "2300.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "0",
+      "hour": "9",
+      "receipts": "1",
+      "revenue": "330.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "0",
+      "hour": "10",
+      "receipts": "1",
+      "revenue": "150.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "0",
+      "hour": "11",
+      "receipts": "1",
+      "revenue": "450.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "0",
+      "hour": "12",
+      "receipts": "2",
+      "revenue": "3340.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "0",
+      "hour": "13",
+      "receipts": "2",
+      "revenue": "1480.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "0",
+      "hour": "15",
+      "receipts": "4",
+      "revenue": "3770.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "0",
+      "hour": "16",
+      "receipts": "1",
+      "revenue": "630.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "0",
+      "hour": "17",
+      "receipts": "4",
+      "revenue": "3960.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "0",
+      "hour": "19",
+      "receipts": "1",
+      "revenue": "0.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "1",
+      "hour": "8",
+      "receipts": "1",
+      "revenue": "120.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "1",
+      "hour": "9",
+      "receipts": "4",
+      "revenue": "880.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "1",
+      "hour": "11",
+      "receipts": "1",
+      "revenue": "730.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "1",
+      "hour": "12",
+      "receipts": "1",
+      "revenue": "610.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "1",
+      "hour": "13",
+      "receipts": "1",
+      "revenue": "690.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "1",
+      "hour": "14",
+      "receipts": "3",
+      "revenue": "910.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "1",
+      "hour": "15",
+      "receipts": "2",
+      "revenue": "1100.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "1",
+      "hour": "16",
+      "receipts": "2",
+      "revenue": "280.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "1",
+      "hour": "18",
+      "receipts": "4",
+      "revenue": "1470.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "1",
+      "hour": "19",
+      "receipts": "7",
+      "revenue": "3290.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "2",
+      "hour": "9",
+      "receipts": "3",
+      "revenue": "600.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "2",
+      "hour": "10",
+      "receipts": "2",
+      "revenue": "180.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "2",
+      "hour": "11",
+      "receipts": "1",
+      "revenue": "930.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "2",
+      "hour": "12",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "2",
+      "hour": "13",
+      "receipts": "3",
+      "revenue": "2310.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "2",
+      "hour": "14",
+      "receipts": "6",
+      "revenue": "3260.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "2",
+      "hour": "15",
+      "receipts": "5",
+      "revenue": "2060.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "2",
+      "hour": "17",
+      "receipts": "4",
+      "revenue": "980.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "2",
+      "hour": "18",
+      "receipts": "3",
+      "revenue": "3450.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "2",
+      "hour": "19",
+      "receipts": "3",
+      "revenue": "1470.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "8",
+      "receipts": "1",
+      "revenue": "120.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "9",
+      "receipts": "4",
+      "revenue": "810.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "10",
+      "receipts": "1",
+      "revenue": "300.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "11",
+      "receipts": "2",
+      "revenue": "1700.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "12",
+      "receipts": "3",
+      "revenue": "1190.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "13",
+      "receipts": "3",
+      "revenue": "2430.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "14",
+      "receipts": "5",
+      "revenue": "1210.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "15",
+      "receipts": "6",
+      "revenue": "3440.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "16",
+      "receipts": "3",
+      "revenue": "1880.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "17",
+      "receipts": "4",
+      "revenue": "3460.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "18",
+      "receipts": "4",
+      "revenue": "1500.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "3",
+      "hour": "19",
+      "receipts": "1",
+      "revenue": "380.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "4",
+      "hour": "8",
+      "receipts": "0",
+      "revenue": "0"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "4",
+      "hour": "9",
+      "receipts": "2",
+      "revenue": "730.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "4",
+      "hour": "10",
+      "receipts": "4",
+      "revenue": "630.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "4",
+      "hour": "11",
+      "receipts": "1",
+      "revenue": "330.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "4",
+      "hour": "12",
+      "receipts": "4",
+      "revenue": "2810.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "4",
+      "hour": "13",
+      "receipts": "1",
+      "revenue": "950.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "4",
+      "hour": "14",
+      "receipts": "5",
+      "revenue": "2710.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "4",
+      "hour": "15",
+      "receipts": "1",
+      "revenue": "0.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "4",
+      "hour": "17",
+      "receipts": "2",
+      "revenue": "500.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "4",
+      "hour": "18",
+      "receipts": "2",
+      "revenue": "1290.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "4",
+      "hour": "19",
+      "receipts": "4",
+      "revenue": "1980.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "9",
+      "receipts": "3",
+      "revenue": "690.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "10",
+      "receipts": "1",
+      "revenue": "300.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "11",
+      "receipts": "3",
+      "revenue": "3840.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "12",
+      "receipts": "6",
+      "revenue": "4420.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "13",
+      "receipts": "1",
+      "revenue": "0.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "14",
+      "receipts": "1",
+      "revenue": "120.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "15",
+      "receipts": "5",
+      "revenue": "4180.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "16",
+      "receipts": "1",
+      "revenue": "30.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "17",
+      "receipts": "3",
+      "revenue": "1560.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "18",
+      "receipts": "2",
+      "revenue": "150.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "19",
+      "receipts": "1",
+      "revenue": "2090.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "5",
+      "hour": "20",
+      "receipts": "1",
+      "revenue": "280.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "6",
+      "hour": "9",
+      "receipts": "2",
+      "revenue": "750.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "6",
+      "hour": "11",
+      "receipts": "4",
+      "revenue": "1010.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "6",
+      "hour": "12",
+      "receipts": "2",
+      "revenue": "4090.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "6",
+      "hour": "13",
+      "receipts": "3",
+      "revenue": "1430.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "6",
+      "hour": "14",
+      "receipts": "4",
+      "revenue": "3470.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "6",
+      "hour": "15",
+      "receipts": "3",
+      "revenue": "2060.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "6",
+      "hour": "16",
+      "receipts": "1",
+      "revenue": "290.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "6",
+      "hour": "17",
+      "receipts": "3",
+      "revenue": "3690.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "6",
+      "hour": "18",
+      "receipts": "4",
+      "revenue": "2410.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "dow": "6",
+      "hour": "19",
+      "receipts": "2",
+      "revenue": "1630.00"
+    }
+  ],
+  "DISCOUNTS": [
+    {
+      "venue": "Kebab King Карла",
+      "discount_percent": 100,
+      "n": "1",
+      "discount": "150.00",
+      "total": "0.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "discount_percent": 10,
+      "n": "3",
+      "discount": "423.00",
+      "total": "3807.00"
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "discount_percent": 100,
+      "n": "2",
+      "discount": "830.00",
+      "total": "0.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "discount_percent": 10,
+      "n": "15",
+      "discount": "1785.00",
+      "total": "16065.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "discount_percent": 15,
+      "n": "3",
+      "discount": "825.00",
+      "total": "4675.00"
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "discount_percent": 100,
+      "n": "35",
+      "discount": "54600.00",
+      "total": "0.00"
+    },
+    {
+      "venue": "MC Гранд",
+      "discount_percent": 100,
+      "n": "19",
+      "discount": "16430.00",
+      "total": "0.00"
+    }
+  ],
+  "AVG": [
+    {
+      "venue": "Kebab King Карла",
+      "receipts": "1026",
+      "avg_check": "526.5292397660818713",
+      "median_check": 440
+    },
+    {
+      "venue": "Kebab King Октябрьская",
+      "receipts": "1790",
+      "avg_check": "567.4988826815642458",
+      "median_check": 490
+    },
+    {
+      "venue": "MC Lounge Puff",
+      "receipts": "17",
+      "avg_check": "1588.2352941176470588",
+      "median_check": 1500
+    },
+    {
+      "venue": "MC Lounge Роза",
+      "receipts": "142",
+      "avg_check": "829.4366197183098592",
+      "median_check": 750
+    },
+    {
+      "venue": "MC Гранд",
+      "receipts": "192",
+      "avg_check": "563.9062500000000000",
+      "median_check": 380
+    }
+  ]
+}
