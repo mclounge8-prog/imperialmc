@@ -1201,7 +1201,7 @@
       {
         "counterparty": "Краснобродская Ксения Леонидовна",
         "amount": 80570,
-        "note": "1 платёж 14.09, вероятно подряд/зарплата — уточнить"
+        "note": "1 платёж 14.09, за день до зарплатного окна; статья не размечена"
       },
       {
         "counterparty": "ООО «Мистер Крабс»",
@@ -1239,12 +1239,45 @@
       "magnit": 9520.27,
       "monetka": 9350.12
     },
+    "owner_rule": {
+      "predprinimatelskiy_dohod": "вывод себе / заработкок",
+      "withdrawals_on_15_or_16": "чаще зарплаты сотрудникам, даже если назначение то же",
+      "sber_payroll_registry": "белый ФОТ по договору 83390253"
+    },
+    "predprinimatelskiy_dohod_to_demkina": {
+      "destination": "личная карта 40817…8639",
+      "ops": [
+        { "date": "2026-09-01", "amount": 45000, "role": "owner" },
+        { "date": "2026-09-04", "amount": 20000, "role": "owner" },
+        { "date": "2026-09-05", "amount": 23000, "role": "owner" },
+        { "date": "2026-09-08", "amount": 9500, "role": "owner" },
+        { "date": "2026-09-08", "amount": 32000, "role": "owner" },
+        { "date": "2026-09-09", "amount": 4000, "role": "owner" },
+        { "date": "2026-09-11", "amount": 43000, "role": "owner" },
+        { "date": "2026-09-11", "amount": 52000, "role": "owner" },
+        { "date": "2026-09-15", "amount": 58000, "role": "payroll_window" },
+        { "date": "2026-09-27", "amount": 10000, "role": "owner" }
+      ],
+      "total": 296500,
+      "owner_ex_15_16": 238500,
+      "marked_payroll_window": 58000
+    },
+    "sber_payroll_15_09": [
+      { "registry": 77, "amount": 18620, "purpose": "Аванс по заработной плате" },
+      { "registry": 76, "amount": 78870, "purpose": "Аванс по заработной плате" }
+    ],
+    "payroll_visible_if_15th_draw_is_salary": 155490,
     "not_in_this_file": [
       "аренда по точкам",
-      "ФОТ целиком (кроме одного платежа Краснобродской)",
+      "полный ФОТ наличными из кассы, если платили мимо Сбера",
       "коммуналка",
       "налоги",
       "наличная выручка 287 902.50 из POS — в выписку как эквайринг не попадает"
-    ]
+    ],
+    "rosa_context": {
+      "renovation": true,
+      "held_by_regulars": true,
+      "owner_comps_are_expected": true
+    }
   }
 }
