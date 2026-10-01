@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Imperial MC · Сентябрь 2026</title>
+<style>
+@font-face { font-family: Inter; font-weight: 400; src: url('fonts/Inter-400-cyr.woff2') format('woff2'); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: Inter; font-weight: 400; src: url('fonts/Inter-400-lat.woff2') format('woff2'); unicode-range: U+0000-00FF; }
+@font-face { font-family: Inter; font-weight: 500; src: url('fonts/Inter-500-cyr.woff2') format('woff2'); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: Inter; font-weight: 500; src: url('fonts/Inter-500-lat.woff2') format('woff2'); unicode-range: U+0000-00FF; }
+@font-face { font-family: Inter; font-weight: 600; src: url('fonts/Inter-600-cyr.woff2') format('woff2'); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: Inter; font-weight: 600; src: url('fonts/Inter-600-lat.woff2') format('woff2'); unicode-range: U+0000-00FF; }
+@font-face { font-family: Inter; font-weight: 700; src: url('fonts/Inter-700-cyr.woff2') format('woff2'); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: Inter; font-weight: 700; src: url('fonts/Inter-700-lat.woff2') format('woff2'); unicode-range: U+0000-00FF; }
+@font-face { font-family: Grotesk; font-weight: 600; src: url('fonts/SpaceGrotesk-600-lat.woff2') format('woff2'); }
+@font-face { font-family: Grotesk; font-weight: 700; src: url('fonts/SpaceGrotesk-700-lat.woff2') format('woff2'); }
+
+:root {
+  --bg: #121214;
+  --surface: #1b1b1f;
+  --surface-2: #24242a;
+  --line: #34343c;
+  --text: #f1f1f3;
+  --muted: #98979f;
+  --blue: #3f63e6;
+  --blue-deep: #2647c7;
+  --ok: #3dbe8c;
+  --lilac: #8b7cff;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #0b0b0d; }
+@page { size: 1920px 1080px; margin: 0; }
+.slide {
+  width: 1920px; height: 1080px;
+  background:
+    radial-gradient(900px 520px at 112% -10%, rgba(63,99,230,.22), transparent 58%),
+    radial-gradient(700px 400px at -8% 110%, rgba(38,71,199,.16), transparent 55%),
+    var(--bg);
+  color: var(--text);
+  font-family: Inter, 'DejaVu Sans', sans-serif;
+  padding: 64px 80px 56px;
+  position: relative;
+  overflow: hidden;
+  page-break-after: always;
+}
+.slide::before {
+  content: "";
+  position: absolute; left: 0; top: 0; bottom: 0; width: 7px;
+  background: linear-gradient(180deg, var(--blue), var(--blue-deep));
+}
+.glow-line {
+  width: 48px; height: 3px; border-radius: 2px;
+  background: var(--blue);
+  box-shadow: 0 0 16px 2px rgba(63,99,230,.55);
+  margin: 16px 0 0;
+}
+.top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 36px; }
+.eyebrow {
+  font-size: 15px; font-weight: 600; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--blue); margin: 0 0 10px;
+}
+h2 { font-size: 46px; font-weight: 700; letter-spacing: -.03em; margin: 0; line-height: 1.12; max-width: 1500px; }
+.logo {
+  height: 52px; width: auto; max-width: 140px;
+  object-fit: contain; object-position: right center;
+  flex: 0 0 auto;
+}
+.title-slide { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding-left: 120px; }
+.title-logo {
+  height: 78px; width: auto; max-width: 220px;
+  object-fit: contain; object-position: left center;
+  display: block; margin: 0 0 40px;
+}
+.title-slide h1 {
+  font-size: 92px; font-weight: 700; letter-spacing: -.04em;
+  margin: 0; line-height: .95;
+}
+.chips { display: flex; gap: 12px; margin-top: 36px; flex-wrap: wrap; }
+.chip {
+  border: 1px solid var(--line); background: rgba(27,27,31,.7);
+  border-radius: 999px; padding: 10px 18px; font-size: 18px; color: var(--muted);
+}
+.kpis { display: grid; gap: 20px; }
+.k4 { grid-template-columns: repeat(4, 1fr); }
+.k3 { grid-template-columns: repeat(3, 1fr); }
+.k5 { grid-template-columns: repeat(5, 1fr); }
+.k2 { grid-template-columns: 1fr 1fr; }
+.card {
+  background: linear-gradient(180deg, #222228, #1b1b1f);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 32px 30px 28px;
+  position: relative;
+  min-height: 210px;
+}
+.card .v { white-space: nowrap; }
+.card::after {
+  content: "";
+  position: absolute; left: 24px; right: 24px; top: 0; height: 2px;
+  background: linear-gradient(90deg, var(--blue), transparent);
+  border-radius: 2px;
+}
+.card .l { color: var(--muted); font-size: 15px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
+.card .v {
+  font-family: Grotesk, Inter, sans-serif;
+  font-size: 48px; font-weight: 700; margin-top: 12px; letter-spacing: -.03em; line-height: 1;
+}
+.card .s { color: var(--muted); font-size: 18px; margin-top: 12px; line-height: 1.4; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+.venue {
+  background: linear-gradient(180deg, #222228, #1b1b1f);
+  border: 1px solid var(--line); border-radius: 16px; padding: 26px 24px 22px;
+}
+.venue.hot { border-color: #3a4ea8; box-shadow: inset 0 0 0 1px rgba(63,99,230,.25); }
+.venue .name { font-size: 20px; font-weight: 600; margin-bottom: 18px; }
+.venue .sum { font-family: Grotesk, Inter, sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -.03em; }
+.venue .meta { color: var(--muted); font-size: 18px; margin-top: 10px; line-height: 1.45; }
+.statrow { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; margin-top: 28px; }
+.statrow .k { color: var(--muted); font-size: 16px; }
+.statrow .n { font-family: Grotesk, Inter, sans-serif; font-size: 30px; font-weight: 700; margin-top: 4px; }
+.note {
+  margin-top: 28px; padding: 18px 22px;
+  background: rgba(63,99,230,.1); border: 1px solid rgba(63,99,230,.28);
+  border-radius: 14px; font-size: 20px; line-height: 1.4; color: #d5dbf5;
+}
+.ok {
+  background: rgba(61,190,140,.1); border-color: rgba(61,190,140,.28); color: #d4f3e4;
+}
+.hours { display: flex; align-items: flex-end; gap: 10px; height: 360px; }
+.hbar { width: 48px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.hbar-fill { width: 30px; border-radius: 8px 8px 3px 3px; }
+.hbar span { font-size: 16px; color: var(--muted); }
+.br { display: grid; grid-template-columns: 220px 1fr 180px; gap: 18px; align-items: center; margin: 18px 0; }
+.br-l { font-size: 22px; font-weight: 550; }
+.br-track { height: 16px; background: #2a2a32; border-radius: 99px; overflow: hidden; }
+.br-fill { height: 100%; background: linear-gradient(90deg, var(--blue-deep), var(--blue)); border-radius: 99px; }
+.br-v { font-family: Grotesk, Inter, sans-serif; font-size: 24px; font-weight: 700; text-align: right; }
+.person { padding: 28px; }
+.person .who { font-size: 24px; font-weight: 600; }
+.take {
+  display: grid; grid-template-columns: 64px 1fr; gap: 18px; align-items: start;
+  background: linear-gradient(180deg, #222228, #1b1b1f);
+  border: 1px solid var(--line); border-radius: 16px; padding: 26px 26px 24px;
+}
+.take .num {
+  width: 56px; height: 56px; border-radius: 14px;
+  background: rgba(63,99,230,.16); color: var(--blue);
+  font-family: Grotesk, Inter, sans-serif; font-weight: 700; font-size: 26px;
+  display: flex; align-items: center; justify-content: center;
+}
+.take b { display: block; font-size: 24px; margin-bottom: 8px; }
+.take span { color: var(--muted); font-size: 18px; line-height: 1.4; }
+.foot {
+  position: absolute; left: 80px; right: 80px; bottom: 28px;
+  display: flex; justify-content: space-between; align-items: center;
+  color: var(--muted); font-size: 14px;
+}
+.page {
+  min-width: 64px; text-align: center;
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
+}
+.share { display: flex; height: 72px; border-radius: 16px; overflow: hidden; margin: 36px 0 0; }
+.share-seg { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; font-weight: 600; gap: 8px; }
+.share-seg b { font-weight: 700; }
+.vs {
+  position: absolute; left: 50%; top: 58%; transform: translate(-50%,-50%);
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #121214; border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 14px; font-weight: 600; letter-spacing: .08em;
+}
+</style>
+</head>
+<body>
+<section class="slide title-slide">
+
+  <img class="title-logo" src="logo-white.png" alt="Imperial MC">
+  <p class="eyebrow">Аналитика сети</p>
+  <h1>Сентябрь<br>2026</h1>
+  <div class="glow-line"></div>
+  <div class="chips">
+    <span class="chip">1–30 сентября</span>
+    <span class="chip">Екатеринбург</span>
+    <span class="chip">5 точек</span>
+    <span class="chip">3 167 чеков</span>
+  </div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">1 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Сеть</p><h2>Месяц одним взглядом</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="kpis k4">
+    <div class="card"><div class="l">Оплачено</div><div class="v">1 809 092</div><div class="s">скидки 75 043 ₽</div></div>
+    <div class="card"><div class="l">Карта</div><div class="v">84,1%</div><div class="s">1 521 190 ₽</div></div>
+    <div class="card"><div class="l">Нал</div><div class="v">15,9%</div><div class="s">287 902 ₽</div></div>
+    <div class="card"><div class="l">Kebab King</div><div class="v">86%</div><div class="s">1 556 042 ₽ на двоих</div></div>
+  </div>
+  <div class="share">
+    <div class="share-seg" style="width:56.2%;background:#3f63e6"><b>Октябрьская</b> 56%</div>
+    <div class="share-seg" style="width:29.9%;background:#6f8cff"><b>Карла</b> 30%</div>
+    <div class="share-seg" style="width:6.5%;background:#8b7cff"><b>Роза</b></div>
+    <div class="share-seg" style="width:6.0%;background:#3dbe8c"><b>Гранд</b></div>
+    <div class="share-seg" style="width:1.4%;background:#5c5c66"></div>
+  </div>
+  <div class="note">Роза в ремонте. Гранд и Puff открылись 15-го. Их сентябрь — не нормальный месяц точки.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">2 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Разрез</p><h2>Пять точек</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="kpis k5"><div class="venue hot"><div class="name">Октябрьская</div><div class="sum">1 015 823</div><div class="meta">56,2% сети · 1 790 чеков<br>средний 568 · день 33 861</div></div><div class="venue hot"><div class="name">Карла</div><div class="sum">540 219</div><div class="meta">29,9% сети · 1 026 чеков<br>средний 527 · день 18 007</div></div><div class="venue"><div class="name">Роза</div><div class="sum">117 780</div><div class="meta">6,5% сети · 142 чеков<br>средний 829 · день 4 061</div></div><div class="venue"><div class="name">Гранд</div><div class="sum">108 270</div><div class="meta">6,0% сети · 192 чеков<br>средний 564 · день 6 767</div></div><div class="venue"><div class="name">Puff</div><div class="sum">27 000</div><div class="meta">1,5% сети · 17 чеков<br>средний 1 588 · день 3 857</div></div></div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">3 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Kebab King</p><h2>Октябрьская в 1,88 раза больше</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="grid2" style="position:relative">
+    <div class="card">
+      <div class="l">Октябрьская</div>
+      <div class="v">1 015 823</div>
+      <div class="statrow">
+        <div><div class="k">Чеки</div><div class="n">1 790</div></div>
+        <div><div class="k">День</div><div class="n">33 861</div></div>
+        <div><div class="k">Обед 11–16</div><div class="n">458 313</div></div>
+        <div><div class="k">Вечер 17–23</div><div class="n">475 755</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="l">Карла</div>
+      <div class="v">540 219</div>
+      <div class="statrow">
+        <div><div class="k">Чеки</div><div class="n">1 026</div></div>
+        <div><div class="k">День</div><div class="n">18 007</div></div>
+        <div><div class="k">Обед 11–16</div><div class="n">190 005</div></div>
+        <div><div class="k">Вечер 17–23</div><div class="n">315 929</div></div>
+      </div>
+    </div>
+    <div class="vs">VS</div>
+  </div>
+  <div class="note">Средний чек почти тот же. Ломается не меню — дневной ритм.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">4 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Часы</p><h2>Октябрьская — весь день. Карла — вечер.</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="grid2">
+    <div>
+      <div class="l" style="color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:15px;margin-bottom:12px">Октябрьская</div>
+      <div class="hours"><div class="hbar"><div class="hbar-fill" style="height:170px;background:#3f63e6"></div><span>10</span></div><div class="hbar"><div class="hbar-fill" style="height:138px;background:#3f63e6"></div><span>11</span></div><div class="hbar"><div class="hbar-fill" style="height:247px;background:#3f63e6"></div><span>12</span></div><div class="hbar"><div class="hbar-fill" style="height:269px;background:#3f63e6"></div><span>13</span></div><div class="hbar"><div class="hbar-fill" style="height:227px;background:#3f63e6"></div><span>14</span></div><div class="hbar"><div class="hbar-fill" style="height:277px;background:#3f63e6"></div><span>15</span></div><div class="hbar"><div class="hbar-fill" style="height:243px;background:#3f63e6"></div><span>16</span></div><div class="hbar"><div class="hbar-fill" style="height:203px;background:#3f63e6"></div><span>17</span></div><div class="hbar"><div class="hbar-fill" style="height:246px;background:#3f63e6"></div><span>18</span></div><div class="hbar"><div class="hbar-fill" style="height:264px;background:#3f63e6"></div><span>19</span></div><div class="hbar"><div class="hbar-fill" style="height:292px;background:#3f63e6"></div><span>20</span></div><div class="hbar"><div class="hbar-fill" style="height:204px;background:#3f63e6"></div><span>21</span></div><div class="hbar"><div class="hbar-fill" style="height:152px;background:#3f63e6"></div><span>22</span></div><div class="hbar"><div class="hbar-fill" style="height:103px;background:#3f63e6"></div><span>23</span></div></div>
+    </div>
+    <div>
+      <div class="l" style="color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:15px;margin-bottom:12px">Карла</div>
+      <div class="hours"><div class="hbar"><div class="hbar-fill" style="height:19px;background:#8b7cff"></div><span>10</span></div><div class="hbar"><div class="hbar-fill" style="height:90px;background:#8b7cff"></div><span>11</span></div><div class="hbar"><div class="hbar-fill" style="height:97px;background:#8b7cff"></div><span>12</span></div><div class="hbar"><div class="hbar-fill" style="height:113px;background:#8b7cff"></div><span>13</span></div><div class="hbar"><div class="hbar-fill" style="height:90px;background:#8b7cff"></div><span>14</span></div><div class="hbar"><div class="hbar-fill" style="height:112px;background:#8b7cff"></div><span>15</span></div><div class="hbar"><div class="hbar-fill" style="height:120px;background:#8b7cff"></div><span>16</span></div><div class="hbar"><div class="hbar-fill" style="height:139px;background:#8b7cff"></div><span>17</span></div><div class="hbar"><div class="hbar-fill" style="height:148px;background:#8b7cff"></div><span>18</span></div><div class="hbar"><div class="hbar-fill" style="height:167px;background:#8b7cff"></div><span>19</span></div><div class="hbar"><div class="hbar-fill" style="height:170px;background:#8b7cff"></div><span>20</span></div><div class="hbar"><div class="hbar-fill" style="height:120px;background:#8b7cff"></div><span>21</span></div><div class="hbar"><div class="hbar-fill" style="height:123px;background:#8b7cff"></div><span>22</span></div><div class="hbar"><div class="hbar-fill" style="height:133px;background:#8b7cff"></div><span>23</span></div></div>
+    </div>
+  </div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">5 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Допродажи</p><h2>На Карла не дожимают напиток</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="kpis k3">
+    <div class="card"><div class="l">Фри на чек</div><div class="v">0,22</div><div class="s">Октябрьская и Карла одинаково</div></div>
+    <div class="card"><div class="l">Дип на чек</div><div class="v">0,13</div><div class="s">Карла 0,12 — тоже рядом</div></div>
+    <div class="card"><div class="l">Напиток на чек</div><div class="v">0,35</div><div class="s">Карла только 0,24</div></div>
+  </div>
+  <div class="note">Шаурма 63–68% выручки, курица / свинина 60 / 40 на обеих. Комбо: 10 наборов за месяц. Напиток на Карла — единственный живой рычаг.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">6 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Смены</p><h2>Кто держал кассу</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="grid2">
+    <div>
+      <p class="eyebrow" style="margin-bottom:16px">Октябрьская</p>
+      <div class="kpis k2"><div class="card person"><div class="who">Алена Аленовна</div><div class="v" style="font-size:40px;margin-top:16px">35 357</div><div class="s">15 смен · всего 530 357</div></div><div class="card person"><div class="who">Умида Раджапова</div><div class="v" style="font-size:40px;margin-top:16px">32 364</div><div class="s">15 смен · всего 485 466</div></div></div>
+    </div>
+    <div>
+      <p class="eyebrow" style="margin-bottom:16px">Карла</p>
+      <div class="kpis k2"><div class="card person"><div class="who">Егор Алексеевич</div><div class="v" style="font-size:40px;margin-top:16px">17 989</div><div class="s">17 смен · всего 305 809</div></div><div class="card person"><div class="who">Андрей Косенков</div><div class="v" style="font-size:40px;margin-top:16px">15 351</div><div class="s">14 смен · всего 214 910</div></div></div>
+    </div>
+  </div>
+  <div class="note">Октябрьская ровная. На Карла разница Егора и Андрея может быть графиком.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">7 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Роза</p><h2>Ремонт. Постоянники. Свои списания.</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="kpis k4">
+    <div class="card"><div class="l">Оплачено</div><div class="v">117 780</div><div class="s">142 чека · средний 829</div></div>
+    <div class="card"><div class="l">Постоянники</div><div class="v">38</div><div class="s">чаш · база зала</div></div>
+    <div class="card"><div class="l">Классика</div><div class="v">67</div><div class="s">чаш гостей по полной</div></div>
+    <div class="card"><div class="l">Стафф</div><div class="v">85</div><div class="s">чаш начальства · не дыра</div></div>
+  </div>
+  <div class="grid2" style="margin-top:22px">
+    <div class="note ok">Списания под начальство так и должны быть видны в кассе. Это мы.</div>
+    <div class="note">Смотреть снова после ремонта: появился ли гость сверх этой базы.</div>
+  </div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">8 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">С 15 сентября</p><h2>Гранд нащупал ядро. Puff дежурит.</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="l">Гранд · 16 дней</div>
+      <div class="v">108 270</div>
+      <div class="statrow">
+        <div><div class="k">Чеки</div><div class="n">192</div></div>
+        <div><div class="k">День</div><div class="n">6 767</div></div>
+        <div><div class="k">Медиана</div><div class="n">380</div></div>
+        <div><div class="k">Пик 26.09</div><div class="n">17 060</div></div>
+      </div>
+      <div class="s" style="margin-top:22px;font-size:20px">Карбонара, цезарь, капучино. После 20:00 пусто.</div>
+    </div>
+    <div class="card">
+      <div class="l">Puff · 14 смен</div>
+      <div class="v">27 000</div>
+      <div class="statrow">
+        <div><div class="k">Чеки</div><div class="n">17</div></div>
+        <div><div class="k">Чаши</div><div class="n">18</div></div>
+        <div><div class="k">Нулевые смены</div><div class="n">6 из 14</div></div>
+        <div><div class="k">Суббота</div><div class="n">8 чаш</div></div>
+      </div>
+      <div class="s" style="margin-top:22px;font-size:20px">Пока нет трафика — не кормить отдельной сменой каждый день.</div>
+    </div>
+  </div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">9 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Счёт ИП</p><h2>Пришло 1,97 млн · ушло 1,89 млн</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="kpis k4">
+    <div class="card"><div class="l">Входящий</div><div class="v">77 086</div></div>
+    <div class="card"><div class="l">Пришло</div><div class="v">1 972 428</div><div class="s">220 операций</div></div>
+    <div class="card"><div class="l">Ушло</div><div class="v">1 885 929</div><div class="s">918 операций</div></div>
+    <div class="card"><div class="l">На счёте</div><div class="v">163 585</div></div>
+  </div>
+  <div class="note">Эквайринг ≈ 1 455 059 при карте в кассе 1 521 190. Нал кассы 287 902 в выписку не попадает. Вклад — не расход.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">10 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Выводы</p><h2>Себе — 238 500. Пятнадцатое — зарплаты.</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="kpis k3">
+    <div class="card"><div class="l">Себе</div><div class="v">238 500</div><div class="s">«доход от предпринимательской» без 15.09</div></div>
+    <div class="card"><div class="l">Белый ФОТ 15.09</div><div class="v">97 490</div><div class="s">реестры 77 и 76 через Сбер</div></div>
+    <div class="card"><div class="l">Ещё 15.09</div><div class="v">58 000</div><div class="s">тоже зарплатное окно, не себе</div></div>
+  </div>
+  <div class="note">16-го такого вывода не было. Если 58 тыс. тоже зарплата — видимое окно ≈ 155 тыс.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">11 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Поставщики</p><h2>То, что уходит по счетам</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="br"><div class="br-l">МАРР Россия</div><div class="br-track"><div class="br-fill" style="width:100.0%"></div></div><div class="br-v">354 087</div></div>
+  <div class="br"><div class="br-l">Мистер Крабс</div><div class="br-track"><div class="br-fill" style="width:25.3%"></div></div><div class="br-v">66 654</div></div>
+  <div class="br"><div class="br-l">Регионпиво</div><div class="br-track"><div class="br-fill" style="width:20.2%"></div></div><div class="br-v">47 118</div></div>
+  <div class="br"><div class="br-l">Курьер Плюс</div><div class="br-track"><div class="br-fill" style="width:12.5%"></div></div><div class="br-v">17 430</div></div>
+  <div class="br"><div class="br-l">WB / РВБ</div><div class="br-track"><div class="br-fill" style="width:12.4%"></div></div><div class="br-v">16 909</div></div>
+  <div class="br"><div class="br-l">Доксинбокс</div><div class="br-track"><div class="br-fill" style="width:9.3%"></div></div><div class="br-v">5 160</div></div>
+  <div class="note">≈ 507 тыс. узнаваемых счетов. Дальше — то, чего у поставщика нет.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">12 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Карта ИП</p><h2>Добор, который нельзя закрыть счётом</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="kpis k5">
+    <div class="card"><div class="l">Еда с улицы</div><div class="v">66 619</div><div class="s">Пятёрочка, Магнит, Монетка</div></div>
+    <div class="card"><div class="l">Упаковка</div><div class="v">94 750</div><div class="s">Мир упаковки и Fix Price</div></div>
+    <div class="card"><div class="l">К&amp;Б</div><div class="v">36 935</div><div class="s">розн. к Регионпиву</div></div>
+    <div class="card"><div class="l">Маркетплейсы</div><div class="v">31 939</div><div class="s">WB + Avito</div></div>
+    <div class="card"><div class="l">CH450 без имени</div><div class="v">141 429</div><div class="s">Сбер обрезал вывеску</div></div>
+  </div>
+  <div class="note">Срочно, мелко, нет в прайсе МАРР. Ориентир с выписки, не сверка 1:1.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">13 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Розничный добор еды</p><h2>66 619 ₽ · типичный чек 400–550</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="br"><div class="br-l">Пятёрочка</div><div class="br-track"><div class="br-fill" style="width:100.0%"></div></div><div class="br-v">23 488 · 55</div></div><div class="br"><div class="br-l">Магнит</div><div class="br-track"><div class="br-fill" style="width:60.0%"></div></div><div class="br-v">13 282 · 24</div></div><div class="br"><div class="br-l">Монетка</div><div class="br-track"><div class="br-fill" style="width:53.8%"></div></div><div class="br-v">11 692 · 24</div></div><div class="br"><div class="br-l">Доброцен</div><div class="br-track"><div class="br-fill" style="width:28.6%"></div></div><div class="br-v">5 257 · 3</div></div><div class="br"><div class="br-l">Метрополис</div><div class="br-track"><div class="br-fill" style="width:27.8%"></div></div><div class="br-v">5 058 · 14</div></div><div class="br"><div class="br-l">Чайка</div><div class="br-track"><div class="br-fill" style="width:16.5%"></div></div><div class="br-v">2 180 · 4</div></div>
+  <div class="note ok">Зелень к вечеру, молоко, мелочь на смену. Не МАРР и не «непонятные траты» — завести статьёй.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">14 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Крупнее добора</p><h2>Упаковка, алкоголь, маркетплейсы</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="kpis k4">
+    <div class="card"><div class="l">Мир упаковки</div><div class="v">68 648</div><div class="s">три завоза 7 / 14 / 28.09</div></div>
+    <div class="card"><div class="l">Fix Price</div><div class="v">24 406</div><div class="s">19 покупок · расходники</div></div>
+    <div class="card"><div class="l">Красное &amp; Белое</div><div class="v">36 935</div><div class="s">рядом с оптом 47 тыс.</div></div>
+    <div class="card"><div class="l">Wildberries</div><div class="v">28 583</div><div class="s">плюс счёт РВБ 16 909</div></div>
+  </div>
+  <div class="note">Упаковка + Fix Price ≈ 93 053 ₽. Это уже не «заскочил в пятёрочку».</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">15 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Слепой кусок</p><h2>CH450 — 141 429 ₽ без вывески</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="kpis k4">
+    <div class="card"><div class="l">CH45003</div><div class="v">50 363</div><div class="s">17 покупок</div></div><div class="card"><div class="l">CH45002</div><div class="v">35 270</div><div class="s">17 покупок</div></div><div class="card"><div class="l">CH45020</div><div class="v">35 206</div><div class="s">18 покупок</div></div><div class="card"><div class="l">CH45024</div><div class="v">13 428</div><div class="s">2 покупок</div></div><div class="card"><div class="l">CH45011</div><div class="v">7 162</div><div class="s">2 покупок</div></div>
+  </div>
+  <div class="note">Сбер пишет код точки, не имя. Открыть в СберБизнесе — розничный добор, скорее всего, вырастет.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">16 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Безнал, который виден</p><h2>Куда уехали деньги</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="kpis k3">
+    <div class="card"><div class="l">Себе</div><div class="v">238 500</div></div>
+    <div class="card"><div class="l">ФОТ 15.09</div><div class="v">97 490</div></div>
+    <div class="card"><div class="l">МАРР + Крабс</div><div class="v">420 741</div></div>
+    <div class="card"><div class="l">Пиво опт + К&amp;Б</div><div class="v">84 053</div></div>
+    <div class="card"><div class="l">Упаковка</div><div class="v">94 750</div></div>
+    <div class="card"><div class="l">Магазины еды</div><div class="v">66 619</div></div>
+  </div>
+  <div class="note">Нет аренды, полного ФОТа налом и коммуналки. Это карта безнала, не прибыль точек.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">17 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Октябрь</p><h2>Что делать</h2></div><img class="logo" src="logo-white.png" alt=""></div>
+  <div class="grid3"><div class="take"><div class="num">01</div><div><b>Октябрьскую не ломать</b><span>56% сети. Обед равен вечеру.</span></div></div><div class="take"><div class="num">02</div><div><b>Карла — день и напиток</b><span>Вечер уже есть. 0,24 напитка против 0,35.</span></div></div><div class="take"><div class="num">03</div><div><b>Розу не лечить</b><span>Ремонт, постоянники, списания на своих.</span></div></div><div class="take"><div class="num">04</div><div><b>Гранд — ядро меню</b><span>Карбонара, цезарь, капучино. Повторить 26.09.</span></div></div><div class="take"><div class="num">05</div><div><b>Добор — отдельная статья</b><span>Пятёрочка / Магнит / Монетка 48 461 ₽.</span></div></div><div class="take"><div class="num">06</div><div><b>Открыть имена CH450</b><span>Ещё 141 429 ₽ без вывески в СберБизнесе.</span></div></div></div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">18 / 18</span></div>
+</section>
+</body>
+</html>

@@ -1,0 +1,1283 @@
+{
+  "period": {
+    "from": "2026-09-01",
+    "to": "2026-09-30",
+    "timezone": "Asia/Yekaterinburg",
+    "source": "POS closed_at in month"
+  },
+  "generated_at": "2026-09-30T20:38:53.635Z",
+  "totals": {
+    "paid": 1809092,
+    "card": 1521189.5,
+    "cash": 287902.5,
+    "card_pct": 84.1,
+    "cash_pct": 15.9,
+    "paid_receipts": 3167,
+    "cancelled_receipts": 174,
+    "refunded_receipts": 12,
+    "discount_total": 75043,
+    "subtotal": 1884135
+  },
+  "venues": [
+    {
+      "id": 4,
+      "name": "Kebab King Октябрьская",
+      "paid_total": 1015823,
+      "share_pct": 56.2,
+      "subtotal": 1017076,
+      "discount_total": 1253,
+      "paid_receipts": 1790,
+      "cancelled_receipts": 56,
+      "refunded_receipts": 1,
+      "cancel_share_of_tickets_pct": 3,
+      "avg_check": 567.5,
+      "median_check": 490,
+      "card": 884015,
+      "cash": 131808,
+      "paid_days": 30,
+      "avg_day": 33860.77,
+      "min_day": 21005,
+      "max_day": 49920,
+      "shifts": 30,
+      "open_shifts": [],
+      "first_shift": "2026-09-01T03:42:07.687Z",
+      "attach": {
+        "shawarma_qty": 1984,
+        "fries_qty": 401,
+        "dips_qty": 227,
+        "drinks_qty": 631,
+        "fries_per_ticket": 0.22,
+        "dips_per_ticket": 0.13,
+        "drinks_per_ticket": 0.35
+      },
+      "lunch_11_16": {
+        "from": 11,
+        "to": 16,
+        "receipts": 788,
+        "revenue": 458313
+      },
+      "evening_17_23": {
+        "from": 17,
+        "to": 23,
+        "receipts": 852,
+        "revenue": 475755
+      },
+      "peak_hours": [
+        {
+          "hour": 20,
+          "receipts": 166,
+          "revenue": 96570
+        },
+        {
+          "hour": 15,
+          "receipts": 146,
+          "revenue": 91365
+        },
+        {
+          "hour": 13,
+          "receipts": 154,
+          "revenue": 88725
+        },
+        {
+          "hour": 19,
+          "receipts": 152,
+          "revenue": 86770
+        },
+        {
+          "hour": 12,
+          "receipts": 152,
+          "revenue": 81089
+        }
+      ],
+      "categories": [
+        {
+          "cat": "Шаурма",
+          "qty": 1984,
+          "revenue": 636756,
+          "share": 62.6
+        },
+        {
+          "cat": "Бургеры и сэндвичи",
+          "qty": 532,
+          "revenue": 180040,
+          "share": 17.7
+        },
+        {
+          "cat": "Закуски и гарниры",
+          "qty": 456,
+          "revenue": 80160,
+          "share": 7.9
+        },
+        {
+          "cat": "Роллы и хот-доги",
+          "qty": 158,
+          "revenue": 40520,
+          "share": 4
+        },
+        {
+          "cat": "Напитки КК",
+          "qty": 227,
+          "revenue": 15570,
+          "share": 1.5
+        },
+        {
+          "cat": "Кола",
+          "qty": 136,
+          "revenue": 15560,
+          "share": 1.5
+        },
+        {
+          "cat": "Чай бутилированный",
+          "qty": 89,
+          "revenue": 13350,
+          "share": 1.3
+        },
+        {
+          "cat": "Дип-Пот",
+          "qty": 227,
+          "revenue": 11350,
+          "share": 1.1
+        },
+        {
+          "cat": "Кофе в кофемашине",
+          "qty": 84,
+          "revenue": 9000,
+          "share": 0.9
+        },
+        {
+          "cat": "Комбо-наборы",
+          "qty": 10,
+          "revenue": 5500,
+          "share": 0.5
+        },
+        {
+          "cat": "Энергетики",
+          "qty": 25,
+          "revenue": 3750,
+          "share": 0.4
+        },
+        {
+          "cat": "Вода",
+          "qty": 39,
+          "revenue": 2940,
+          "share": 0.3
+        },
+        {
+          "cat": "Соки",
+          "qty": 31,
+          "revenue": 2170,
+          "share": 0.2
+        },
+        {
+          "cat": "Дополнения",
+          "qty": 8,
+          "revenue": 410,
+          "share": 0
+        }
+      ],
+      "top_items": [
+        {
+          "cat": "Шаурма",
+          "name": "Шаурма Стандарт с курицей",
+          "qty": 520,
+          "revenue": 163975
+        },
+        {
+          "cat": "Шаурма",
+          "name": "Шаурма Большая со свининой",
+          "qty": 339,
+          "revenue": 121880
+        },
+        {
+          "cat": "Шаурма",
+          "name": "Шаурма Большая с курицей",
+          "qty": 339,
+          "revenue": 120985
+        },
+        {
+          "cat": "Шаурма",
+          "name": "Шаурма Стандарт со свининой",
+          "qty": 266,
+          "revenue": 83761
+        },
+        {
+          "cat": "Закуски и гарниры",
+          "name": "Картофель фри",
+          "qty": 401,
+          "revenue": 68170
+        },
+        {
+          "cat": "Шаурма",
+          "name": "Шаурма Мини с курицей",
+          "qty": 262,
+          "revenue": 66265
+        },
+        {
+          "cat": "Бургеры и сэндвичи",
+          "name": "Чикенбургер",
+          "qty": 125,
+          "revenue": 41250
+        },
+        {
+          "cat": "Бургеры и сэндвичи",
+          "name": "Чизбургер",
+          "qty": 106,
+          "revenue": 39220
+        }
+      ],
+      "discounts": [
+        {
+          "percent": 10,
+          "n": 3,
+          "discount": 423,
+          "paid_after": 3807
+        },
+        {
+          "percent": 100,
+          "n": 2,
+          "discount": 830,
+          "paid_after": 0
+        }
+      ],
+      "shift_openers": [
+        {
+          "name": "Алена Аленовна",
+          "shifts": 15,
+          "revenue": 530357,
+          "avg_shift": 35357.13
+        },
+        {
+          "name": "Умида Раджапова",
+          "shifts": 15,
+          "revenue": 485466,
+          "avg_shift": 32364.4
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Kebab King Карла",
+      "paid_total": 540219,
+      "share_pct": 29.9,
+      "subtotal": 540369,
+      "discount_total": 150,
+      "paid_receipts": 1026,
+      "cancelled_receipts": 21,
+      "refunded_receipts": 5,
+      "cancel_share_of_tickets_pct": 2,
+      "avg_check": 526.53,
+      "median_check": 440,
+      "card": 449769,
+      "cash": 90450,
+      "paid_days": 30,
+      "avg_day": 18007.3,
+      "min_day": 9800,
+      "max_day": 27840,
+      "shifts": 31,
+      "open_shifts": [
+        {
+          "id": 153,
+          "opened_by": "Егор Алексеевич",
+          "opened_at": "2026-09-30T05:50:33.072Z"
+        }
+      ],
+      "first_shift": "2026-09-01T06:00:50.079Z",
+      "attach": {
+        "shawarma_qty": 1164,
+        "fries_qty": 235,
+        "dips_qty": 125,
+        "drinks_qty": 244,
+        "fries_per_ticket": 0.23,
+        "dips_per_ticket": 0.12,
+        "drinks_per_ticket": 0.24
+      },
+      "lunch_11_16": {
+        "from": 11,
+        "to": 16,
+        "receipts": 359,
+        "revenue": 190005
+      },
+      "evening_17_23": {
+        "from": 17,
+        "to": 23,
+        "receipts": 605,
+        "revenue": 315929
+      },
+      "peak_hours": [
+        {
+          "hour": 20,
+          "receipts": 103,
+          "revenue": 54380
+        },
+        {
+          "hour": 19,
+          "receipts": 92,
+          "revenue": 53600
+        },
+        {
+          "hour": 18,
+          "receipts": 93,
+          "revenue": 46850
+        },
+        {
+          "hour": 17,
+          "receipts": 89,
+          "revenue": 43800
+        },
+        {
+          "hour": 23,
+          "receipts": 77,
+          "revenue": 41865
+        }
+      ],
+      "categories": [
+        {
+          "cat": "Шаурма",
+          "qty": 1164,
+          "revenue": 367929,
+          "share": 68.1
+        },
+        {
+          "cat": "Бургеры и сэндвичи",
+          "qty": 236,
+          "revenue": 80770,
+          "share": 14.9
+        },
+        {
+          "cat": "Закуски и гарниры",
+          "qty": 269,
+          "revenue": 47070,
+          "share": 8.7
+        },
+        {
+          "cat": "Роллы и хот-доги",
+          "qty": 73,
+          "revenue": 19160,
+          "share": 3.5
+        },
+        {
+          "cat": "Напитки КК",
+          "qty": 157,
+          "revenue": 8120,
+          "share": 1.5
+        },
+        {
+          "cat": "Дип-Пот",
+          "qty": 125,
+          "revenue": 6250,
+          "share": 1.2
+        },
+        {
+          "cat": "Чай бутилированный",
+          "qty": 36,
+          "revenue": 5400,
+          "share": 1
+        },
+        {
+          "cat": "Кола",
+          "qty": 20,
+          "revenue": 2100,
+          "share": 0.4
+        },
+        {
+          "cat": "Соки",
+          "qty": 17,
+          "revenue": 2030,
+          "share": 0.4
+        },
+        {
+          "cat": "Энергетики",
+          "qty": 7,
+          "revenue": 1050,
+          "share": 0.2
+        },
+        {
+          "cat": "Вода",
+          "qty": 7,
+          "revenue": 490,
+          "share": 0.1
+        }
+      ],
+      "top_items": [
+        {
+          "cat": "Шаурма",
+          "name": "Шаурма Стандарт с курицей",
+          "qty": 321,
+          "revenue": 100885
+        },
+        {
+          "cat": "Шаурма",
+          "name": "Шаурма Большая со свининой",
+          "qty": 174,
+          "revenue": 62315
+        },
+        {
+          "cat": "Шаурма",
+          "name": "Шаурма Большая с курицей",
+          "qty": 166,
+          "revenue": 59375
+        },
+        {
+          "cat": "Шаурма",
+          "name": "Шаурма Стандарт со свининой",
+          "qty": 184,
+          "revenue": 57929
+        },
+        {
+          "cat": "Шаурма",
+          "name": "Шаурма Мини с курицей",
+          "qty": 168,
+          "revenue": 42515
+        },
+        {
+          "cat": "Закуски и гарниры",
+          "name": "Картофель фри",
+          "qty": 235,
+          "revenue": 39950
+        },
+        {
+          "cat": "Шаурма",
+          "name": "Шаурма Мини со свининой",
+          "qty": 91,
+          "revenue": 22980
+        },
+        {
+          "cat": "Бургеры и сэндвичи",
+          "name": "Чикенбургер",
+          "qty": 66,
+          "revenue": 21780
+        }
+      ],
+      "discounts": [
+        {
+          "percent": 100,
+          "n": 1,
+          "discount": 150,
+          "paid_after": 0
+        }
+      ],
+      "shift_openers": [
+        {
+          "name": "Егор Алексеевич",
+          "shifts": 17,
+          "revenue": 305809,
+          "avg_shift": 17988.76
+        },
+        {
+          "name": "Андрей Косенков",
+          "shifts": 14,
+          "revenue": 214910,
+          "avg_shift": 15350.71
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "MC Lounge Роза",
+      "paid_total": 117780,
+      "share_pct": 6.5,
+      "subtotal": 174990,
+      "discount_total": 57210,
+      "paid_receipts": 142,
+      "cancelled_receipts": 41,
+      "refunded_receipts": 6,
+      "cancel_share_of_tickets_pct": 22.4,
+      "avg_check": 829.44,
+      "median_check": 750,
+      "card": 75655.5,
+      "cash": 42124.5,
+      "paid_days": 29,
+      "avg_day": 4061.38,
+      "min_day": 977.5,
+      "max_day": 9272.5,
+      "shifts": 30,
+      "open_shifts": [],
+      "first_shift": "2026-09-01T13:38:33.327Z",
+      "lunch_11_16": {
+        "from": 11,
+        "to": 16,
+        "receipts": 4,
+        "revenue": 1460
+      },
+      "evening_17_23": {
+        "from": 17,
+        "to": 23,
+        "receipts": 105,
+        "revenue": 92745
+      },
+      "peak_hours": [
+        {
+          "hour": 23,
+          "receipts": 49,
+          "revenue": 37476.5
+        },
+        {
+          "hour": 21,
+          "receipts": 22,
+          "revenue": 24160
+        },
+        {
+          "hour": 22,
+          "receipts": 19,
+          "revenue": 18626.5
+        },
+        {
+          "hour": 0,
+          "receipts": 27,
+          "revenue": 15425
+        },
+        {
+          "hour": 1,
+          "receipts": 6,
+          "revenue": 8150
+        }
+      ],
+      "categories": [
+        {
+          "cat": "Мангалы",
+          "qty": 67,
+          "revenue": 77050,
+          "share": 44
+        },
+        {
+          "cat": "Кальяны постоянникам",
+          "qty": 38,
+          "revenue": 28500,
+          "share": 16.3
+        },
+        {
+          "cat": "Стафф",
+          "qty": 85,
+          "revenue": 23800,
+          "share": 13.6
+        },
+        {
+          "cat": "Пиво",
+          "qty": 48,
+          "revenue": 13790,
+          "share": 7.9
+        },
+        {
+          "cat": "Услуги",
+          "qty": 50,
+          "revenue": 10400,
+          "share": 5.9
+        },
+        {
+          "cat": "Улун",
+          "qty": 14,
+          "revenue": 7100,
+          "share": 4.1
+        },
+        {
+          "cat": "Премиум Напитки",
+          "qty": 10,
+          "revenue": 4620,
+          "share": 2.6
+        },
+        {
+          "cat": "Красный чай",
+          "qty": 6,
+          "revenue": 2700,
+          "share": 1.5
+        },
+        {
+          "cat": "Игры",
+          "qty": 6,
+          "revenue": 2100,
+          "share": 1.2
+        },
+        {
+          "cat": "Лимонады",
+          "qty": 3,
+          "revenue": 1480,
+          "share": 0.8
+        },
+        {
+          "cat": "Черный чай",
+          "qty": 3,
+          "revenue": 1200,
+          "share": 0.7
+        },
+        {
+          "cat": "Пуэр",
+          "qty": 2,
+          "revenue": 900,
+          "share": 0.5
+        },
+        {
+          "cat": "Зеленый чай",
+          "qty": 2,
+          "revenue": 800,
+          "share": 0.5
+        },
+        {
+          "cat": "Шаурма",
+          "qty": 1,
+          "revenue": 350,
+          "share": 0.2
+        },
+        {
+          "cat": "Пиво Б/А",
+          "qty": 1,
+          "revenue": 200,
+          "share": 0.1
+        }
+      ],
+      "top_items": [
+        {
+          "cat": "Мангалы",
+          "name": "Кальян классический",
+          "qty": 67,
+          "revenue": 77050
+        },
+        {
+          "cat": "Кальяны постоянникам",
+          "name": "Кальян классический",
+          "qty": 38,
+          "revenue": 28500
+        },
+        {
+          "cat": "Стафф",
+          "name": "Кальян Персонал",
+          "qty": 85,
+          "revenue": 23800
+        },
+        {
+          "cat": "Пиво",
+          "name": "Пиво Stella Artois 0,45",
+          "qty": 18,
+          "revenue": 5040
+        },
+        {
+          "cat": "Услуги",
+          "name": "Аренда VIP Комнаты",
+          "qty": 9,
+          "revenue": 4500
+        },
+        {
+          "cat": "Улун",
+          "name": "Чай - Да Хун Пау",
+          "qty": 7,
+          "revenue": 3850
+        },
+        {
+          "cat": "Услуги",
+          "name": "Сервисный сбор",
+          "qty": 32,
+          "revenue": 3200
+        },
+        {
+          "cat": "Пиво",
+          "name": "Пиво Хугарден 0.45",
+          "qty": 11,
+          "revenue": 3080
+        }
+      ],
+      "discounts": [
+        {
+          "percent": 10,
+          "n": 15,
+          "discount": 1785,
+          "paid_after": 16065
+        },
+        {
+          "percent": 15,
+          "n": 3,
+          "discount": 825,
+          "paid_after": 4675
+        },
+        {
+          "percent": 100,
+          "n": 35,
+          "discount": 54600,
+          "paid_after": 0
+        }
+      ],
+      "shift_openers": [
+        {
+          "name": "Дарья Аверина",
+          "shifts": 15,
+          "revenue": 73244.5,
+          "avg_shift": 4882.97
+        },
+        {
+          "name": "Тимур Аббасов",
+          "shifts": 11,
+          "revenue": 29555.5,
+          "avg_shift": 2686.86
+        },
+        {
+          "name": "Никитосик",
+          "shifts": 4,
+          "revenue": 15480,
+          "avg_shift": 3870
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "MC Гранд",
+      "paid_total": 108270,
+      "share_pct": 6,
+      "subtotal": 124700,
+      "discount_total": 16430,
+      "paid_receipts": 192,
+      "cancelled_receipts": 52,
+      "refunded_receipts": 0,
+      "cancel_share_of_tickets_pct": 21.3,
+      "avg_check": 563.91,
+      "median_check": 380,
+      "card": 90750,
+      "cash": 17520,
+      "paid_days": 16,
+      "avg_day": 6766.88,
+      "min_day": 1470,
+      "max_day": 17060,
+      "shifts": 16,
+      "open_shifts": [],
+      "first_shift": "2026-09-15T14:11:04.324Z",
+      "lunch_11_16": {
+        "from": 11,
+        "to": 16,
+        "receipts": 103,
+        "revenue": 66140
+      },
+      "evening_17_23": {
+        "from": 17,
+        "to": 23,
+        "receipts": 59,
+        "revenue": 35540
+      },
+      "peak_hours": [
+        {
+          "hour": 15,
+          "receipts": 26,
+          "revenue": 16610
+        },
+        {
+          "hour": 12,
+          "receipts": 18,
+          "revenue": 16460
+        },
+        {
+          "hour": 17,
+          "receipts": 20,
+          "revenue": 14150
+        },
+        {
+          "hour": 14,
+          "receipts": 24,
+          "revenue": 11680
+        },
+        {
+          "hour": 19,
+          "receipts": 19,
+          "revenue": 10840
+        }
+      ],
+      "categories": [
+        {
+          "cat": "Блюда и закуски",
+          "qty": 88,
+          "revenue": 29160,
+          "share": 23.4
+        },
+        {
+          "cat": "Кофе",
+          "qty": 126,
+          "revenue": 22020,
+          "share": 17.7
+        },
+        {
+          "cat": "Салаты",
+          "qty": 58,
+          "revenue": 21600,
+          "share": 17.3
+        },
+        {
+          "cat": "Завтраки",
+          "qty": 44,
+          "revenue": 11600,
+          "share": 9.3
+        },
+        {
+          "cat": "Пицца",
+          "qty": 16,
+          "revenue": 10740,
+          "share": 8.6
+        },
+        {
+          "cat": "Лимонады",
+          "qty": 30,
+          "revenue": 8420,
+          "share": 6.8
+        },
+        {
+          "cat": "Милкшейки",
+          "qty": 15,
+          "revenue": 5240,
+          "share": 4.2
+        },
+        {
+          "cat": "Десерты",
+          "qty": 23,
+          "revenue": 5050,
+          "share": 4
+        },
+        {
+          "cat": "Авторский чай",
+          "qty": 11,
+          "revenue": 3890,
+          "share": 3.1
+        },
+        {
+          "cat": "Чай 1л",
+          "qty": 14,
+          "revenue": 3840,
+          "share": 3.1
+        },
+        {
+          "cat": "Напитки ГРАНТ",
+          "qty": 36,
+          "revenue": 3140,
+          "share": 2.5
+        }
+      ],
+      "top_items": [
+        {
+          "cat": "Блюда и закуски",
+          "name": "Паста карбонара",
+          "qty": 48,
+          "revenue": 17760
+        },
+        {
+          "cat": "Салаты",
+          "name": "Цезарь с курицей",
+          "qty": 24,
+          "revenue": 8640
+        },
+        {
+          "cat": "Кофе",
+          "name": "Капучино",
+          "qty": 44,
+          "revenue": 7920
+        },
+        {
+          "cat": "Салаты",
+          "name": "Цезарь с тигровыми креветками",
+          "qty": 16,
+          "revenue": 6880
+        },
+        {
+          "cat": "Кофе",
+          "name": "Американо",
+          "qty": 40,
+          "revenue": 6000
+        },
+        {
+          "cat": "Завтраки",
+          "name": "Яичница-глазунья, тост с ветчиной и сыром, чай",
+          "qty": 19,
+          "revenue": 5320
+        },
+        {
+          "cat": "Блюда и закуски",
+          "name": "Паста фетучини с курицей и грибами",
+          "qty": 12,
+          "revenue": 5040
+        },
+        {
+          "cat": "Пицца",
+          "name": "Мясная",
+          "qty": 6,
+          "revenue": 4740
+        }
+      ],
+      "discounts": [
+        {
+          "percent": 100,
+          "n": 19,
+          "discount": 16430,
+          "paid_after": 0
+        }
+      ],
+      "shift_openers": [
+        {
+          "name": "Демкина Надежда Э.",
+          "shifts": 16,
+          "revenue": 108270,
+          "avg_shift": 6766.88
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "MC Lounge Puff",
+      "paid_total": 27000,
+      "share_pct": 1.5,
+      "subtotal": 27000,
+      "discount_total": 0,
+      "paid_receipts": 17,
+      "cancelled_receipts": 4,
+      "refunded_receipts": 0,
+      "cancel_share_of_tickets_pct": 19,
+      "avg_check": 1588.24,
+      "median_check": 1500,
+      "card": 21000,
+      "cash": 6000,
+      "paid_days": 7,
+      "avg_day": 3857.14,
+      "min_day": 1500,
+      "max_day": 6000,
+      "shifts": 14,
+      "open_shifts": [],
+      "first_shift": "2026-09-15T17:06:13.069Z",
+      "lunch_11_16": {
+        "from": 11,
+        "to": 16,
+        "receipts": 1,
+        "revenue": 1500
+      },
+      "evening_17_23": {
+        "from": 17,
+        "to": 23,
+        "receipts": 16,
+        "revenue": 25500
+      },
+      "peak_hours": [
+        {
+          "hour": 21,
+          "receipts": 5,
+          "revenue": 7500
+        },
+        {
+          "hour": 22,
+          "receipts": 4,
+          "revenue": 6000
+        },
+        {
+          "hour": 20,
+          "receipts": 3,
+          "revenue": 4500
+        },
+        {
+          "hour": 19,
+          "receipts": 2,
+          "revenue": 3000
+        },
+        {
+          "hour": 23,
+          "receipts": 1,
+          "revenue": 3000
+        }
+      ],
+      "categories": [
+        {
+          "cat": "Мангалы Puff",
+          "qty": 18,
+          "revenue": 27000,
+          "share": 100
+        }
+      ],
+      "top_items": [
+        {
+          "cat": "Мангалы Puff",
+          "name": "Кальян классический",
+          "qty": 18,
+          "revenue": 27000
+        }
+      ],
+      "discounts": [],
+      "shift_openers": [
+        {
+          "name": "Дарья Аверина",
+          "shifts": 6,
+          "revenue": 13500,
+          "avg_shift": 2250
+        },
+        {
+          "name": "Тимур Аббасов",
+          "shifts": 3,
+          "revenue": 7500,
+          "avg_shift": 2500
+        },
+        {
+          "name": "Никитосик",
+          "shifts": 5,
+          "revenue": 6000,
+          "avg_shift": 1200
+        }
+      ]
+    }
+  ],
+  "weeks": [
+    {
+      "week": "2026-W36",
+      "venue": "Kebab King Карла",
+      "days": 6,
+      "receipts": 183,
+      "revenue": 97025
+    },
+    {
+      "week": "2026-W36",
+      "venue": "Kebab King Октябрьская",
+      "days": 6,
+      "receipts": 375,
+      "revenue": 208500
+    },
+    {
+      "week": "2026-W36",
+      "venue": "MC Lounge Роза",
+      "days": 6,
+      "receipts": 27,
+      "revenue": 19871.5
+    },
+    {
+      "week": "2026-W37",
+      "venue": "Kebab King Карла",
+      "days": 7,
+      "receipts": 248,
+      "revenue": 130134
+    },
+    {
+      "week": "2026-W37",
+      "venue": "Kebab King Октябрьская",
+      "days": 7,
+      "receipts": 436,
+      "revenue": 246365
+    },
+    {
+      "week": "2026-W37",
+      "venue": "MC Lounge Роза",
+      "days": 6,
+      "receipts": 34,
+      "revenue": 29637.5
+    },
+    {
+      "week": "2026-W38",
+      "venue": "Kebab King Карла",
+      "days": 7,
+      "receipts": 269,
+      "revenue": 143525
+    },
+    {
+      "week": "2026-W38",
+      "venue": "Kebab King Октябрьская",
+      "days": 7,
+      "receipts": 383,
+      "revenue": 218874
+    },
+    {
+      "week": "2026-W38",
+      "venue": "MC Lounge Puff",
+      "days": 5,
+      "receipts": 11,
+      "revenue": 16500
+    },
+    {
+      "week": "2026-W38",
+      "venue": "MC Lounge Роза",
+      "days": 7,
+      "receipts": 32,
+      "revenue": 30440
+    },
+    {
+      "week": "2026-W38",
+      "venue": "MC Гранд",
+      "days": 6,
+      "receipts": 57,
+      "revenue": 29410
+    },
+    {
+      "week": "2026-W39",
+      "venue": "Kebab King Карла",
+      "days": 7,
+      "receipts": 227,
+      "revenue": 115775
+    },
+    {
+      "week": "2026-W39",
+      "venue": "Kebab King Октябрьская",
+      "days": 7,
+      "receipts": 432,
+      "revenue": 253784
+    },
+    {
+      "week": "2026-W39",
+      "venue": "MC Lounge Puff",
+      "days": 3,
+      "receipts": 5,
+      "revenue": 7500
+    },
+    {
+      "week": "2026-W39",
+      "venue": "MC Lounge Роза",
+      "days": 7,
+      "receipts": 33,
+      "revenue": 24056
+    },
+    {
+      "week": "2026-W39",
+      "venue": "MC Гранд",
+      "days": 7,
+      "receipts": 94,
+      "revenue": 60490
+    },
+    {
+      "week": "2026-W40",
+      "venue": "Kebab King Карла",
+      "days": 3,
+      "receipts": 99,
+      "revenue": 53760
+    },
+    {
+      "week": "2026-W40",
+      "venue": "Kebab King Октябрьская",
+      "days": 3,
+      "receipts": 164,
+      "revenue": 88300
+    },
+    {
+      "week": "2026-W40",
+      "venue": "MC Lounge Puff",
+      "days": 1,
+      "receipts": 1,
+      "revenue": 3000
+    },
+    {
+      "week": "2026-W40",
+      "venue": "MC Lounge Роза",
+      "days": 3,
+      "receipts": 16,
+      "revenue": 13775
+    },
+    {
+      "week": "2026-W40",
+      "venue": "MC Гранд",
+      "days": 3,
+      "receipts": 41,
+      "revenue": 18370
+    }
+  ],
+  "bank_statement": {
+    "file": "sber-statement-ip-demkina.pdf",
+    "account_holder": "ИП Дёмкина Надежда Эдуардовна",
+    "period": "2026-09-01 .. 2026-09-30",
+    "formed_at": "2026-09-30 23:29:01",
+    "pages": 122,
+    "official": {
+      "operations_debit": 918,
+      "operations_credit": 220,
+      "operations_total": 1138,
+      "opening_balance": 77086.1,
+      "debit_turnover": 1885928.65,
+      "credit_turnover": 1972427.99,
+      "closing_balance": 163585.44
+    },
+    "parser_caveat": "PDF повёрнут, суммы по контрагентам — ориентир, не аудит. Официальные итоги — с последней страницы выписки.",
+    "acquiring_net_by_merchant_approx": {
+      "321000064321": 775998.63,
+      "321000064405": 449092.06,
+      "321000064322": 69956.34,
+      "321000056401": 68594.27,
+      "321000064406": 50161.62,
+      "321000064320": 15053.88,
+      "321000064404": 14716.26,
+      "321000056400": 10741.37,
+      "321000056402": 744.75,
+      "total": 1455059.18
+    },
+    "merchant_guess": {
+      "321000064405": "скорее Kebab King Карла (POS карта 449 769 ≈ нетто 449 092)",
+      "321000064321": "скорее Kebab King Октябрьская, основной терминал"
+    },
+    "named_outgoing_approx": [
+      {
+        "counterparty": "ООО «МАРР Россия»",
+        "amount": 354086.73,
+        "note": "продуктовый дистрибьютор, 7 платежей"
+      },
+      {
+        "counterparty": "Краснобродская Ксения Леонидовна",
+        "amount": 80570,
+        "note": "1 платёж 14.09, за день до зарплатного окна; статья не размечена"
+      },
+      {
+        "counterparty": "ООО «Мистер Крабс»",
+        "amount": 66654,
+        "note": "4 платежа в течение месяца"
+      },
+      {
+        "counterparty": "ООО «Регионпиво»",
+        "amount": 47118.3,
+        "note": "1 платёж 05.09; выручка пива на Розе за месяц ~13.8 тыс — либо закуп/остатки, либо ещё точки"
+      },
+      {
+        "counterparty": "ООО «Курьер Плюс»",
+        "amount": 17430,
+        "note": "08.09"
+      },
+      {
+        "counterparty": "ООО РВБ (Wildberries Bank)",
+        "amount": 16909,
+        "note": "счёт на товары 01.09"
+      },
+      {
+        "counterparty": "ООО «Доксинбокс»",
+        "amount": 5160,
+        "note": "DocsInBox"
+      }
+    ],
+    "card_purchases_approx": {
+      "krasnoe_beloe": 25489.59,
+      "mir_upakovki": 23046.78,
+      "pyaterochka": 16676.75,
+      "fixprice": 16560.62,
+      "yandex": 14610.21,
+      "wildberries_card": 13586.09,
+      "magnit": 9520.27,
+      "monetka": 9350.12
+    },
+    "owner_rule": {
+      "predprinimatelskiy_dohod": "вывод себе / заработкок",
+      "withdrawals_on_15_or_16": "чаще зарплаты сотрудникам, даже если назначение то же",
+      "sber_payroll_registry": "белый ФОТ по договору 83390253"
+    },
+    "predprinimatelskiy_dohod_to_demkina": {
+      "destination": "личная карта 40817…8639",
+      "ops": [
+        { "date": "2026-09-01", "amount": 45000, "role": "owner" },
+        { "date": "2026-09-04", "amount": 20000, "role": "owner" },
+        { "date": "2026-09-05", "amount": 23000, "role": "owner" },
+        { "date": "2026-09-08", "amount": 9500, "role": "owner" },
+        { "date": "2026-09-08", "amount": 32000, "role": "owner" },
+        { "date": "2026-09-09", "amount": 4000, "role": "owner" },
+        { "date": "2026-09-11", "amount": 43000, "role": "owner" },
+        { "date": "2026-09-11", "amount": 52000, "role": "owner" },
+        { "date": "2026-09-15", "amount": 58000, "role": "payroll_window" },
+        { "date": "2026-09-27", "amount": 10000, "role": "owner" }
+      ],
+      "total": 296500,
+      "owner_ex_15_16": 238500,
+      "marked_payroll_window": 58000
+    },
+    "sber_payroll_15_09": [
+      { "registry": 77, "amount": 18620, "purpose": "Аванс по заработной плате" },
+      { "registry": 76, "amount": 78870, "purpose": "Аванс по заработной плате" }
+    ],
+    "payroll_visible_if_15th_draw_is_salary": 155490,
+    "not_in_this_file": [
+      "аренда по точкам",
+      "полный ФОТ наличными из кассы, если платили мимо Сбера",
+      "коммуналка",
+      "налоги",
+      "наличная выручка 287 902.50 из POS — в выписку как эквайринг не попадает"
+    ],
+    "rosa_context": {
+      "renovation": true,
+      "held_by_regulars": true,
+      "owner_comps_are_expected": true
+    }
+  }
+}
