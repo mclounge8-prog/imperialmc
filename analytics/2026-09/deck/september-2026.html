@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Imperial MC · Сентябрь 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #121214;
+  --surface: #1b1b1f;
+  --surface-2: #24242a;
+  --border: #34343c;
+  --text: #f1f1f3;
+  --muted: #98979f;
+  --accent: #2647c7;
+  --accent-2: #3f63e6;
+  --danger: #e14c4c;
+  --ok: #3dbe8c;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #0c0c0e; }
+@page { size: 1920px 1080px; margin: 0; }
+.slide {
+  width: 1920px;
+  height: 1080px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', 'DejaVu Sans', sans-serif;
+  padding: 56px 72px 48px;
+  position: relative;
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
+}
+.slide::before {
+  content: "";
+  position: absolute; inset: 0 auto 0 0; width: 6px;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+}
+.top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 28px;
+}
+.eyebrow {
+  font-family: 'Space Grotesk', 'DejaVu Sans', sans-serif;
+  font-size: 13px; font-weight: 500; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--accent-2); margin: 0 0 6px;
+}
+h1 {
+  font-family: 'Space Grotesk', 'DejaVu Sans', sans-serif;
+  font-size: 44px; font-weight: 600; margin: 0; letter-spacing: -0.02em;
+}
+h2 {
+  font-family: 'Space Grotesk', 'DejaVu Sans', sans-serif;
+  font-size: 36px; font-weight: 600; margin: 0 0 8px;
+}
+.sub { color: var(--muted); font-size: 18px; margin: 8px 0 0; }
+.logo { height: 42px; opacity: .92; }
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 28px 0; }
+.kpis5 { grid-template-columns: repeat(5, 1fr); }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px 22px;
+}
+.card .l { color: var(--muted); font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
+.card .v {
+  font-family: 'Space Grotesk', 'DejaVu Sans', sans-serif;
+  font-size: 34px; font-weight: 600; margin-top: 8px;
+}
+.card .s { color: var(--muted); font-size: 14px; margin-top: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 16px; }
+th { text-align: left; color: var(--muted); font-weight: 500; font-size: 13px;
+  letter-spacing: .06em; text-transform: uppercase; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+td { padding: 11px 12px; border-bottom: 1px solid #2a2a30; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.hi td { color: var(--accent-2); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+.note {
+  background: #1a2038; border: 1px solid #2c3a78; border-radius: 10px;
+  padding: 14px 18px; color: #c8d0f0; font-size: 15px; line-height: 1.45;
+}
+.warn {
+  background: #2a1c1c; border: 1px solid #5a3030; color: #f0c8c8;
+}
+.oknote { background: #14241c; border: 1px solid #24543c; color: #c8f0dc; }
+.foot {
+  position: absolute; left: 72px; right: 72px; bottom: 28px;
+  display: flex; justify-content: space-between; color: var(--muted); font-size: 13px;
+}
+.stack { display: flex; height: 18px; border-radius: 9px; overflow: hidden; background: var(--surface-2); }
+.stack-seg { height: 100%; }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; color: var(--muted); font-size: 14px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.hours { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 10px; }
+.hbar { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 42px; }
+.hbar-fill { width: 28px; border-radius: 6px 6px 2px 2px; }
+.hbar span { color: var(--muted); font-size: 11px; }
+.weeks { display: flex; align-items: flex-end; gap: 14px; height: 150px; }
+.wbar { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 90px; }
+.wbar-fill { width: 44px; border-radius: 8px 8px 2px 2px; }
+.wbar span { color: var(--muted); font-size: 11px; }
+.ul { margin: 8px 0 0; padding-left: 18px; color: var(--text); line-height: 1.55; font-size: 17px; }
+.ul li { margin: 6px 0; }
+.title-slide { display: flex; flex-direction: column; justify-content: center; padding-left: 110px; }
+.title-slide h1 { font-size: 72px; line-height: 1.05; max-width: 1200px; }
+.title-slide .underline { width: 56px; height: 3px; background: var(--accent-2); border-radius: 2px;
+  box-shadow: 0 0 14px 2px rgba(63,99,230,.55); margin: 22px 0 18px; }
+.biglist { font-size: 22px; line-height: 1.5; }
+.two-col-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 40px; }
+</style>
+</head>
+<body>
+<section class="slide title-slide">
+
+  <img class="logo" src="logo-white.png" alt="Imperial MC" style="height:64px;margin-bottom:36px">
+  <p class="eyebrow">Аналитика сети</p>
+  <h1>Сентябрь 2026</h1>
+  <div class="underline"></div>
+  <p class="sub" style="font-size:22px;max-width:980px">Выручка из кассы по пяти точкам. Движение денег — из выписки Сбера ИП. Карточные закупки в магазинах — то, что не берём у поставщика.</p>
+  <p class="sub">1–30 сентября · Екатеринбург · 3 167 оплаченных чеков</p>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>1 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Сеть</p><h2>Месяц одним взглядом</h2></div><img class="logo" src="logo-white.png"></div>
+  <div class="kpis">
+    <div class="card"><div class="l">Оплачено</div><div class="v">1 809 092 ₽</div><div class="s">субтотал 1 884 135 · скидки 75 043</div></div>
+    <div class="card"><div class="l">Карта / нал</div><div class="v">84,1 / 15,9</div><div class="s">1 521 190 · 287 902 ₽</div></div>
+    <div class="card"><div class="l">Чеки</div><div class="v">3 167</div><div class="s">отмены 174 · возвраты 12</div></div>
+    <div class="card"><div class="l">KK вместе</div><div class="v">86%</div><div class="s">1 556 042 ₽ · две точки кормят сеть</div></div>
+  </div>
+  <div class="stack"><div class="stack-seg" style="width:56.15%;background:#3f63e6" title="Октябрьская"></div><div class="stack-seg" style="width:29.86%;background:#6f8cff" title="Карла"></div><div class="stack-seg" style="width:6.51%;background:#8b7cff" title="Роза"></div><div class="stack-seg" style="width:5.98%;background:#3dbe8c" title="Гранд"></div><div class="stack-seg" style="width:1.49%;background:#98979f" title="Puff"></div></div>
+  <div class="legend">
+    <span><i class="dot" style="background:#3f63e6"></i>Октябрьская 56,2%</span>
+    <span><i class="dot" style="background:#6f8cff"></i>Карла 29,9%</span>
+    <span><i class="dot" style="background:#8b7cff"></i>Роза 6,5%</span>
+    <span><i class="dot" style="background:#3dbe8c"></i>Гранд 6,0%</span>
+    <span><i class="dot" style="background:#98979f"></i>Puff 1,5%</span>
+  </div>
+  <p class="sub" style="margin-top:28px">Роза в ремонте, Гранд и Puff — с 15 сентября. Их месяц нельзя читать как «нормальный ранрейт».</p>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>2 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Разрез</p><h2>Пять точек, все цифры</h2></div><img class="logo" src="logo-white.png"></div>
+  <table>
+    <thead><tr><th>Точка</th><th class="num">Выручка</th><th class="num">Доля</th><th class="num">Чеки</th>
+    <th class="num">Средний / мед.</th><th class="num">Отмены</th><th class="num">Скидки</th><th class="num">День</th></tr></thead>
+    <tbody>
+      <tr class="hi"><td>Kebab King Октябрьская</td><td class="num">1 015 823</td>
+    <td class="num">56,2%</td><td class="num">1 790</td>
+    <td class="num">568 / 490</td>
+    <td class="num">56 (3,0%)</td>
+    <td class="num">1 253</td><td class="num">33 861</td></tr><tr class="hi"><td>Kebab King Карла</td><td class="num">540 219</td>
+    <td class="num">29,9%</td><td class="num">1 026</td>
+    <td class="num">527 / 440</td>
+    <td class="num">21 (2,0%)</td>
+    <td class="num">150</td><td class="num">18 007</td></tr><tr><td>MC Lounge Роза</td><td class="num">117 780</td>
+    <td class="num">6,5%</td><td class="num">142</td>
+    <td class="num">829 / 750</td>
+    <td class="num">41 (22,4%)</td>
+    <td class="num">57 210</td><td class="num">4 061</td></tr><tr><td>MC Гранд</td><td class="num">108 270</td>
+    <td class="num">6,0%</td><td class="num">192</td>
+    <td class="num">564 / 380</td>
+    <td class="num">52 (21,3%)</td>
+    <td class="num">16 430</td><td class="num">6 767</td></tr><tr><td>MC Lounge Puff</td><td class="num">27 000</td>
+    <td class="num">1,5%</td><td class="num">17</td>
+    <td class="num">1 588 / 1 500</td>
+    <td class="num">4 (19,0%)</td>
+    <td class="num">0</td><td class="num">3 857</td></tr>
+    </tbody>
+  </table>
+  <div class="grid2" style="margin-top:22px">
+    <div class="card"><div class="l">Карта по точкам</div>
+      <div class="s">Октябрьская 884 015 · Карла 449 769 · Роза 75 656 · Гранд 90 750 · Puff 21 000</div></div>
+    <div class="card"><div class="l">Нал по точкам</div>
+      <div class="s">Октябрьская 131 808 · Карла 90 450 · Роза 42 124 · Гранд 17 520 · Puff 6 000</div></div>
+  </div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>3 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Kebab King</p><h2>Октябрьская в 1,88 раза больше Карла</h2>
+  <p class="sub">Средний чек почти тот же. Ломается не меню — ритм дня.</p></div><img class="logo" src="logo-white.png"></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="l">Октябрьская</div>
+      <div class="v">1 015 823 ₽</div>
+      <ul class="ul">
+        <li>1 790 чеков · 30 смен · день 33 861 ₽</li>
+        <li>мин 21 005 · макс 49 920</li>
+        <li>обед 11–16: 458 313 ₽ / 788 чеков</li>
+        <li>вечер 17–23: 475 755 ₽ / 852 чеков</li>
+        <li>напиток на чек <b>0.35</b> · фри 0.22</li>
+        <li>скидки 1 253 ₽ · отмены 3%</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="l">Карла</div>
+      <div class="v">540 219 ₽</div>
+      <ul class="ul">
+        <li>1 026 чеков · 31 смена (одна открыта 30.09)</li>
+        <li>мин 9 800 · макс 27 840 · день 18 007</li>
+        <li>обед 11–16: 190 005 ₽ / 359 чеков</li>
+        <li>вечер 17–23: 315 929 ₽ / 605 чеков</li>
+        <li>напиток на чек <b>0.24</b> · фри 0.23</li>
+        <li>плюс 32 тыс. после полуночи — точка вечерняя</li>
+      </ul>
+    </div>
+  </div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>4 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Часы</p><h2>Октябрьская живёт весь день, Карла — с вечера</h2></div><img class="logo" src="logo-white.png"></div>
+  <div class="grid2">
+    <div>
+      <div class="l" style="color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:13px">Октябрьская</div>
+      <div class="hours"><div class="hbar"><div class="hbar-fill" style="height:11px;background:#3f63e6"></div><span>8</span></div><div class="hbar"><div class="hbar-fill" style="height:51px;background:#3f63e6"></div><span>9</span></div><div class="hbar"><div class="hbar-fill" style="height:98px;background:#3f63e6"></div><span>10</span></div><div class="hbar"><div class="hbar-fill" style="height:80px;background:#3f63e6"></div><span>11</span></div><div class="hbar"><div class="hbar-fill" style="height:142px;background:#3f63e6"></div><span>12</span></div><div class="hbar"><div class="hbar-fill" style="height:155px;background:#3f63e6"></div><span>13</span></div><div class="hbar"><div class="hbar-fill" style="height:131px;background:#3f63e6"></div><span>14</span></div><div class="hbar"><div class="hbar-fill" style="height:159px;background:#3f63e6"></div><span>15</span></div><div class="hbar"><div class="hbar-fill" style="height:140px;background:#3f63e6"></div><span>16</span></div><div class="hbar"><div class="hbar-fill" style="height:117px;background:#3f63e6"></div><span>17</span></div><div class="hbar"><div class="hbar-fill" style="height:142px;background:#3f63e6"></div><span>18</span></div><div class="hbar"><div class="hbar-fill" style="height:152px;background:#3f63e6"></div><span>19</span></div><div class="hbar"><div class="hbar-fill" style="height:168px;background:#3f63e6"></div><span>20</span></div><div class="hbar"><div class="hbar-fill" style="height:118px;background:#3f63e6"></div><span>21</span></div><div class="hbar"><div class="hbar-fill" style="height:88px;background:#3f63e6"></div><span>22</span></div><div class="hbar"><div class="hbar-fill" style="height:60px;background:#3f63e6"></div><span>23</span></div></div>
+    </div>
+    <div>
+      <div class="l" style="color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:13px">Карла</div>
+      <div class="hours"><div class="hbar"><div class="hbar-fill" style="height:8px;background:#8b7cff"></div><span>8</span></div><div class="hbar"><div class="hbar-fill" style="height:8px;background:#8b7cff"></div><span>9</span></div><div class="hbar"><div class="hbar-fill" style="height:12px;background:#8b7cff"></div><span>10</span></div><div class="hbar"><div class="hbar-fill" style="height:52px;background:#8b7cff"></div><span>11</span></div><div class="hbar"><div class="hbar-fill" style="height:57px;background:#8b7cff"></div><span>12</span></div><div class="hbar"><div class="hbar-fill" style="height:66px;background:#8b7cff"></div><span>13</span></div><div class="hbar"><div class="hbar-fill" style="height:53px;background:#8b7cff"></div><span>14</span></div><div class="hbar"><div class="hbar-fill" style="height:65px;background:#8b7cff"></div><span>15</span></div><div class="hbar"><div class="hbar-fill" style="height:70px;background:#8b7cff"></div><span>16</span></div><div class="hbar"><div class="hbar-fill" style="height:81px;background:#8b7cff"></div><span>17</span></div><div class="hbar"><div class="hbar-fill" style="height:86px;background:#8b7cff"></div><span>18</span></div><div class="hbar"><div class="hbar-fill" style="height:97px;background:#8b7cff"></div><span>19</span></div><div class="hbar"><div class="hbar-fill" style="height:98px;background:#8b7cff"></div><span>20</span></div><div class="hbar"><div class="hbar-fill" style="height:70px;background:#8b7cff"></div><span>21</span></div><div class="hbar"><div class="hbar-fill" style="height:71px;background:#8b7cff"></div><span>22</span></div><div class="hbar"><div class="hbar-fill" style="height:77px;background:#8b7cff"></div><span>23</span></div></div>
+    </div>
+  </div>
+  <div class="note" style="margin-top:28px">Пики Октябрьской — 12–13 и 20:00. Карла разгоняется после 17 и держит хвост до часа ночи. Если днём у входа на Карла есть люди — их недобираем. Если района днём нет — не ждать паритета тем же меню.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>5 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Номенклатура KK</p><h2>Шаурма 63–68%, курица / свинина 60 / 40</h2></div><img class="logo" src="logo-white.png"></div>
+  <div class="grid2">
+    <div class="card"><div class="l">Октябрьская · топ</div><table><thead><tr><th>Позиция</th><th class="num">Шт</th><th class="num">₽</th></tr></thead><tbody><tr><td>Шаурма Стандарт с курицей</td><td class="num">520</td><td class="num">163 975</td></tr><tr><td>Шаурма Большая со свининой</td><td class="num">339</td><td class="num">121 880</td></tr><tr><td>Шаурма Большая с курицей</td><td class="num">339</td><td class="num">120 985</td></tr><tr><td>Шаурма Стандарт со свининой</td><td class="num">266</td><td class="num">83 761</td></tr><tr><td>Картофель фри</td><td class="num">401</td><td class="num">68 170</td></tr><tr><td>Шаурма Мини с курицей</td><td class="num">262</td><td class="num">66 265</td></tr><tr><td>Чикенбургер</td><td class="num">125</td><td class="num">41 250</td></tr><tr><td>Чизбургер</td><td class="num">106</td><td class="num">39 220</td></tr></tbody></table></div>
+    <div class="card"><div class="l">Карла · топ</div><table><thead><tr><th>Позиция</th><th class="num">Шт</th><th class="num">₽</th></tr></thead><tbody><tr><td>Шаурма Стандарт с курицей</td><td class="num">321</td><td class="num">100 885</td></tr><tr><td>Шаурма Большая со свининой</td><td class="num">174</td><td class="num">62 315</td></tr><tr><td>Шаурма Большая с курицей</td><td class="num">166</td><td class="num">59 375</td></tr><tr><td>Шаурма Стандарт со свининой</td><td class="num">184</td><td class="num">57 929</td></tr><tr><td>Шаурма Мини с курицей</td><td class="num">168</td><td class="num">42 515</td></tr><tr><td>Картофель фри</td><td class="num">235</td><td class="num">39 950</td></tr><tr><td>Шаурма Мини со свининой</td><td class="num">91</td><td class="num">22 980</td></tr><tr><td>Чикенбургер</td><td class="num">66</td><td class="num">21 780</td></tr></tbody></table></div>
+  </div>
+  <p class="sub" style="margin-top:16px">Комбо на Октябрьской: 10 наборов / 5 500 ₽ за месяц — наборами не торгуем. Дипы 0,13 и 0,12 на чек, фри одинаково 0,22–0,23. Дыра Карла — напиток (0,24 vs 0,35).</p>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>6 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Смены KK</p><h2>Кто держал кассу</h2></div><img class="logo" src="logo-white.png"></div>
+  <div class="grid2">
+    <div class="card"><div class="l">Октябрьская</div><table><thead><tr><th>Кто открывал</th><th class="num">Смен</th><th class="num">Выручка</th><th class="num">На смену</th></tr></thead><tbody><tr><td>Алена Аленовна</td><td class="num">15</td><td class="num">530 357</td><td class="num">35 357</td></tr><tr><td>Умида Раджапова</td><td class="num">15</td><td class="num">485 466</td><td class="num">32 364</td></tr></tbody></table></div>
+    <div class="card"><div class="l">Карла</div><table><thead><tr><th>Кто открывал</th><th class="num">Смен</th><th class="num">Выручка</th><th class="num">На смену</th></tr></thead><tbody><tr><td>Егор Алексеевич</td><td class="num">17</td><td class="num">305 809</td><td class="num">17 989</td></tr><tr><td>Андрей Косенков</td><td class="num">14</td><td class="num">214 910</td><td class="num">15 351</td></tr></tbody></table></div>
+  </div>
+  <div class="note" style="margin-top:22px">Октябрьская ровная: Алёна чуть сильнее Умиды. На Карла Егор выше Андрея — часть разницы может быть графиком, не навыком. Смена #153 Егора на 30.09 ещё была открыта в выгрузке.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>7 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">MC Lounge Роза</p><h2>Ремонт. Зал на постоянниках. Списания — свои.</h2></div><img class="logo" src="logo-white.png"></div>
+  <div class="kpis">
+    <div class="card"><div class="l">Оплачено</div><div class="v">117 780 ₽</div><div class="s">по меню 174 990</div></div>
+    <div class="card"><div class="l">Чеки</div><div class="v">142</div><div class="s">средний 829 · мед. 750</div></div>
+    <div class="card"><div class="l">Постоянники</div><div class="v">38 чаш</div><div class="s">28 500 ₽ · база, на которой зал стоит</div></div>
+    <div class="card"><div class="l">Классика</div><div class="v">67 чаш</div><div class="s">77 050 ₽ гостевых по полной</div></div>
+  </div>
+  <div class="grid2">
+    <div class="oknote">Списания под начальство (85 чаш стафф, 35 чеков по 100% на 54 600 ₽) — это мы, не дыра. В сентябре так и должно быть видно в кассе.</div>
+    <div class="note">Отмены 41 к 142. Баг учёта: отмена не возвращает табак на склад — ревизия будет расходиться. Это не «кто-то ворует».</div>
+  </div>
+  <p class="sub" style="margin-top:18px">Пик 21:00–01:00. Дарья 15 смен / 73 тыс., Тимур 11 / 30 тыс. Пиво в чеках 13,8 тыс. при Регионпиве 47 тыс. — закуп впрок или несколько точек, сверить приход. Смотреть Розу снова после ремонта: появился ли гость сверх этой базы.</p>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>8 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Новые точки · с 15 сентября</p><h2>Гранд нащупал ядро, Puff пока дежурит</h2></div><img class="logo" src="logo-white.png"></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="l">MC Гранд · 16 дней</div>
+      <div class="v">108 270 ₽</div>
+      <ul class="ul">
+        <li>192 чека · день 6 767 · медиана 380 ₽</li>
+        <li>Ядро: карбонара 48 / 17,8 тыс., цезарь, капучино 44, американо 40</li>
+        <li>25–27.09 всплеск: 10,7 + <b>17,1</b> + 8,6 тыс. — разбирать и повторять</li>
+        <li>После 20:00 точка почти пустая</li>
+        <li>19 чеков по 100% / 16 430 ₽ на старте</li>
+        <li>Все 16 смен открывала Дёмкина</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="l">Puff · 14 смен</div>
+      <div class="v">27 000 ₽</div>
+      <ul class="ul">
+        <li>17 чеков · 18 классических чаш по 1 500</li>
+        <li>Шесть смен из четырнадцати — ноль</li>
+        <li>Суббота живее (8 чаш), будни часто пустые</li>
+        <li>28 сентября смены не было</li>
+        <li>Пока нет трафика — не кормить отдельной сменой каждый день</li>
+      </ul>
+    </div>
+  </div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>9 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Выписка Сбера · официальные итоги</p><h2>Пришло 1,97 млн · ушло 1,89 млн</h2></div><img class="logo" src="logo-white.png"></div>
+  <div class="kpis">
+    <div class="card"><div class="l">Входящий</div><div class="v">77 086.10</div></div>
+    <div class="card"><div class="l">Кредит · 220 оп.</div><div class="v">1 972 427.99</div><div class="s">эквайринг и прочие зачисления</div></div>
+    <div class="card"><div class="l">Дебет · 918 оп.</div><div class="v">1 885 928.65</div><div class="s">поставщики, выводы, магазины, вклад</div></div>
+    <div class="card"><div class="l">Исходящий</div><div class="v">163 585.44</div></div>
+  </div>
+  <div class="note">Эквайринг нетто по мерчантам ≈ 1 455 059 ₽ при карте в POS 1 521 190 ₽. Разница — комиссия ~2,5–2,7%, T+1 и 30-е. Мерчант …64405 почти рубль в рубль совпал с Карла. Нал 287 902 ₽ из кассы в выписку не попадает. Переводы во вклад — не расход.</div>
+  <p class="sub" style="margin-top:18px">PDF повёрнут: контрагенты ниже — ориентир. Официальные обороты сняты с последней страницы и сходятся.</p>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>10 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Выводы со счёта</p><h2>«Доход от предпринимательской» = заработкок</h2>
+  <p class="sub">Кроме 15–16 числа — это чаще зарплаты. 16-го вывода не было.</p></div><img class="logo" src="logo-white.png"></div>
+  <div class="grid2">
+    <div class="card" style="max-height:720px;overflow:hidden">
+      <table><thead><tr><th>Дата</th><th class="num">Сумма</th><th>Как читаем</th></tr></thead><tbody><tr><td>01.09</td><td class="num">45 000</td><td>себе</td></tr><tr><td>04.09</td><td class="num">20 000</td><td>себе</td></tr><tr><td>05.09</td><td class="num">23 000</td><td>себе</td></tr><tr><td>08.09</td><td class="num">9 500</td><td>себе</td></tr><tr><td>08.09</td><td class="num">32 000</td><td>себе</td></tr><tr><td>09.09</td><td class="num">4 000</td><td>себе</td></tr><tr><td>11.09</td><td class="num">43 000</td><td>себе</td></tr><tr><td>11.09</td><td class="num">52 000</td><td>себе</td></tr><tr class="hi"><td>15.09</td><td class="num">58 000</td><td>зарплатное окно</td></tr><tr><td>27.09</td><td class="num">10 000</td><td>себе</td></tr></tbody></table>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px"><div class="l">Себе за месяц</div><div class="v">238 500 ₽</div><div class="s">без 58 000 ₽ 15 сентября</div></div>
+      <div class="card" style="margin-bottom:14px"><div class="l">Белый ФОТ 15.09</div><div class="v">97 490 ₽</div><div class="s">реестр 77 — 18 620 · реестр 76 — 78 870 · договор 83390253</div></div>
+      <div class="card"><div class="l">Если 58 тыс. тоже зарплата</div><div class="v">155 490 ₽</div><div class="s">видимое окно середины месяца. Краснобродская 80,6 тыс. 14.09 рядом, статью не размечали.</div></div>
+    </div>
+  </div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>11 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Поставщики · безнал</p><h2>То, что берём по счетам</h2></div><img class="logo" src="logo-white.png"></div>
+  <table>
+    <thead><tr><th>Контрагент</th><th class="num">Сумма</th><th>Платежей</th><th>Комментарий</th></tr></thead>
+    <tbody>
+      <tr><td>ООО «МАРР Россия»</td><td class="num">354 087</td><td>7</td><td>Основной продуктовый контур KK</td></tr>
+      <tr><td>ООО «Мистер Крабс»</td><td class="num">66 654</td><td>4</td><td>Регулярный поставщик в течение месяца</td></tr>
+      <tr><td>ООО «Регионпиво»</td><td class="num">47 118</td><td>1</td><td>5.09 · пиво в чеках Розы ~13,8 тыс.</td></tr>
+      <tr><td>ООО «Курьер Плюс»</td><td class="num">17 430</td><td>1</td><td>8.09</td></tr>
+      <tr><td>ООО РВБ / Wildberries Bank</td><td class="num">16 909</td><td>1</td><td>Счёт на товары, отдельно от карты WB</td></tr>
+      <tr><td>ООО «Доксинбокс»</td><td class="num">5 160</td><td>1</td><td>Сервис документов</td></tr>
+    </tbody>
+  </table>
+  <p class="sub" style="margin-top:22px">Итого узнаваемых счетов ≈ 507 тыс. Это не вся себестоимость: часть еды, химии и мелочи уходит картой в магазины — следующий слайд.</p>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>12 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Карта ИП · магазины</p><h2>Закуп, который нельзя закрыть поставщиком</h2>
+  <p class="sub">Срочно, мелко, нет в прайсе МАРР, другой город, упаковка, алкоголь в рознице, бытовое.</p></div><img class="logo" src="logo-white.png"></div>
+  <div class="kpis kpis5">
+    <div class="card"><div class="l">Улица / еда</div><div class="v">66 619</div><div class="s">Пятёрочка, Магнит, Монетка, локальные</div></div>
+    <div class="card"><div class="l">Упаковка и расходники</div><div class="v">95 110</div><div class="s">Мир упаковки, Fix Price, Клади-пакуй</div></div>
+    <div class="card"><div class="l">Красное &amp; Белое</div><div class="v">36 935</div><div class="s">20 покупок · розница к Регионпиву</div></div>
+    <div class="card"><div class="l">Маркетплейсы</div><div class="v">31 939</div><div class="s">WB карта + Avito, плюс счёт РВБ 16,9 тыс.</div></div>
+    <div class="card"><div class="l">Без названия CH450</div><div class="v">141 429</div><div class="s">Сбер обрезал имя точки в выписке</div></div>
+  </div>
+  <div class="note warn">Суммы карточных покупок собраны с повёрнутого PDF: мерчант + следующая операция VO 17. Это ориентир, не сверка 1:1 с банком. Официальный дебет месяца — 1 885 929 ₽, в нём ещё вклад, МАРР, ФОТ и выводы.</div>
+  <p class="sub" style="margin-top:18px">Имеет смысл завести статью «розничный добор» и не смешивать её с МАРР. Это нормальный opex общепита, просто дороже счёта поставщика.</p>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>13 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Розничный добор еды</p><h2>Пятёрочка, Магнит, Монетка и локальные</h2>
+  <p class="sub">Сумма 66 619 ₽ · 138 покупок. Типичный чек 400–550 ₽ — докупка, не фура.</p></div><img class="logo" src="logo-white.png"></div>
+  <div class="grid2">
+    <table>
+      <thead><tr><th>Магазин</th><th class="num">Чеков</th><th class="num">₽</th><th class="num">Средний</th></tr></thead>
+      <tbody><tr><td>Пятёрочка</td><td class="num">55</td><td class="num">23 488</td><td class="num">427</td></tr><tr><td>Магнит</td><td class="num">24</td><td class="num">13 282</td><td class="num">553</td></tr><tr><td>Монетка</td><td class="num">24</td><td class="num">11 692</td><td class="num">487</td></tr><tr><td>Доброцен</td><td class="num">3</td><td class="num">5 257</td><td class="num">1 752</td></tr><tr><td>Метрополис</td><td class="num">14</td><td class="num">5 058</td><td class="num">361</td></tr><tr><td>Чайка</td><td class="num">4</td><td class="num">2 180</td><td class="num">545</td></tr><tr><td>магазин «Сом»</td><td class="num">1</td><td class="num">1 420</td><td class="num">1 420</td></tr><tr><td>Мясной</td><td class="num">2</td><td class="num">1 098</td><td class="num">549</td></tr><tr><td>Пельменная</td><td class="num">1</td><td class="num">950</td><td class="num">950</td></tr><tr><td>Магазин продуктов</td><td class="num">2</td><td class="num">938</td><td class="num">469</td></tr><tr><td>Продукты</td><td class="num">2</td><td class="num">371</td><td class="num">186</td></tr><tr><td>ИП Гаджиев</td><td class="num">1</td><td class="num">310</td><td class="num">310</td></tr><tr><td>Фруктовый</td><td class="num">1</td><td class="num">200</td><td class="num">200</td></tr><tr><td>Горячий хлеб</td><td class="num">1</td><td class="num">199</td><td class="num">199</td></tr><tr><td>Кондитерская</td><td class="num">2</td><td class="num">102</td><td class="num">51</td></tr><tr><td>Фруктовый рай</td><td class="num">1</td><td class="num">76</td><td class="num">76</td></tr></tbody>
+    </table>
+    <div>
+      <div class="card" style="margin-bottom:14px"><div class="l">Три сети</div>
+        <div class="s">Пятёрочка 23 488 / 55 чеков<br>
+        Магнит 13 282 / 24<br>
+        Монетка 11 692 / 24</div></div>
+      <div class="oknote">Это как раз закуп, который у МАРР не взять: зелень к вечеру, молоко, мелочь на смену, то что кончилось в зале. Не путать с «личными тратами», пока не разметим карту. Часть чеков наверняка смешанная.</div>
+    </div>
+  </div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>14 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Упаковка · алкоголь · маркетплейсы</p><h2>Крупнее продуктового добора</h2></div><img class="logo" src="logo-white.png"></div>
+  <table>
+    <thead><tr><th>Где</th><th class="num">Чеков</th><th class="num">₽</th><th>Заметка</th></tr></thead>
+    <tbody>
+<tr><td>Мир упаковки</td><td class="num">13</td><td class="num">68 648</td><td>Крупные завозы 7.09 / 14.09 / 28.09 (19,7 · 12,3 · 21,9 тыс.)</td></tr>
+<tr><td>Fix Price</td><td class="num">19</td><td class="num">24 406</td><td>Расходники, пакеты, бытовое · 4 точки</td></tr>
+<tr><td>Клади-пакуй</td><td class="num">2</td><td class="num">1 697</td><td>Упаковка</td></tr>
+<tr><td>Galamart</td><td class="num">1</td><td class="num">360</td><td></td></tr>
+<tr><td>Красное &amp; Белое</td><td class="num">20</td><td class="num">36 935</td><td>Розн. алкоголь к счёту Регионпива</td></tr>
+<tr><td>Wildberries карта</td><td class="num">7</td><td class="num">28 583</td><td>Плюс счёт РВБ 16 909 ₽</td></tr>
+<tr><td>Avito</td><td class="num">2</td><td class="num">3 356</td><td></td></tr>
+<tr><td>Tabysh</td><td class="num">10</td><td class="num">7 601</td><td>Локальная точка, 10 чеков</td></tr>
+</tbody>
+  </table>
+  <p class="sub" style="margin-top:20px">Мир упаковки + Fix Price ≈ 93 053 ₽. Это уже не «заскочил в пятёрочку», а отдельная статья. К&amp;Б 36 935 рядом с Регионпивом 47 тыс. — либо срочный добор, либо ассортимент, которого нет у оптовика.</p>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>15 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Что выписка не назвала</p><h2>Терминалы CH450xx и сервисы</h2>
+  <p class="sub">Сбер в назначении пишет код точки, не вывеску. 141 429 ₽ — скорее ещё розница, не переводы.</p></div><img class="logo" src="logo-white.png"></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="l">Обрезанные имена</div>
+      <table><thead><tr><th>Код</th><th class="num">Чеков</th><th class="num">₽</th></tr></thead><tbody><tr><td>CH45003</td><td class="num">17</td><td class="num">50 363</td></tr><tr><td>CH45002</td><td class="num">17</td><td class="num">35 270</td></tr><tr><td>CH45020</td><td class="num">18</td><td class="num">35 206</td></tr><tr><td>CH45024</td><td class="num">2</td><td class="num">13 428</td></tr><tr><td>CH45011</td><td class="num">2</td><td class="num">7 162</td></tr></tbody></table>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px"><div class="l">Яндекс</div>
+        <div class="v">26 855</div>
+        <div class="s">5814 — 19 558 · директ? 5 850 · Плюс 1 447. Не размечали: реклама / доставка / лавка.</div></div>
+      <div class="card" style="margin-bottom:14px"><div class="l">Сервисы</div>
+        <div class="s">CK*PAYTOOL 14 299 · Timeweb 7 952 · ваучер 5 452 · стоматология 1 900 · T2 / VK — мелочь. Часть явно личная.</div></div>
+      <div class="note">Если открыть в СберБизнесе оригинальные имена CH450 — розничный добор, скорее всего, вырастет. Это следующий уточняющий файл, не дыра.</div>
+    </div>
+  </div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>16 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Карта месяца</p><h2>Куда уехали безнал-деньги, которые мы видим</h2></div><img class="logo" src="logo-white.png"></div>
+  <div class="grid3">
+    <div class="card"><div class="l">Себе</div><div class="v">238 500</div><div class="s">доход от предпр. без 15.09</div></div>
+    <div class="card"><div class="l">ФОТ видимый</div><div class="v">97 490</div><div class="s">реестры Сбера 15.09 · плюс возможно 58 тыс.</div></div>
+    <div class="card"><div class="l">МАРР + Крабс</div><div class="v">420 741</div><div class="s">основной продуктовый контур</div></div>
+    <div class="card"><div class="l">Пиво опт + К&amp;Б</div><div class="v">84 053</div><div class="s">Регионпиво и розница</div></div>
+    <div class="card"><div class="l">Упаковка</div><div class="v">94 750</div><div class="s">счета + карта</div></div>
+    <div class="card"><div class="l">Магазины еды</div><div class="v">66 619</div><div class="s">добор, которого нет у поставщика</div></div>
+  </div>
+  <div class="note" style="margin-top:22px">Не хватает аренды, полного ФОТа наличными, коммуналки и налогов. Пока это карта безнала, не P&amp;L точек. Нал кассы 287 902 ₽ живёт отдельно.</div>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>17 / 18</span></div>
+</section><section class="slide">
+
+  <div class="top"><div><p class="eyebrow">Октябрь</p><h2>Что делать, а что не трогать</h2></div><img class="logo" src="logo-white.png"></div>
+  <ul class="ul biglist">
+    <li><b>Октябрьскую не ломать.</b> 56% сети, ровный месяц, обед = вечер.</li>
+    <li><b>Карла — день и напиток.</b> Вечер уже есть. 0,24 напитка на чек vs 0,35 на Октябрьской. Комбо не работает.</li>
+    <li><b>Розу не лечить.</b> Ремонт, постоянники, списания на своих. Смотреть после открытия зала.</li>
+    <li><b>Гранд — ядро меню</b> (карбонара, цезарь, капучино) и пик 26.09. Puff не кормить пустыми сменами.</li>
+    <li><b>Розничный добор завести статьёй.</b> Пятёрочка / Магнит / Монетка 48 461 ₽ — нормальный opex, не «непонятные траты».</li>
+    <li><b>Открыть имена CH450</b> в СберБизнесе — там ещё 141 429 ₽ без вывески.</li>
+  </ul>
+
+<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>18 / 18</span></div>
+</section>
+</body>
+</html>
