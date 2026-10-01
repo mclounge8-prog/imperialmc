@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""Build Imperial MC September 2026 slide deck HTML."""
+"""Imperial MC September 2026 deck — readable, brand-dark, one idea per slide."""
 from pathlib import Path
 import json
 
 ROOT = Path(__file__).resolve().parent
 FIG = json.loads((ROOT.parent / "figures.json").read_text())
-CARD = json.loads(Path("/tmp/analytics/card-shops.json").read_text())
+CARD = json.loads((ROOT.parent / "card-shops.json").read_text())
 POS = json.loads((ROOT.parent / "pos-dump.json").read_text())
-LOGO = ROOT / "logo-white.png"
+LOGO = "logo-white.png"
+
 SHOP_RU = {
     "MAGAZIN DOBROTSEN": "Доброцен",
     "MAGAZIN CHAJKA": "Чайка",
-    "MAGAZIN SOM": "магазин «Сом»",
+    "MAGAZIN SOM": "Сом",
     "MAGAZIN MYASNOJ": "Мясной",
-    "MAGAZIN PRODUKTOV": "Магазин продуктов",
+    "MAGAZIN PRODUKTOV": "Продукты",
     "PRODUKTY": "Продукты",
     "PELMENNAYA 1": "Пельменная",
     "FRUKTOVYJ": "Фруктовый",
@@ -23,16 +24,16 @@ SHOP_RU = {
     "EVO_KONDITER IZDELIYA": "Кондитерская",
 }
 
+
 def r(n, digits=0):
     n = float(n)
-    if digits:
-        s = f"{n:,.{digits}f}"
-    else:
-        s = f"{n:,.0f}"
-    return s.replace(",", " ")
+    s = f"{n:,.{digits}f}" if digits else f"{n:,.0f}"
+    return s.replace(",", "\u202f")
+
 
 def pct(n):
     return f"{float(n):.1f}".replace(".", ",")
+
 
 venues = {v["name"]: v for v in FIG["venues"]}
 oct_ = venues["Kebab King Октябрьская"]
@@ -42,15 +43,17 @@ grand = venues["MC Гранд"]
 puff = venues["MC Lounge Puff"]
 T = FIG["totals"]
 B = FIG["bank_statement"]
-
+od = B["predprinimatelskiy_dohod_to_demkina"]
 merch = CARD["by_merchant"]
-buckets = CARD["by_bucket"]
+
 
 def merch_amt(name):
     return next((m["amount"] for m in merch if m["name"] == name), 0)
 
+
 def merch_n(name):
     return next((m["n"] for m in merch if m["name"] == name), 0)
+
 
 street_names = [
     "Пятёрочка", "Магнит", "Монетка", "Метрополис", "MAGAZIN DOBROTSEN",
@@ -59,528 +62,510 @@ street_names = [
     "GORYACHIJ KHLEB", "IP GADZHIEV IMRAN", "EVO_KONDITER IZDELIYA",
 ]
 street = [(SHOP_RU.get(n, n), merch_amt(n), merch_n(n)) for n in street_names if merch_amt(n)]
+# fold duplicate Продукты
+folded = {}
+for n, a, nn in street:
+    folded[n] = [folded.get(n, [0, 0])[0] + a, folded.get(n, [0, 0])[1] + nn]
+street = [(n, a, nn) for n, (a, nn) in folded.items()]
 street_sum = sum(a for _, a, _ in street)
-
 unlab = [(m["name"], m["amount"], m["n"]) for m in merch if m["name"].startswith("CH450")]
 unlab_sum = sum(a for _, a, _ in unlab)
 
-# hour bars
+
 def hours(venue):
-    rows = [h for h in POS["HOUR"] if h["venue"] == venue]
     by = {}
-    for h in rows:
+    for h in POS["HOUR"]:
+        if h["venue"] != venue:
+            continue
         k = int(h["hour"])
         by[k] = by.get(k, 0) + float(h["revenue"])
     return by
+
 
 oct_h = hours("Kebab King Октябрьская")
 karl_h = hours("Kebab King Карла")
 max_h = max(list(oct_h.values()) + list(karl_h.values()))
 
+
 def hour_bars(data, color):
     parts = []
-    for h in range(8, 24):
+    for h in range(10, 24):
         v = data.get(h, 0)
-        ht = 8 + (v / max_h) * 160 if max_h else 8
+        ht = 12 + (v / max_h) * 280 if max_h else 12
         parts.append(
-            f'<div class="hbar"><div class="hbar-fill" style="height:{ht:.0f}px;background:{color}"></div>'
+            f'<div class="hbar">'
+            f'<div class="hbar-fill" style="height:{ht:.0f}px;background:{color}"></div>'
             f'<span>{h}</span></div>'
         )
     return "".join(parts)
 
-# weekly
-weeks = {}
-for w in FIG["weeks"]:
-    weeks.setdefault(w["week"], {})[w["venue"]] = w["revenue"]
-week_ids = sorted(weeks)
 
-def venue_week_row(name, color):
-    cells = []
-    vals = [weeks[w].get(name, 0) for w in week_ids]
-    mx = max(vals) or 1
-    for v in vals:
-        cells.append(
-            f'<div class="wbar"><div class="wbar-fill" style="height:{20+v/mx*90:.0f}px;background:{color}"></div>'
-            f'<span>{r(v)}</span></div>'
-        )
-    return "".join(cells)
+def hbar_row(label, value, max_v, extra=""):
+    w = 8 + (value / max_v) * 92 if max_v else 8
+    return (
+        f'<div class="br">'
+        f'<div class="br-l">{label}</div>'
+        f'<div class="br-track"><div class="br-fill" style="width:{w:.1f}%"></div></div>'
+        f'<div class="br-v">{r(value)}{extra}</div></div>'
+    )
 
-def share_bar(items):
-    # items: (label, value, color)
-    total = sum(v for _, v, _ in items) or 1
-    html = '<div class="stack">'
-    for label, v, c in items:
-        html += f'<div class="stack-seg" style="width:{v/total*100:.2f}%;background:{c}" title="{label}"></div>'
-    html += "</div>"
-    return html
 
-CSS = """
+FONT_FACES = """
+@font-face { font-family: Inter; font-weight: 400; src: url('fonts/Inter-400-cyr.woff2') format('woff2'); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: Inter; font-weight: 400; src: url('fonts/Inter-400-lat.woff2') format('woff2'); unicode-range: U+0000-00FF; }
+@font-face { font-family: Inter; font-weight: 500; src: url('fonts/Inter-500-cyr.woff2') format('woff2'); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: Inter; font-weight: 500; src: url('fonts/Inter-500-lat.woff2') format('woff2'); unicode-range: U+0000-00FF; }
+@font-face { font-family: Inter; font-weight: 600; src: url('fonts/Inter-600-cyr.woff2') format('woff2'); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: Inter; font-weight: 600; src: url('fonts/Inter-600-lat.woff2') format('woff2'); unicode-range: U+0000-00FF; }
+@font-face { font-family: Inter; font-weight: 700; src: url('fonts/Inter-700-cyr.woff2') format('woff2'); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: Inter; font-weight: 700; src: url('fonts/Inter-700-lat.woff2') format('woff2'); unicode-range: U+0000-00FF; }
+@font-face { font-family: Grotesk; font-weight: 600; src: url('fonts/SpaceGrotesk-600-lat.woff2') format('woff2'); }
+@font-face { font-family: Grotesk; font-weight: 700; src: url('fonts/SpaceGrotesk-700-lat.woff2') format('woff2'); }
+"""
+
+CSS = FONT_FACES + """
 :root {
   --bg: #121214;
   --surface: #1b1b1f;
   --surface-2: #24242a;
-  --border: #34343c;
+  --line: #34343c;
   --text: #f1f1f3;
   --muted: #98979f;
-  --accent: #2647c7;
-  --accent-2: #3f63e6;
-  --danger: #e14c4c;
+  --blue: #3f63e6;
+  --blue-deep: #2647c7;
   --ok: #3dbe8c;
+  --lilac: #8b7cff;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #0c0c0e; }
+html, body { margin: 0; background: #0b0b0d; }
 @page { size: 1920px 1080px; margin: 0; }
 .slide {
-  width: 1920px;
-  height: 1080px;
-  background: var(--bg);
+  width: 1920px; height: 1080px;
+  background:
+    radial-gradient(900px 520px at 112% -10%, rgba(63,99,230,.22), transparent 58%),
+    radial-gradient(700px 400px at -8% 110%, rgba(38,71,199,.16), transparent 55%),
+    var(--bg);
   color: var(--text);
-  font-family: 'Inter', 'DejaVu Sans', sans-serif;
-  padding: 56px 72px 48px;
+  font-family: Inter, 'DejaVu Sans', sans-serif;
+  padding: 64px 80px 56px;
   position: relative;
   overflow: hidden;
   page-break-after: always;
-  break-after: page;
 }
 .slide::before {
   content: "";
-  position: absolute; inset: 0 auto 0 0; width: 6px;
-  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  position: absolute; left: 0; top: 0; bottom: 0; width: 7px;
+  background: linear-gradient(180deg, var(--blue), var(--blue-deep));
 }
-.top {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 28px;
+.glow-line {
+  width: 48px; height: 3px; border-radius: 2px;
+  background: var(--blue);
+  box-shadow: 0 0 16px 2px rgba(63,99,230,.55);
+  margin: 16px 0 0;
 }
+.top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 36px; }
 .eyebrow {
-  font-family: 'Space Grotesk', 'DejaVu Sans', sans-serif;
-  font-size: 13px; font-weight: 500; letter-spacing: .16em;
-  text-transform: uppercase; color: var(--accent-2); margin: 0 0 6px;
+  font-size: 15px; font-weight: 600; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--blue); margin: 0 0 10px;
 }
-h1 {
-  font-family: 'Space Grotesk', 'DejaVu Sans', sans-serif;
-  font-size: 44px; font-weight: 600; margin: 0; letter-spacing: -0.02em;
+h2 { font-size: 46px; font-weight: 700; letter-spacing: -.03em; margin: 0; line-height: 1.12; max-width: 1500px; }
+.logo {
+  height: 52px; width: auto; max-width: 140px;
+  object-fit: contain; object-position: right center;
+  flex: 0 0 auto;
 }
-h2 {
-  font-family: 'Space Grotesk', 'DejaVu Sans', sans-serif;
-  font-size: 36px; font-weight: 600; margin: 0 0 8px;
+.title-slide { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding-left: 120px; }
+.title-logo {
+  height: 78px; width: auto; max-width: 220px;
+  object-fit: contain; object-position: left center;
+  display: block; margin: 0 0 40px;
 }
-.sub { color: var(--muted); font-size: 18px; margin: 8px 0 0; }
-.logo { height: 42px; opacity: .92; }
-.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 28px 0; }
-.kpis5 { grid-template-columns: repeat(5, 1fr); }
+.title-slide h1 {
+  font-size: 92px; font-weight: 700; letter-spacing: -.04em;
+  margin: 0; line-height: .95;
+}
+.chips { display: flex; gap: 12px; margin-top: 36px; flex-wrap: wrap; }
+.chip {
+  border: 1px solid var(--line); background: rgba(27,27,31,.7);
+  border-radius: 999px; padding: 10px 18px; font-size: 18px; color: var(--muted);
+}
+.kpis { display: grid; gap: 20px; }
+.k4 { grid-template-columns: repeat(4, 1fr); }
+.k3 { grid-template-columns: repeat(3, 1fr); }
+.k5 { grid-template-columns: repeat(5, 1fr); }
+.k2 { grid-template-columns: 1fr 1fr; }
 .card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 20px 22px;
+  background: linear-gradient(180deg, #222228, #1b1b1f);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 32px 30px 28px;
+  position: relative;
+  min-height: 210px;
 }
-.card .l { color: var(--muted); font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
+.card .v { white-space: nowrap; }
+.card::after {
+  content: "";
+  position: absolute; left: 24px; right: 24px; top: 0; height: 2px;
+  background: linear-gradient(90deg, var(--blue), transparent);
+  border-radius: 2px;
+}
+.card .l { color: var(--muted); font-size: 15px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
 .card .v {
-  font-family: 'Space Grotesk', 'DejaVu Sans', sans-serif;
-  font-size: 34px; font-weight: 600; margin-top: 8px;
+  font-family: Grotesk, Inter, sans-serif;
+  font-size: 48px; font-weight: 700; margin-top: 12px; letter-spacing: -.03em; line-height: 1;
 }
-.card .s { color: var(--muted); font-size: 14px; margin-top: 6px; }
-table { width: 100%; border-collapse: collapse; font-size: 16px; }
-th { text-align: left; color: var(--muted); font-weight: 500; font-size: 13px;
-  letter-spacing: .06em; text-transform: uppercase; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-td { padding: 11px 12px; border-bottom: 1px solid #2a2a30; }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-tr.hi td { color: var(--accent-2); }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+.card .s { color: var(--muted); font-size: 18px; margin-top: 12px; line-height: 1.4; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+.venue {
+  background: linear-gradient(180deg, #222228, #1b1b1f);
+  border: 1px solid var(--line); border-radius: 16px; padding: 26px 24px 22px;
+}
+.venue.hot { border-color: #3a4ea8; box-shadow: inset 0 0 0 1px rgba(63,99,230,.25); }
+.venue .name { font-size: 20px; font-weight: 600; margin-bottom: 18px; }
+.venue .sum { font-family: Grotesk, Inter, sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -.03em; }
+.venue .meta { color: var(--muted); font-size: 18px; margin-top: 10px; line-height: 1.45; }
+.statrow { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; margin-top: 28px; }
+.statrow .k { color: var(--muted); font-size: 16px; }
+.statrow .n { font-family: Grotesk, Inter, sans-serif; font-size: 30px; font-weight: 700; margin-top: 4px; }
 .note {
-  background: #1a2038; border: 1px solid #2c3a78; border-radius: 10px;
-  padding: 14px 18px; color: #c8d0f0; font-size: 15px; line-height: 1.45;
+  margin-top: 28px; padding: 18px 22px;
+  background: rgba(63,99,230,.1); border: 1px solid rgba(63,99,230,.28);
+  border-radius: 14px; font-size: 20px; line-height: 1.4; color: #d5dbf5;
 }
-.warn {
-  background: #2a1c1c; border: 1px solid #5a3030; color: #f0c8c8;
+.ok {
+  background: rgba(61,190,140,.1); border-color: rgba(61,190,140,.28); color: #d4f3e4;
 }
-.oknote { background: #14241c; border: 1px solid #24543c; color: #c8f0dc; }
+.hours { display: flex; align-items: flex-end; gap: 10px; height: 360px; }
+.hbar { width: 48px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.hbar-fill { width: 30px; border-radius: 8px 8px 3px 3px; }
+.hbar span { font-size: 16px; color: var(--muted); }
+.br { display: grid; grid-template-columns: 220px 1fr 180px; gap: 18px; align-items: center; margin: 18px 0; }
+.br-l { font-size: 22px; font-weight: 550; }
+.br-track { height: 16px; background: #2a2a32; border-radius: 99px; overflow: hidden; }
+.br-fill { height: 100%; background: linear-gradient(90deg, var(--blue-deep), var(--blue)); border-radius: 99px; }
+.br-v { font-family: Grotesk, Inter, sans-serif; font-size: 24px; font-weight: 700; text-align: right; }
+.person { padding: 28px; }
+.person .who { font-size: 24px; font-weight: 600; }
+.take {
+  display: grid; grid-template-columns: 64px 1fr; gap: 18px; align-items: start;
+  background: linear-gradient(180deg, #222228, #1b1b1f);
+  border: 1px solid var(--line); border-radius: 16px; padding: 26px 26px 24px;
+}
+.take .num {
+  width: 56px; height: 56px; border-radius: 14px;
+  background: rgba(63,99,230,.16); color: var(--blue);
+  font-family: Grotesk, Inter, sans-serif; font-weight: 700; font-size: 26px;
+  display: flex; align-items: center; justify-content: center;
+}
+.take b { display: block; font-size: 24px; margin-bottom: 8px; }
+.take span { color: var(--muted); font-size: 18px; line-height: 1.4; }
 .foot {
-  position: absolute; left: 72px; right: 72px; bottom: 28px;
-  display: flex; justify-content: space-between; color: var(--muted); font-size: 13px;
+  position: absolute; left: 80px; right: 80px; bottom: 28px;
+  display: flex; justify-content: space-between; align-items: center;
+  color: var(--muted); font-size: 14px;
 }
-.stack { display: flex; height: 18px; border-radius: 9px; overflow: hidden; background: var(--surface-2); }
-.stack-seg { height: 100%; }
-.legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; color: var(--muted); font-size: 14px; }
-.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
-.hours { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 10px; }
-.hbar { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 42px; }
-.hbar-fill { width: 28px; border-radius: 6px 6px 2px 2px; }
-.hbar span { color: var(--muted); font-size: 11px; }
-.weeks { display: flex; align-items: flex-end; gap: 14px; height: 150px; }
-.wbar { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 90px; }
-.wbar-fill { width: 44px; border-radius: 8px 8px 2px 2px; }
-.wbar span { color: var(--muted); font-size: 11px; }
-.ul { margin: 8px 0 0; padding-left: 18px; color: var(--text); line-height: 1.55; font-size: 17px; }
-.ul li { margin: 6px 0; }
-.title-slide { display: flex; flex-direction: column; justify-content: center; padding-left: 110px; }
-.title-slide h1 { font-size: 72px; line-height: 1.05; max-width: 1200px; }
-.title-slide .underline { width: 56px; height: 3px; background: var(--accent-2); border-radius: 2px;
-  box-shadow: 0 0 14px 2px rgba(63,99,230,.55); margin: 22px 0 18px; }
-.biglist { font-size: 22px; line-height: 1.5; }
-.two-col-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 40px; }
+.page {
+  min-width: 64px; text-align: center;
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
+}
+.share { display: flex; height: 72px; border-radius: 16px; overflow: hidden; margin: 36px 0 0; }
+.share-seg { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; font-weight: 600; gap: 8px; }
+.share-seg b { font-weight: 700; }
+.vs {
+  position: absolute; left: 50%; top: 58%; transform: translate(-50%,-50%);
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #121214; border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 14px; font-weight: 600; letter-spacing: .08em;
+}
 """
 
-def slide(body, num, total=18, title_slide=False):
-    klass = "slide title-slide" if title_slide else "slide"
+TOTAL = 18
+
+
+def slide(body, num, title=False):
+    klass = "slide title-slide" if title else "slide"
     return f'''<section class="{klass}">
 {body}
-<div class="foot"><span>Imperial MC · сентябрь 2026 · внутренняя аналитика</span><span>{num} / {total}</span></div>
+<div class="foot"><span>Imperial MC · сентябрь 2026</span><span class="page">{num} / {TOTAL}</span></div>
 </section>'''
+
 
 slides = []
 
-# 1 title
 slides.append(slide(f'''
-  <img class="logo" src="{LOGO.name}" alt="Imperial MC" style="height:64px;margin-bottom:36px">
+  <img class="title-logo" src="{LOGO}" alt="Imperial MC">
   <p class="eyebrow">Аналитика сети</p>
-  <h1>Сентябрь 2026</h1>
-  <div class="underline"></div>
-  <p class="sub" style="font-size:22px;max-width:980px">Выручка из кассы по пяти точкам. Движение денег — из выписки Сбера ИП. Карточные закупки в магазинах — то, что не берём у поставщика.</p>
-  <p class="sub">1–30 сентября · Екатеринбург · 3 167 оплаченных чеков</p>
-''', 1, title_slide=True))
+  <h1>Сентябрь<br>2026</h1>
+  <div class="glow-line"></div>
+  <div class="chips">
+    <span class="chip">1–30 сентября</span>
+    <span class="chip">Екатеринбург</span>
+    <span class="chip">5 точек</span>
+    <span class="chip">3 167 чеков</span>
+  </div>
+''', 1, title=True))
 
-# 2 network
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Сеть</p><h2>Месяц одним взглядом</h2></div><img class="logo" src="{LOGO.name}"></div>
-  <div class="kpis">
-    <div class="card"><div class="l">Оплачено</div><div class="v">{r(T["paid"])} ₽</div><div class="s">субтотал {r(T["subtotal"])} · скидки {r(T["discount_total"])}</div></div>
-    <div class="card"><div class="l">Карта / нал</div><div class="v">{pct(T["card_pct"])} / {pct(T["cash_pct"])}</div><div class="s">{r(T["card"])} · {r(T["cash"])} ₽</div></div>
-    <div class="card"><div class="l">Чеки</div><div class="v">{r(T["paid_receipts"])}</div><div class="s">отмены {r(T["cancelled_receipts"])} · возвраты {r(T["refunded_receipts"])}</div></div>
-    <div class="card"><div class="l">KK вместе</div><div class="v">86%</div><div class="s">{r(oct_["paid_total"]+karl["paid_total"])} ₽ · две точки кормят сеть</div></div>
+  <div class="top"><div><p class="eyebrow">Сеть</p><h2>Месяц одним взглядом</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="kpis k4">
+    <div class="card"><div class="l">Оплачено</div><div class="v">{r(T["paid"])}</div><div class="s">скидки {r(T["discount_total"])} ₽</div></div>
+    <div class="card"><div class="l">Карта</div><div class="v">{pct(T["card_pct"])}%</div><div class="s">{r(T["card"])} ₽</div></div>
+    <div class="card"><div class="l">Нал</div><div class="v">{pct(T["cash_pct"])}%</div><div class="s">{r(T["cash"])} ₽</div></div>
+    <div class="card"><div class="l">Kebab King</div><div class="v">86%</div><div class="s">{r(oct_["paid_total"]+karl["paid_total"])} ₽ на двоих</div></div>
   </div>
-  {share_bar([
-      ("Октябрьская", oct_["paid_total"], "#3f63e6"),
-      ("Карла", karl["paid_total"], "#6f8cff"),
-      ("Роза", rosa["paid_total"], "#8b7cff"),
-      ("Гранд", grand["paid_total"], "#3dbe8c"),
-      ("Puff", puff["paid_total"], "#98979f"),
-  ])}
-  <div class="legend">
-    <span><i class="dot" style="background:#3f63e6"></i>Октябрьская {pct(oct_["share_pct"])}%</span>
-    <span><i class="dot" style="background:#6f8cff"></i>Карла {pct(karl["share_pct"])}%</span>
-    <span><i class="dot" style="background:#8b7cff"></i>Роза {pct(rosa["share_pct"])}%</span>
-    <span><i class="dot" style="background:#3dbe8c"></i>Гранд {pct(grand["share_pct"])}%</span>
-    <span><i class="dot" style="background:#98979f"></i>Puff {pct(puff["share_pct"])}%</span>
+  <div class="share">
+    <div class="share-seg" style="width:56.2%;background:#3f63e6"><b>Октябрьская</b> 56%</div>
+    <div class="share-seg" style="width:29.9%;background:#6f8cff"><b>Карла</b> 30%</div>
+    <div class="share-seg" style="width:6.5%;background:#8b7cff"><b>Роза</b></div>
+    <div class="share-seg" style="width:6.0%;background:#3dbe8c"><b>Гранд</b></div>
+    <div class="share-seg" style="width:1.4%;background:#5c5c66"></div>
   </div>
-  <p class="sub" style="margin-top:28px">Роза в ремонте, Гранд и Puff — с 15 сентября. Их месяц нельзя читать как «нормальный ранрейт».</p>
+  <div class="note">Роза в ремонте. Гранд и Puff открылись 15-го. Их сентябрь — не нормальный месяц точки.</div>
 ''', 2))
 
-# 3 table
-def row(v, hi=False):
-    cls = ' class="hi"' if hi else ""
-    return f'''<tr{cls}><td>{v["name"]}</td><td class="num">{r(v["paid_total"])}</td>
-    <td class="num">{pct(v["share_pct"])}%</td><td class="num">{r(v["paid_receipts"])}</td>
-    <td class="num">{r(v["avg_check"])} / {r(v["median_check"])}</td>
-    <td class="num">{r(v["cancelled_receipts"])} ({pct(v["cancel_share_of_tickets_pct"])}%)</td>
-    <td class="num">{r(v["discount_total"])}</td><td class="num">{r(v["avg_day"])}</td></tr>'''
-
+venue_cards = [
+    (oct_, True, "Октябрьская"),
+    (karl, True, "Карла"),
+    (rosa, False, "Роза"),
+    (grand, False, "Гранд"),
+    (puff, False, "Puff"),
+]
+vc = []
+for v, hot, short in venue_cards:
+    vc.append(
+        f'<div class="venue{" hot" if hot else ""}"><div class="name">{short}</div>'
+        f'<div class="sum">{r(v["paid_total"])}</div>'
+        f'<div class="meta">{pct(v["share_pct"])}% сети · {r(v["paid_receipts"])} чеков<br>'
+        f'средний {r(v["avg_check"])} · день {r(v["avg_day"])}</div></div>'
+    )
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Разрез</p><h2>Пять точек, все цифры</h2></div><img class="logo" src="{LOGO.name}"></div>
-  <table>
-    <thead><tr><th>Точка</th><th class="num">Выручка</th><th class="num">Доля</th><th class="num">Чеки</th>
-    <th class="num">Средний / мед.</th><th class="num">Отмены</th><th class="num">Скидки</th><th class="num">День</th></tr></thead>
-    <tbody>
-      {row(oct_, True)}{row(karl, True)}{row(rosa)}{row(grand)}{row(puff)}
-    </tbody>
-  </table>
-  <div class="grid2" style="margin-top:22px">
-    <div class="card"><div class="l">Карта по точкам</div>
-      <div class="s">Октябрьская {r(oct_["card"])} · Карла {r(karl["card"])} · Роза {r(rosa["card"])} · Гранд {r(grand["card"])} · Puff {r(puff["card"])}</div></div>
-    <div class="card"><div class="l">Нал по точкам</div>
-      <div class="s">Октябрьская {r(oct_["cash"])} · Карла {r(karl["cash"])} · Роза {r(rosa["cash"])} · Гранд {r(grand["cash"])} · Puff {r(puff["cash"])}</div></div>
-  </div>
+  <div class="top"><div><p class="eyebrow">Разрез</p><h2>Пять точек</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="kpis k5">{''.join(vc)}</div>
 ''', 3))
 
-# 4 KK compare
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Kebab King</p><h2>Октябрьская в 1,88 раза больше Карла</h2>
-  <p class="sub">Средний чек почти тот же. Ломается не меню — ритм дня.</p></div><img class="logo" src="{LOGO.name}"></div>
-  <div class="grid2">
+  <div class="top"><div><p class="eyebrow">Kebab King</p><h2>Октябрьская в 1,88 раза больше</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="grid2" style="position:relative">
     <div class="card">
       <div class="l">Октябрьская</div>
-      <div class="v">{r(oct_["paid_total"])} ₽</div>
-      <ul class="ul">
-        <li>1 790 чеков · 30 смен · день {r(oct_["avg_day"])} ₽</li>
-        <li>мин {r(oct_["min_day"])} · макс {r(oct_["max_day"])}</li>
-        <li>обед 11–16: {r(oct_["lunch_11_16"]["revenue"])} ₽ / {r(oct_["lunch_11_16"]["receipts"])} чеков</li>
-        <li>вечер 17–23: {r(oct_["evening_17_23"]["revenue"])} ₽ / {r(oct_["evening_17_23"]["receipts"])} чеков</li>
-        <li>напиток на чек <b>{oct_["attach"]["drinks_per_ticket"]}</b> · фри {oct_["attach"]["fries_per_ticket"]}</li>
-        <li>скидки {r(oct_["discount_total"])} ₽ · отмены 3%</li>
-      </ul>
+      <div class="v">{r(oct_["paid_total"])}</div>
+      <div class="statrow">
+        <div><div class="k">Чеки</div><div class="n">1 790</div></div>
+        <div><div class="k">День</div><div class="n">{r(oct_["avg_day"])}</div></div>
+        <div><div class="k">Обед 11–16</div><div class="n">{r(oct_["lunch_11_16"]["revenue"])}</div></div>
+        <div><div class="k">Вечер 17–23</div><div class="n">{r(oct_["evening_17_23"]["revenue"])}</div></div>
+      </div>
     </div>
     <div class="card">
       <div class="l">Карла</div>
-      <div class="v">{r(karl["paid_total"])} ₽</div>
-      <ul class="ul">
-        <li>1 026 чеков · 31 смена (одна открыта 30.09)</li>
-        <li>мин {r(karl["min_day"])} · макс {r(karl["max_day"])} · день {r(karl["avg_day"])}</li>
-        <li>обед 11–16: {r(karl["lunch_11_16"]["revenue"])} ₽ / {r(karl["lunch_11_16"]["receipts"])} чеков</li>
-        <li>вечер 17–23: {r(karl["evening_17_23"]["revenue"])} ₽ / {r(karl["evening_17_23"]["receipts"])} чеков</li>
-        <li>напиток на чек <b>{karl["attach"]["drinks_per_ticket"]}</b> · фри {karl["attach"]["fries_per_ticket"]}</li>
-        <li>плюс 32 тыс. после полуночи — точка вечерняя</li>
-      </ul>
+      <div class="v">{r(karl["paid_total"])}</div>
+      <div class="statrow">
+        <div><div class="k">Чеки</div><div class="n">1 026</div></div>
+        <div><div class="k">День</div><div class="n">{r(karl["avg_day"])}</div></div>
+        <div><div class="k">Обед 11–16</div><div class="n">{r(karl["lunch_11_16"]["revenue"])}</div></div>
+        <div><div class="k">Вечер 17–23</div><div class="n">{r(karl["evening_17_23"]["revenue"])}</div></div>
+      </div>
     </div>
+    <div class="vs">VS</div>
   </div>
+  <div class="note">Средний чек почти тот же. Ломается не меню — дневной ритм.</div>
 ''', 4))
 
-# 5 hours
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Часы</p><h2>Октябрьская живёт весь день, Карла — с вечера</h2></div><img class="logo" src="{LOGO.name}"></div>
+  <div class="top"><div><p class="eyebrow">Часы</p><h2>Октябрьская — весь день. Карла — вечер.</h2></div><img class="logo" src="{LOGO}" alt=""></div>
   <div class="grid2">
     <div>
-      <div class="l" style="color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:13px">Октябрьская</div>
+      <div class="l" style="color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:15px;margin-bottom:12px">Октябрьская</div>
       <div class="hours">{hour_bars(oct_h, "#3f63e6")}</div>
     </div>
     <div>
-      <div class="l" style="color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:13px">Карла</div>
+      <div class="l" style="color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:15px;margin-bottom:12px">Карла</div>
       <div class="hours">{hour_bars(karl_h, "#8b7cff")}</div>
     </div>
   </div>
-  <div class="note" style="margin-top:28px">Пики Октябрьской — 12–13 и 20:00. Карла разгоняется после 17 и держит хвост до часа ночи. Если днём у входа на Карла есть люди — их недобираем. Если района днём нет — не ждать паритета тем же меню.</div>
 ''', 5))
 
-# 6 mix
-oct_items = oct_["top_items"]
-karl_items = karl["top_items"]
-def items_table(items):
-    rows = "".join(
-        f'<tr><td>{i["name"]}</td><td class="num">{r(i["qty"])}</td><td class="num">{r(i["revenue"])}</td></tr>'
-        for i in items[:8]
-    )
-    return f'<table><thead><tr><th>Позиция</th><th class="num">Шт</th><th class="num">₽</th></tr></thead><tbody>{rows}</tbody></table>'
-
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Номенклатура KK</p><h2>Шаурма 63–68%, курица / свинина 60 / 40</h2></div><img class="logo" src="{LOGO.name}"></div>
-  <div class="grid2">
-    <div class="card"><div class="l">Октябрьская · топ</div>{items_table(oct_items)}</div>
-    <div class="card"><div class="l">Карла · топ</div>{items_table(karl_items)}</div>
+  <div class="top"><div><p class="eyebrow">Допродажи</p><h2>На Карла не дожимают напиток</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="kpis k3">
+    <div class="card"><div class="l">Фри на чек</div><div class="v">0,22</div><div class="s">Октябрьская и Карла одинаково</div></div>
+    <div class="card"><div class="l">Дип на чек</div><div class="v">0,13</div><div class="s">Карла 0,12 — тоже рядом</div></div>
+    <div class="card"><div class="l">Напиток на чек</div><div class="v">0,35</div><div class="s">Карла только 0,24</div></div>
   </div>
-  <p class="sub" style="margin-top:16px">Комбо на Октябрьской: 10 наборов / 5 500 ₽ за месяц — наборами не торгуем. Дипы 0,13 и 0,12 на чек, фри одинаково 0,22–0,23. Дыра Карла — напиток (0,24 vs 0,35).</p>
+  <div class="note">Шаурма 63–68% выручки, курица / свинина 60 / 40 на обеих. Комбо: 10 наборов за месяц. Напиток на Карла — единственный живой рычаг.</div>
 ''', 6))
 
-# 7 shifts KK
-def openers(v):
-    rows = "".join(
-        f'<tr><td>{o["name"]}</td><td class="num">{o["shifts"]}</td><td class="num">{r(o["revenue"])}</td><td class="num">{r(o["avg_shift"])}</td></tr>'
-        for o in v["shift_openers"]
-    )
-    return f'<table><thead><tr><th>Кто открывал</th><th class="num">Смен</th><th class="num">Выручка</th><th class="num">На смену</th></tr></thead><tbody>{rows}</tbody></table>'
+# shifts as people cards
+def people(v):
+    bits = []
+    for o in v["shift_openers"]:
+        bits.append(
+            f'<div class="card person"><div class="who">{o["name"]}</div>'
+            f'<div class="v" style="font-size:40px;margin-top:16px">{r(o["avg_shift"])}</div>'
+            f'<div class="s">{o["shifts"]} смен · всего {r(o["revenue"])}</div></div>'
+        )
+    return "".join(bits)
 
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Смены KK</p><h2>Кто держал кассу</h2></div><img class="logo" src="{LOGO.name}"></div>
+  <div class="top"><div><p class="eyebrow">Смены</p><h2>Кто держал кассу</h2></div><img class="logo" src="{LOGO}" alt=""></div>
   <div class="grid2">
-    <div class="card"><div class="l">Октябрьская</div>{openers(oct_)}</div>
-    <div class="card"><div class="l">Карла</div>{openers(karl)}</div>
+    <div>
+      <p class="eyebrow" style="margin-bottom:16px">Октябрьская</p>
+      <div class="kpis k2">{people(oct_)}</div>
+    </div>
+    <div>
+      <p class="eyebrow" style="margin-bottom:16px">Карла</p>
+      <div class="kpis k2">{people(karl)}</div>
+    </div>
   </div>
-  <div class="note" style="margin-top:22px">Октябрьская ровная: Алёна чуть сильнее Умиды. На Карла Егор выше Андрея — часть разницы может быть графиком, не навыком. Смена #153 Егора на 30.09 ещё была открыта в выгрузке.</div>
+  <div class="note">Октябрьская ровная. На Карла разница Егора и Андрея может быть графиком.</div>
 ''', 7))
 
-# 8 rosa
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">MC Lounge Роза</p><h2>Ремонт. Зал на постоянниках. Списания — свои.</h2></div><img class="logo" src="{LOGO.name}"></div>
-  <div class="kpis">
-    <div class="card"><div class="l">Оплачено</div><div class="v">{r(rosa["paid_total"])} ₽</div><div class="s">по меню {r(rosa["subtotal"])}</div></div>
-    <div class="card"><div class="l">Чеки</div><div class="v">{r(rosa["paid_receipts"])}</div><div class="s">средний {r(rosa["avg_check"])} · мед. {r(rosa["median_check"])}</div></div>
-    <div class="card"><div class="l">Постоянники</div><div class="v">38 чаш</div><div class="s">28 500 ₽ · база, на которой зал стоит</div></div>
-    <div class="card"><div class="l">Классика</div><div class="v">67 чаш</div><div class="s">77 050 ₽ гостевых по полной</div></div>
+  <div class="top"><div><p class="eyebrow">Роза</p><h2>Ремонт. Постоянники. Свои списания.</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="kpis k4">
+    <div class="card"><div class="l">Оплачено</div><div class="v">{r(rosa["paid_total"])}</div><div class="s">142 чека · средний {r(rosa["avg_check"])}</div></div>
+    <div class="card"><div class="l">Постоянники</div><div class="v">38</div><div class="s">чаш · база зала</div></div>
+    <div class="card"><div class="l">Классика</div><div class="v">67</div><div class="s">чаш гостей по полной</div></div>
+    <div class="card"><div class="l">Стафф</div><div class="v">85</div><div class="s">чаш начальства · не дыра</div></div>
   </div>
-  <div class="grid2">
-    <div class="oknote">Списания под начальство (85 чаш стафф, 35 чеков по 100% на 54 600 ₽) — это мы, не дыра. В сентябре так и должно быть видно в кассе.</div>
-    <div class="note">Отмены 41 к 142. Баг учёта: отмена не возвращает табак на склад — ревизия будет расходиться. Это не «кто-то ворует».</div>
+  <div class="grid2" style="margin-top:22px">
+    <div class="note ok">Списания под начальство так и должны быть видны в кассе. Это мы.</div>
+    <div class="note">Смотреть снова после ремонта: появился ли гость сверх этой базы.</div>
   </div>
-  <p class="sub" style="margin-top:18px">Пик 21:00–01:00. Дарья 15 смен / 73 тыс., Тимур 11 / 30 тыс. Пиво в чеках 13,8 тыс. при Регионпиве 47 тыс. — закуп впрок или несколько точек, сверить приход. Смотреть Розу снова после ремонта: появился ли гость сверх этой базы.</p>
 ''', 8))
 
-# 9 grand puff
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Новые точки · с 15 сентября</p><h2>Гранд нащупал ядро, Puff пока дежурит</h2></div><img class="logo" src="{LOGO.name}"></div>
+  <div class="top"><div><p class="eyebrow">С 15 сентября</p><h2>Гранд нащупал ядро. Puff дежурит.</h2></div><img class="logo" src="{LOGO}" alt=""></div>
   <div class="grid2">
     <div class="card">
-      <div class="l">MC Гранд · 16 дней</div>
-      <div class="v">{r(grand["paid_total"])} ₽</div>
-      <ul class="ul">
-        <li>192 чека · день {r(grand["avg_day"])} · медиана 380 ₽</li>
-        <li>Ядро: карбонара 48 / 17,8 тыс., цезарь, капучино 44, американо 40</li>
-        <li>25–27.09 всплеск: 10,7 + <b>17,1</b> + 8,6 тыс. — разбирать и повторять</li>
-        <li>После 20:00 точка почти пустая</li>
-        <li>19 чеков по 100% / 16 430 ₽ на старте</li>
-        <li>Все 16 смен открывала Дёмкина</li>
-      </ul>
+      <div class="l">Гранд · 16 дней</div>
+      <div class="v">{r(grand["paid_total"])}</div>
+      <div class="statrow">
+        <div><div class="k">Чеки</div><div class="n">192</div></div>
+        <div><div class="k">День</div><div class="n">{r(grand["avg_day"])}</div></div>
+        <div><div class="k">Медиана</div><div class="n">380</div></div>
+        <div><div class="k">Пик 26.09</div><div class="n">17 060</div></div>
+      </div>
+      <div class="s" style="margin-top:22px;font-size:20px">Карбонара, цезарь, капучино. После 20:00 пусто.</div>
     </div>
     <div class="card">
       <div class="l">Puff · 14 смен</div>
-      <div class="v">{r(puff["paid_total"])} ₽</div>
-      <ul class="ul">
-        <li>17 чеков · 18 классических чаш по 1 500</li>
-        <li>Шесть смен из четырнадцати — ноль</li>
-        <li>Суббота живее (8 чаш), будни часто пустые</li>
-        <li>28 сентября смены не было</li>
-        <li>Пока нет трафика — не кормить отдельной сменой каждый день</li>
-      </ul>
+      <div class="v">{r(puff["paid_total"])}</div>
+      <div class="statrow">
+        <div><div class="k">Чеки</div><div class="n">17</div></div>
+        <div><div class="k">Чаши</div><div class="n">18</div></div>
+        <div><div class="k">Нулевые смены</div><div class="n">6 из 14</div></div>
+        <div><div class="k">Суббота</div><div class="n">8 чаш</div></div>
+      </div>
+      <div class="s" style="margin-top:22px;font-size:20px">Пока нет трафика — не кормить отдельной сменой каждый день.</div>
     </div>
   </div>
 ''', 9))
 
-# 10 bank official
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Выписка Сбера · официальные итоги</p><h2>Пришло 1,97 млн · ушло 1,89 млн</h2></div><img class="logo" src="{LOGO.name}"></div>
-  <div class="kpis">
-    <div class="card"><div class="l">Входящий</div><div class="v">{r(B["official"]["opening_balance"], 2)}</div></div>
-    <div class="card"><div class="l">Кредит · 220 оп.</div><div class="v">{r(B["official"]["credit_turnover"], 2)}</div><div class="s">эквайринг и прочие зачисления</div></div>
-    <div class="card"><div class="l">Дебет · 918 оп.</div><div class="v">{r(B["official"]["debit_turnover"], 2)}</div><div class="s">поставщики, выводы, магазины, вклад</div></div>
-    <div class="card"><div class="l">Исходящий</div><div class="v">{r(B["official"]["closing_balance"], 2)}</div></div>
+  <div class="top"><div><p class="eyebrow">Счёт ИП</p><h2>Пришло 1,97 млн · ушло 1,89 млн</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="kpis k4">
+    <div class="card"><div class="l">Входящий</div><div class="v">{r(B["official"]["opening_balance"])}</div></div>
+    <div class="card"><div class="l">Пришло</div><div class="v">{r(B["official"]["credit_turnover"])}</div><div class="s">220 операций</div></div>
+    <div class="card"><div class="l">Ушло</div><div class="v">{r(B["official"]["debit_turnover"])}</div><div class="s">918 операций</div></div>
+    <div class="card"><div class="l">На счёте</div><div class="v">{r(B["official"]["closing_balance"])}</div></div>
   </div>
-  <div class="note">Эквайринг нетто по мерчантам ≈ {r(B["acquiring_net_by_merchant_approx"]["total"])} ₽ при карте в POS {r(T["card"])} ₽. Разница — комиссия ~2,5–2,7%, T+1 и 30-е. Мерчант …64405 почти рубль в рубль совпал с Карла. Нал {r(T["cash"])} ₽ из кассы в выписку не попадает. Переводы во вклад — не расход.</div>
-  <p class="sub" style="margin-top:18px">PDF повёрнут: контрагенты ниже — ориентир. Официальные обороты сняты с последней страницы и сходятся.</p>
+  <div class="note">Эквайринг ≈ {r(B["acquiring_net_by_merchant_approx"]["total"])} при карте в кассе {r(T["card"])}. Нал кассы {r(T["cash"])} в выписку не попадает. Вклад — не расход.</div>
 ''', 10))
 
-# 11 owner / payroll
-od = B["predprinimatelskiy_dohod_to_demkina"]
-def draw_row(o):
-    cls = ' class="hi"' if o["role"] == "payroll_window" else ""
-    role = "зарплатное окно" if o["role"] == "payroll_window" else "себе"
-    return f'<tr{cls}><td>{o["date"][8:10]}.09</td><td class="num">{r(o["amount"])}</td><td>{role}</td></tr>'
-
-rows = "".join(draw_row(o) for o in od["ops"])
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Выводы со счёта</p><h2>«Доход от предпринимательской» = заработкок</h2>
-  <p class="sub">Кроме 15–16 числа — это чаще зарплаты. 16-го вывода не было.</p></div><img class="logo" src="{LOGO.name}"></div>
-  <div class="grid2">
-    <div class="card" style="max-height:720px;overflow:hidden">
-      <table><thead><tr><th>Дата</th><th class="num">Сумма</th><th>Как читаем</th></tr></thead><tbody>{rows}</tbody></table>
-    </div>
-    <div>
-      <div class="card" style="margin-bottom:14px"><div class="l">Себе за месяц</div><div class="v">{r(od["owner_ex_15_16"])} ₽</div><div class="s">без 58 000 ₽ 15 сентября</div></div>
-      <div class="card" style="margin-bottom:14px"><div class="l">Белый ФОТ 15.09</div><div class="v">{r(18620+78870)} ₽</div><div class="s">реестр 77 — 18 620 · реестр 76 — 78 870 · договор 83390253</div></div>
-      <div class="card"><div class="l">Если 58 тыс. тоже зарплата</div><div class="v">{r(B["payroll_visible_if_15th_draw_is_salary"])} ₽</div><div class="s">видимое окно середины месяца. Краснобродская 80,6 тыс. 14.09 рядом, статью не размечали.</div></div>
-    </div>
+  <div class="top"><div><p class="eyebrow">Выводы</p><h2>Себе — 238 500. Пятнадцатое — зарплаты.</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="kpis k3">
+    <div class="card"><div class="l">Себе</div><div class="v">{r(od["owner_ex_15_16"])}</div><div class="s">«доход от предпринимательской» без 15.09</div></div>
+    <div class="card"><div class="l">Белый ФОТ 15.09</div><div class="v">{r(18620+78870)}</div><div class="s">реестры 77 и 76 через Сбер</div></div>
+    <div class="card"><div class="l">Ещё 15.09</div><div class="v">58 000</div><div class="s">тоже зарплатное окно, не себе</div></div>
   </div>
+  <div class="note">16-го такого вывода не было. Если 58 тыс. тоже зарплата — видимое окно ≈ 155 тыс.</div>
 ''', 11))
 
-# 12 suppliers
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Поставщики · безнал</p><h2>То, что берём по счетам</h2></div><img class="logo" src="{LOGO.name}"></div>
-  <table>
-    <thead><tr><th>Контрагент</th><th class="num">Сумма</th><th>Платежей</th><th>Комментарий</th></tr></thead>
-    <tbody>
-      <tr><td>ООО «МАРР Россия»</td><td class="num">354 087</td><td>7</td><td>Основной продуктовый контур KK</td></tr>
-      <tr><td>ООО «Мистер Крабс»</td><td class="num">66 654</td><td>4</td><td>Регулярный поставщик в течение месяца</td></tr>
-      <tr><td>ООО «Регионпиво»</td><td class="num">47 118</td><td>1</td><td>5.09 · пиво в чеках Розы ~13,8 тыс.</td></tr>
-      <tr><td>ООО «Курьер Плюс»</td><td class="num">17 430</td><td>1</td><td>8.09</td></tr>
-      <tr><td>ООО РВБ / Wildberries Bank</td><td class="num">16 909</td><td>1</td><td>Счёт на товары, отдельно от карты WB</td></tr>
-      <tr><td>ООО «Доксинбокс»</td><td class="num">5 160</td><td>1</td><td>Сервис документов</td></tr>
-    </tbody>
-  </table>
-  <p class="sub" style="margin-top:22px">Итого узнаваемых счетов ≈ 507 тыс. Это не вся себестоимость: часть еды, химии и мелочи уходит картой в магазины — следующий слайд.</p>
+  <div class="top"><div><p class="eyebrow">Поставщики</p><h2>То, что уходит по счетам</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  {hbar_row("МАРР Россия", 354087, 354087)}
+  {hbar_row("Мистер Крабс", 66654, 354087)}
+  {hbar_row("Регионпиво", 47118, 354087)}
+  {hbar_row("Курьер Плюс", 17430, 354087)}
+  {hbar_row("WB / РВБ", 16909, 354087)}
+  {hbar_row("Доксинбокс", 5160, 354087)}
+  <div class="note">≈ 507 тыс. узнаваемых счетов. Дальше — то, чего у поставщика нет.</div>
 ''', 12))
 
-# 13 street intro
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Карта ИП · магазины</p><h2>Закуп, который нельзя закрыть поставщиком</h2>
-  <p class="sub">Срочно, мелко, нет в прайсе МАРР, другой город, упаковка, алкоголь в рознице, бытовое.</p></div><img class="logo" src="{LOGO.name}"></div>
-  <div class="kpis kpis5">
-    <div class="card"><div class="l">Улица / еда</div><div class="v">{r(street_sum)}</div><div class="s">Пятёрочка, Магнит, Монетка, локальные</div></div>
-    <div class="card"><div class="l">Упаковка и расходники</div><div class="v">{r(buckets.get("pack",{}).get("amount",0))}</div><div class="s">Мир упаковки, Fix Price, Клади-пакуй</div></div>
-    <div class="card"><div class="l">Красное &amp; Белое</div><div class="v">{r(merch_amt("Красное & Белое"))}</div><div class="s">{merch_n("Красное & Белое")} покупок · розница к Регионпиву</div></div>
-    <div class="card"><div class="l">Маркетплейсы</div><div class="v">{r(merch_amt("Wildberries")+merch_amt("YM*avito"))}</div><div class="s">WB карта + Avito, плюс счёт РВБ 16,9 тыс.</div></div>
-    <div class="card"><div class="l">Без названия CH450</div><div class="v">{r(unlab_sum)}</div><div class="s">Сбер обрезал имя точки в выписке</div></div>
+  <div class="top"><div><p class="eyebrow">Карта ИП</p><h2>Добор, который нельзя закрыть счётом</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="kpis k5">
+    <div class="card"><div class="l">Еда с улицы</div><div class="v">{r(street_sum)}</div><div class="s">Пятёрочка, Магнит, Монетка</div></div>
+    <div class="card"><div class="l">Упаковка</div><div class="v">{r(merch_amt("Мир упаковки")+merch_amt("Fix Price")+merch_amt("Клади-пакуй"))}</div><div class="s">Мир упаковки и Fix Price</div></div>
+    <div class="card"><div class="l">К&amp;Б</div><div class="v">{r(merch_amt("Красное & Белое"))}</div><div class="s">розн. к Регионпиву</div></div>
+    <div class="card"><div class="l">Маркетплейсы</div><div class="v">{r(merch_amt("Wildberries")+merch_amt("YM*avito"))}</div><div class="s">WB + Avito</div></div>
+    <div class="card"><div class="l">CH450 без имени</div><div class="v">{r(unlab_sum)}</div><div class="s">Сбер обрезал вывеску</div></div>
   </div>
-  <div class="note warn">Суммы карточных покупок собраны с повёрнутого PDF: мерчант + следующая операция VO 17. Это ориентир, не сверка 1:1 с банком. Официальный дебет месяца — 1 885 929 ₽, в нём ещё вклад, МАРР, ФОТ и выводы.</div>
-  <p class="sub" style="margin-top:18px">Имеет смысл завести статью «розничный добор» и не смешивать её с МАРР. Это нормальный opex общепита, просто дороже счёта поставщика.</p>
+  <div class="note">Срочно, мелко, нет в прайсе МАРР. Ориентир с выписки, не сверка 1:1.</div>
 ''', 13))
 
-# 14 street detail
-street_rows = "".join(
-    f'<tr><td>{n}</td><td class="num">{nn}</td><td class="num">{r(a)}</td><td class="num">{r(a/nn) if nn else "—"}</td></tr>'
-    for n,a,nn in sorted(street, key=lambda x:-x[1])
-)
+top_street = sorted(street, key=lambda x: -x[1])[:6]
+mx = top_street[0][1]
+bars = "".join(hbar_row(n, a, mx, f" · {nn}") for n, a, nn in top_street)
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Розничный добор еды</p><h2>Пятёрочка, Магнит, Монетка и локальные</h2>
-  <p class="sub">Сумма {r(street_sum)} ₽ · {sum(n for _,_,n in street)} покупок. Типичный чек 400–550 ₽ — докупка, не фура.</p></div><img class="logo" src="{LOGO.name}"></div>
-  <div class="grid2">
-    <table>
-      <thead><tr><th>Магазин</th><th class="num">Чеков</th><th class="num">₽</th><th class="num">Средний</th></tr></thead>
-      <tbody>{street_rows}</tbody>
-    </table>
-    <div>
-      <div class="card" style="margin-bottom:14px"><div class="l">Три сети</div>
-        <div class="s">Пятёрочка {r(merch_amt("Пятёрочка"))} / {merch_n("Пятёрочка")} чеков<br>
-        Магнит {r(merch_amt("Магнит"))} / {merch_n("Магнит")}<br>
-        Монетка {r(merch_amt("Монетка"))} / {merch_n("Монетка")}</div></div>
-      <div class="oknote">Это как раз закуп, который у МАРР не взять: зелень к вечеру, молоко, мелочь на смену, то что кончилось в зале. Не путать с «личными тратами», пока не разметим карту. Часть чеков наверняка смешанная.</div>
-    </div>
-  </div>
+  <div class="top"><div><p class="eyebrow">Розничный добор еды</p><h2>{r(street_sum)} ₽ · типичный чек 400–550</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  {bars}
+  <div class="note ok">Зелень к вечеру, молоко, мелочь на смену. Не МАРР и не «непонятные траты» — завести статьёй.</div>
 ''', 14))
 
-# 15 pack alcohol wb
-pack_rows = f'''
-<tr><td>Мир упаковки</td><td class="num">{merch_n("Мир упаковки")}</td><td class="num">{r(merch_amt("Мир упаковки"))}</td><td>Крупные завозы 7.09 / 14.09 / 28.09 (19,7 · 12,3 · 21,9 тыс.)</td></tr>
-<tr><td>Fix Price</td><td class="num">{merch_n("Fix Price")}</td><td class="num">{r(merch_amt("Fix Price"))}</td><td>Расходники, пакеты, бытовое · 4 точки</td></tr>
-<tr><td>Клади-пакуй</td><td class="num">{merch_n("Клади-пакуй")}</td><td class="num">{r(merch_amt("Клади-пакуй"))}</td><td>Упаковка</td></tr>
-<tr><td>Galamart</td><td class="num">{merch_n("GALAMART")}</td><td class="num">{r(merch_amt("GALAMART"))}</td><td></td></tr>
-<tr><td>Красное &amp; Белое</td><td class="num">{merch_n("Красное & Белое")}</td><td class="num">{r(merch_amt("Красное & Белое"))}</td><td>Розн. алкоголь к счёту Регионпива</td></tr>
-<tr><td>Wildberries карта</td><td class="num">{merch_n("Wildberries")}</td><td class="num">{r(merch_amt("Wildberries"))}</td><td>Плюс счёт РВБ 16 909 ₽</td></tr>
-<tr><td>Avito</td><td class="num">{merch_n("YM*avito")}</td><td class="num">{r(merch_amt("YM*avito"))}</td><td></td></tr>
-<tr><td>Tabysh</td><td class="num">{merch_n("Tabysh")}</td><td class="num">{r(merch_amt("Tabysh"))}</td><td>Локальная точка, 10 чеков</td></tr>
-'''
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Упаковка · алкоголь · маркетплейсы</p><h2>Крупнее продуктового добора</h2></div><img class="logo" src="{LOGO.name}"></div>
-  <table>
-    <thead><tr><th>Где</th><th class="num">Чеков</th><th class="num">₽</th><th>Заметка</th></tr></thead>
-    <tbody>{pack_rows}</tbody>
-  </table>
-  <p class="sub" style="margin-top:20px">Мир упаковки + Fix Price ≈ {r(merch_amt("Мир упаковки")+merch_amt("Fix Price"))} ₽. Это уже не «заскочил в пятёрочку», а отдельная статья. К&amp;Б {r(merch_amt("Красное & Белое"))} рядом с Регионпивом 47 тыс. — либо срочный добор, либо ассортимент, которого нет у оптовика.</p>
+  <div class="top"><div><p class="eyebrow">Крупнее добора</p><h2>Упаковка, алкоголь, маркетплейсы</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="kpis k4">
+    <div class="card"><div class="l">Мир упаковки</div><div class="v">{r(merch_amt("Мир упаковки"))}</div><div class="s">три завоза 7 / 14 / 28.09</div></div>
+    <div class="card"><div class="l">Fix Price</div><div class="v">{r(merch_amt("Fix Price"))}</div><div class="s">{merch_n("Fix Price")} покупок · расходники</div></div>
+    <div class="card"><div class="l">Красное &amp; Белое</div><div class="v">{r(merch_amt("Красное & Белое"))}</div><div class="s">рядом с оптом 47 тыс.</div></div>
+    <div class="card"><div class="l">Wildberries</div><div class="v">{r(merch_amt("Wildberries"))}</div><div class="s">плюс счёт РВБ 16 909</div></div>
+  </div>
+  <div class="note">Упаковка + Fix Price ≈ {r(merch_amt("Мир упаковки")+merch_amt("Fix Price"))} ₽. Это уже не «заскочил в пятёрочку».</div>
 ''', 15))
 
-# 16 unlabeled + yandex + services
-ch_rows = "".join(
-    f'<tr><td>{n}</td><td class="num">{nn}</td><td class="num">{r(a)}</td></tr>'
-    for n,a,nn in sorted(unlab, key=lambda x:-x[1])
-)
+ch_sorted = sorted(unlab, key=lambda x: -x[1])
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Что выписка не назвала</p><h2>Терминалы CH450xx и сервисы</h2>
-  <p class="sub">Сбер в назначении пишет код точки, не вывеску. {r(unlab_sum)} ₽ — скорее ещё розница, не переводы.</p></div><img class="logo" src="{LOGO.name}"></div>
-  <div class="grid2">
-    <div class="card">
-      <div class="l">Обрезанные имена</div>
-      <table><thead><tr><th>Код</th><th class="num">Чеков</th><th class="num">₽</th></tr></thead><tbody>{ch_rows}</tbody></table>
-    </div>
-    <div>
-      <div class="card" style="margin-bottom:14px"><div class="l">Яндекс</div>
-        <div class="v">{r(merch_amt("Яндекс (5814)")+merch_amt("Яндекс (директ?)")+merch_amt("Яндекс Плюс"))}</div>
-        <div class="s">5814 — {r(merch_amt("Яндекс (5814)"))} · директ? {r(merch_amt("Яндекс (директ?)"))} · Плюс {r(merch_amt("Яндекс Плюс"))}. Не размечали: реклама / доставка / лавка.</div></div>
-      <div class="card" style="margin-bottom:14px"><div class="l">Сервисы</div>
-        <div class="s">CK*PAYTOOL {r(merch_amt("CK*PAYTOOL"))} · Timeweb {r(merch_amt("TIMEWEB.CLOUD"))} · ваучер {r(merch_amt("VP*VAUCHER"))} · стоматология {r(merch_amt("STOMATOLOGIYA TARI"))} · T2 / VK — мелочь. Часть явно личная.</div></div>
-      <div class="note">Если открыть в СберБизнесе оригинальные имена CH450 — розничный добор, скорее всего, вырастет. Это следующий уточняющий файл, не дыра.</div>
-    </div>
+  <div class="top"><div><p class="eyebrow">Слепой кусок</p><h2>CH450 — {r(unlab_sum)} ₽ без вывески</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="kpis k4">
+    {''.join(f'<div class="card"><div class="l">{n}</div><div class="v">{r(a)}</div><div class="s">{nn} покупок</div></div>' for n,a,nn in ch_sorted)}
   </div>
+  <div class="note">Сбер пишет код точки, не имя. Открыть в СберБизнесе — розничный добор, скорее всего, вырастет.</div>
 ''', 16))
 
-# 17 money map
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Карта месяца</p><h2>Куда уехали безнал-деньги, которые мы видим</h2></div><img class="logo" src="{LOGO.name}"></div>
-  <div class="grid3">
-    <div class="card"><div class="l">Себе</div><div class="v">{r(od["owner_ex_15_16"])}</div><div class="s">доход от предпр. без 15.09</div></div>
-    <div class="card"><div class="l">ФОТ видимый</div><div class="v">{r(18620+78870)}</div><div class="s">реестры Сбера 15.09 · плюс возможно 58 тыс.</div></div>
-    <div class="card"><div class="l">МАРР + Крабс</div><div class="v">{r(354087+66654)}</div><div class="s">основной продуктовый контур</div></div>
-    <div class="card"><div class="l">Пиво опт + К&amp;Б</div><div class="v">{r(47118+merch_amt("Красное & Белое"))}</div><div class="s">Регионпиво и розница</div></div>
-    <div class="card"><div class="l">Упаковка</div><div class="v">{r(merch_amt("Мир упаковки")+merch_amt("Fix Price")+merch_amt("Клади-пакуй"))}</div><div class="s">счета + карта</div></div>
-    <div class="card"><div class="l">Магазины еды</div><div class="v">{r(street_sum)}</div><div class="s">добор, которого нет у поставщика</div></div>
+  <div class="top"><div><p class="eyebrow">Безнал, который виден</p><h2>Куда уехали деньги</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="kpis k3">
+    <div class="card"><div class="l">Себе</div><div class="v">{r(od["owner_ex_15_16"])}</div></div>
+    <div class="card"><div class="l">ФОТ 15.09</div><div class="v">{r(18620+78870)}</div></div>
+    <div class="card"><div class="l">МАРР + Крабс</div><div class="v">{r(354087+66654)}</div></div>
+    <div class="card"><div class="l">Пиво опт + К&amp;Б</div><div class="v">{r(47118+merch_amt("Красное & Белое"))}</div></div>
+    <div class="card"><div class="l">Упаковка</div><div class="v">{r(merch_amt("Мир упаковки")+merch_amt("Fix Price")+merch_amt("Клади-пакуй"))}</div></div>
+    <div class="card"><div class="l">Магазины еды</div><div class="v">{r(street_sum)}</div></div>
   </div>
-  <div class="note" style="margin-top:22px">Не хватает аренды, полного ФОТа наличными, коммуналки и налогов. Пока это карта безнала, не P&amp;L точек. Нал кассы {r(T["cash"])} ₽ живёт отдельно.</div>
+  <div class="note">Нет аренды, полного ФОТа налом и коммуналки. Это карта безнала, не прибыль точек.</div>
 ''', 17))
 
-# 18 takeaways
+takes = [
+    ("01", "Октябрьскую не ломать", "56% сети. Обед равен вечеру."),
+    ("02", "Карла — день и напиток", "Вечер уже есть. 0,24 напитка против 0,35."),
+    ("03", "Розу не лечить", "Ремонт, постоянники, списания на своих."),
+    ("04", "Гранд — ядро меню", "Карбонара, цезарь, капучино. Повторить 26.09."),
+    ("05", "Добор — отдельная статья", f"Пятёрочка / Магнит / Монетка {r(merch_amt('Пятёрочка')+merch_amt('Магнит')+merch_amt('Монетка'))} ₽."),
+    ("06", "Открыть имена CH450", f"Ещё {r(unlab_sum)} ₽ без вывески в СберБизнесе."),
+]
+take_html = "".join(
+    f'<div class="take"><div class="num">{n}</div><div><b>{t}</b><span>{s}</span></div></div>'
+    for n, t, s in takes
+)
 slides.append(slide(f'''
-  <div class="top"><div><p class="eyebrow">Октябрь</p><h2>Что делать, а что не трогать</h2></div><img class="logo" src="{LOGO.name}"></div>
-  <ul class="ul biglist">
-    <li><b>Октябрьскую не ломать.</b> 56% сети, ровный месяц, обед = вечер.</li>
-    <li><b>Карла — день и напиток.</b> Вечер уже есть. 0,24 напитка на чек vs 0,35 на Октябрьской. Комбо не работает.</li>
-    <li><b>Розу не лечить.</b> Ремонт, постоянники, списания на своих. Смотреть после открытия зала.</li>
-    <li><b>Гранд — ядро меню</b> (карбонара, цезарь, капучино) и пик 26.09. Puff не кормить пустыми сменами.</li>
-    <li><b>Розничный добор завести статьёй.</b> Пятёрочка / Магнит / Монетка {r(merch_amt("Пятёрочка")+merch_amt("Магнит")+merch_amt("Монетка"))} ₽ — нормальный opex, не «непонятные траты».</li>
-    <li><b>Открыть имена CH450</b> в СберБизнесе — там ещё {r(unlab_sum)} ₽ без вывески.</li>
-  </ul>
+  <div class="top"><div><p class="eyebrow">Октябрь</p><h2>Что делать</h2></div><img class="logo" src="{LOGO}" alt=""></div>
+  <div class="grid3">{take_html}</div>
 ''', 18))
 
 html = f'''<!doctype html>
@@ -588,8 +573,6 @@ html = f'''<!doctype html>
 <head>
 <meta charset="utf-8">
 <title>Imperial MC · Сентябрь 2026</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>{CSS}</style>
 </head>
 <body>
@@ -597,7 +580,5 @@ html = f'''<!doctype html>
 </body>
 </html>
 '''
-
-out = ROOT / "september-2026.html"
-out.write_text(html, encoding="utf-8")
-print("wrote", out, "slides", len(slides))
+(ROOT / "september-2026.html").write_text(html, encoding="utf-8")
+print("slides", len(slides), "html", (ROOT / "september-2026.html").stat().st_size)
