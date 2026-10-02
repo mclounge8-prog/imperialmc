@@ -131,6 +131,8 @@ def write_md(rows: list[dict], totals: dict) -> str:
         "",
         "## Полная таблица: было → стало",
         "",
+        "CSV с колонкой заведения (строка = точка + позиция): `abc-by-venue.csv`.",
+        "",
         "| Класс | Категория | Позиция | Шт/сент | Было | Стало | Факт % | Точки |",
         "|---|---|---|---:|---:|---:|---:|---|",
     ]
@@ -162,6 +164,44 @@ def main() -> None:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
         w.writerows(rows)
+
+    by_key = {(r["cat"], r["name"]): r for r in rows}
+    venue_rows = []
+    for raw in load_items():
+        key = (raw["cat"], raw["name"])
+        rec = by_key[key]
+        extra_rev = (rec["new"] - rec["current"]) * raw["qty"]
+        venue_rows.append(
+            {
+                "Заведение": raw["venue"],
+                "Класс": rec["abc"],
+                "Категория": rec["cat"],
+                "Позиция": rec["name"],
+                "Шт_сентябрь": int(raw["qty"]),
+                "Было": rec["current"],
+                "Стало": rec["new"],
+                "Цель_%": rec["pct_target"],
+                "Факт_%": rec["actual_pct"],
+                "Прибавка_за_шт": rec["new"] - rec["current"],
+                "Прибавка_выручка": extra_rev,
+            }
+        )
+    venue_rows.sort(
+        key=lambda x: (
+            x["Заведение"],
+            x["Класс"] == "—",
+            x["Класс"],
+            -x["Прибавка_выручка"],
+            x["Категория"],
+            x["Позиция"],
+        )
+    )
+    venue_csv = ROOT / "abc-by-venue.csv"
+    with venue_csv.open("w", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=list(venue_rows[0].keys()))
+        w.writeheader()
+        w.writerows(venue_rows)
+
     md = write_md(rows, totals)
     (ROOT / "ABC.md").write_text(md, encoding="utf-8")
     (ROOT / "abc-figures.json").write_text(
