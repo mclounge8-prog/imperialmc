@@ -52,4 +52,6 @@
 | Дип / кофе 3в1 | 50 | 60 | 60 | 60 |
 | Чай KK | 30 | 40 | 40 | 40 |
 
-Полные прайсы: `prices-5-10.csv` (147 позиций сети × 6 шагов), `prices-by-venue.csv`, `figures.json`.
+Рекомендуемая смешанная шкала (A 5% / B 8% / C 10%): [`ABC.md`](./ABC.md), `abc-was-became.csv`.
+
+Полные прайсы плоских шагов: `prices-5-10.csv`, `prices-by-venue.csv`, `figures.json`.
