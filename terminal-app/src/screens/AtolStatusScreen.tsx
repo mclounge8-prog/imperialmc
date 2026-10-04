@@ -32,6 +32,7 @@ const TYPE_LABELS: Record<string, string> = {
   close_shift: 'Закрытие смены',
   x_report: 'X-отчёт',
   receipt: 'Чек',
+  receipt_return: 'Возврат',
   cash_in: 'Внесение',
   cash_out: 'Инкассация',
 };
@@ -347,6 +348,11 @@ export default function AtolStatusScreen() {
                 {job.fiscalSign ? ` · ФПД ${job.fiscalSign}` : ''}
               </Text>
               {job.lastError ? <Text style={styles.jobError}>{job.lastError}</Text> : null}
+              {canRetry(job) && (job.type === 'receipt' || job.type === 'receipt_return') ? (
+                <Text style={styles.jobHint}>
+                  Повтор сначала сверит ленту кассы. Если чек уже пробит — второй раз не напечатает.
+                </Text>
+              ) : null}
               {canRetry(job) ? (
                 <View style={styles.jobActions}>
                   <Pressable
@@ -446,6 +452,7 @@ const styles = StyleSheet.create({
   jobStatus: { fontSize: 13, fontWeight: '700' },
   jobMeta: { color: colors.textMuted, fontSize: 12 },
   jobError: { color: colors.danger, fontSize: 12, marginTop: 2 },
+  jobHint: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
   jobActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   retryButton: {
     borderWidth: 1,

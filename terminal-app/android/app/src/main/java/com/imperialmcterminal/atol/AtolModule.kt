@@ -79,13 +79,42 @@ class AtolModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMo
         return
       }
 
+      val taskType = JSONObject(taskJson).optString("type", "")
+      if (taskType == "__queryLastDocument") {
+        val last = queryLastDocumentAsJson(fptr)
+        if (last == null) {
+          promise.reject(
+            "ATOL_NO_LAST_DOCUMENT",
+            fptr.errorDescription() ?: "Не удалось прочитать последний документ ФН"
+          )
+        } else {
+          promise.resolve(last)
+        }
+        return
+      }
+
+      // sell/sellReturn: запоминаем ФД до отправки. Если касса пробила, но
+      // processJson вернул ошибку/пустой JSON — зачитываем новый ФД, а не
+      // отдаём failure (иначе очередь шлёт тот же чек второй раз).
+      val isFiscalPrint = taskType == "sell" || taskType == "sellReturn"
+      val beforeDoc = if (isFiscalPrint) queryLastDocNumber(fptr) else -1L
+
       fptr.setParam(IFptr.LIBFPTR_PARAM_JSON_DATA, taskJson)
       fptr.processJson()
-      if (fptr.errorCode() != 0) {
-        promise.reject(
-          "ATOL_${fptr.errorCode()}",
-          fptr.errorDescription() ?: "Касса вернула ошибку"
-        )
+      val processError = fptr.errorCode()
+      val processErrorDesc = fptr.errorDescription() ?: "Касса вернула ошибку"
+
+      if (isFiscalPrint && beforeDoc >= 0) {
+        val afterJson = queryLastDocumentAsJson(fptr)
+        val afterDoc = parseDocNumber(afterJson)
+        if (afterDoc != null && afterDoc > beforeDoc) {
+          promise.resolve(afterJson)
+          return
+        }
+      }
+
+      if (processError != 0) {
+        promise.reject("ATOL_$processError", processErrorDesc)
         return
       }
 
@@ -122,6 +151,27 @@ class AtolModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMo
    * Собирает JSON вида {"fiscalParams":{...},"_source":"fnQueryData_lastDocument"}
    * из классического запроса последнего документа ФН. null — если не удалось.
    */
+  private fun queryLastDocNumber(fptr: Fptr): Long {
+    fptr.setParam(IFptr.LIBFPTR_PARAM_FN_DATA_TYPE, IFptr.LIBFPTR_FNDT_LAST_DOCUMENT)
+    fptr.fnQueryData()
+    if (fptr.errorCode() != 0) {
+      return -1L
+    }
+    return fptr.getParamInt(IFptr.LIBFPTR_PARAM_DOCUMENT_NUMBER)
+  }
+
+  private fun parseDocNumber(json: String?): Long? {
+    if (json.isNullOrBlank()) return null
+    return try {
+      val root = JSONObject(json)
+      val fp = root.optJSONObject("fiscalParams") ?: root
+      val doc = fp.optLong("fiscalDocumentNumber", -1L)
+      if (doc > 0) doc else null
+    } catch (_: Exception) {
+      null
+    }
+  }
+
   private fun queryLastDocumentAsJson(fptr: Fptr): String? {
     fptr.setParam(IFptr.LIBFPTR_PARAM_FN_DATA_TYPE, IFptr.LIBFPTR_FNDT_LAST_DOCUMENT)
     fptr.fnQueryData()
@@ -140,6 +190,15 @@ class AtolModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMo
     wrapper.put("fiscalParams", fiscalParams)
     wrapper.put("_source", "fnQueryData_lastDocument")
     return wrapper.toString()
+  }
+
+  /**
+   * Последний документ ФН без печати. Нужен очереди, чтобы не слать
+   * повторный sell, если первая попытка уже пробила чек.
+   */
+  @ReactMethod
+  fun queryLastDocument(settingsJson: String, promise: Promise) {
+    runTask(settingsJson, """{"type":"__queryLastDocument"}""", promise)
   }
 
   /**

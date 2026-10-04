@@ -3,9 +3,21 @@ import {
   fetchNextFiscalJob,
   reportFiscalJobResult,
   type AtolSettings,
+  type FiscalJob,
 } from '../api/client';
 import { notifyFiscalError } from '../context/FiscalAlertsContext';
-import { isAtolAvailablePlatform, runAtolTask } from '../native/atol';
+import {
+  isAtolAvailablePlatform,
+  queryLastFiscalDocument,
+  runAtolTask,
+  type AtolConnectionSettings,
+} from '../native/atol';
+import {
+  extractResponseFields,
+  isSellLikeJob,
+  receiptHasFiscalDoc,
+  shouldAdoptLastDocument,
+} from './fiscalReconcile';
 
 // Настройки читаем на каждый проход очереди (раз в ~15с). Раньше кэш на
 // всю сессию ломал Карлу/новые точки: включили АТОЛ в бэкофисе, а терминал
@@ -16,38 +28,6 @@ async function getSettings(venueId: number, token: string): Promise<AtolSettings
 
 export function invalidateAtolSettingsCache(_venueId?: number): void {
   // no-op: кэш убран; функция оставлена для старых вызовов/OTA-совместимости
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object') return null;
-  return value as Record<string, unknown>;
-}
-
-function coerceNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value.trim() !== '') {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-
-function extractResponseFields(response: unknown): {
-  fiscalDocNumber: number | null;
-  fiscalSign: string | null;
-  fiscalDatetime: string | null;
-} {
-  const root = asRecord(response);
-  if (!root) {
-    return { fiscalDocNumber: null, fiscalSign: null, fiscalDatetime: null };
-  }
-  const fp = asRecord(root.fiscalParams) ?? root;
-  const doc = coerceNumber(fp.fiscalDocumentNumber ?? fp.documentNumber ?? null);
-  const signRaw = fp.fiscalDocumentSign ?? fp.fiscalSign ?? null;
-  const sign = signRaw == null || signRaw === '' ? null : String(signRaw);
-  const dtRaw = fp.fiscalDocumentDateTime ?? null;
-  const fiscalDatetime = typeof dtRaw === 'string' && dtRaw ? dtRaw : null;
-  return { fiscalDocNumber: doc, fiscalSign: sign, fiscalDatetime };
 }
 
 function jobTypeLabel(type: string): string {
@@ -61,6 +41,44 @@ function jobTypeLabel(type: string): string {
   if (type === 'cash_in') return 'Внесение';
   if (type === 'cash_out') return 'Инкассация';
   return type;
+}
+
+function connectionOf(settings: AtolSettings): AtolConnectionSettings {
+  return {
+    ipAddress: settings.ipAddress as string,
+    ipPort: settings.ipPort ?? 5555,
+    model: settings.model,
+  };
+}
+
+async function tryAdoptPrintedDocument(
+  job: FiscalJob,
+  settings: AtolSettings
+): Promise<ReturnType<typeof extractResponseFields> | null> {
+  if (!isSellLikeJob(job.type)) return null;
+  try {
+    const last = await queryLastFiscalDocument(connectionOf(settings));
+    const fields = extractResponseFields(last);
+    if (
+      shouldAdoptLastDocument({
+        jobType: job.type,
+        attempts: job.attempts,
+        venueLastFiscalDocNumber: job.venueLastFiscalDocNumber,
+        lastDocNumber: fields.fiscalDocNumber,
+      })
+    ) {
+      console.log(
+        `[ATOL] задание #${job.id} — зачитываю уже пробитый ФД ${fields.fiscalDocNumber}, повторный sell не отправляю`
+      );
+      return fields;
+    }
+  } catch (err) {
+    console.warn(
+      `[ATOL] задание #${job.id} — не удалось прочитать последний ФД:`,
+      err instanceof Error ? err.message : err
+    );
+  }
+  return null;
 }
 
 const runningForVenue = new Set<number>();
@@ -88,19 +106,41 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
       if (!job) break;
 
       try {
+        // Повтор sell после «неуспеха» — частая причина лишнего ФД: касса
+        // уже пробила, планшет не разобрал ответ и очередь шлёт тот же чек.
+        if (isSellLikeJob(job.type) && job.attempts >= 2) {
+          const adopted = await tryAdoptPrintedDocument(job, settings);
+          if (adopted) {
+            await reportFiscalJobResult(job.id, token, {
+              success: true,
+              fiscalDocNumber: adopted.fiscalDocNumber,
+              fiscalSign: adopted.fiscalSign,
+              fiscalDatetime: adopted.fiscalDatetime,
+            });
+            continue;
+          }
+        }
+
         // Сервер не отдаёт просроченный close_shift (уже открыта следующая
         // смена): closeShift на ККТ закрыл бы текущую фискальную смену.
         const task = typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
-        const response = await runAtolTask(
-          { ipAddress: settings.ipAddress, ipPort: settings.ipPort ?? 5555, model: settings.model },
-          task
-        );
+        const response = await runAtolTask(connectionOf(settings), task);
         console.log(`[ATOL] задание #${job.id} — ответ кассы:`, JSON.stringify(response));
-        const { fiscalDocNumber, fiscalSign, fiscalDatetime } = extractResponseFields(response);
+        const fields = extractResponseFields(response);
 
-        if (job.type === 'receipt' && (fiscalDocNumber == null || !fiscalSign)) {
+        if (isSellLikeJob(job.type) && !receiptHasFiscalDoc(fields, job.type)) {
+          const adopted = await tryAdoptPrintedDocument(job, settings);
+          if (adopted) {
+            await reportFiscalJobResult(job.id, token, {
+              success: true,
+              fiscalDocNumber: adopted.fiscalDocNumber,
+              fiscalSign: adopted.fiscalSign,
+              fiscalDatetime: adopted.fiscalDatetime,
+            });
+            continue;
+          }
           const message =
-            `Касса ответила без fiscalDocumentNumber/fiscalDocumentSign: ${JSON.stringify(response)}`;
+            `Касса ответила без fiscalDocumentNumber: ${JSON.stringify(response)}`;
           console.warn(`[ATOL] задание #${job.id} — ${message}`);
           notifyFiscalError({
             kind: 'atol',
@@ -114,11 +154,23 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
 
         await reportFiscalJobResult(job.id, token, {
           success: true,
-          fiscalDocNumber,
-          fiscalSign,
-          fiscalDatetime,
+          fiscalDocNumber: fields.fiscalDocNumber,
+          fiscalSign: fields.fiscalSign,
+          fiscalDatetime: fields.fiscalDatetime,
         });
       } catch (err) {
+        const adopted = isSellLikeJob(job.type)
+          ? await tryAdoptPrintedDocument(job, settings)
+          : null;
+        if (adopted) {
+          await reportFiscalJobResult(job.id, token, {
+            success: true,
+            fiscalDocNumber: adopted.fiscalDocNumber,
+            fiscalSign: adopted.fiscalSign,
+            fiscalDatetime: adopted.fiscalDatetime,
+          });
+          continue;
+        }
         const message = err instanceof Error ? err.message : String(err);
         console.warn(`[ATOL] задание #${job.id} — ошибка:`, message);
         notifyFiscalError({

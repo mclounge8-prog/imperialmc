@@ -91,6 +91,19 @@ apiFiscal.get('/jobs/next', async (c) => {
       "UPDATE fiscal_jobs SET status = 'in_progress', attempts = attempts + 1, updated_at = now() WHERE id = $1",
       [job.id]
     );
+    const { rows: watermarkRows } = await client.query(
+      `SELECT GREATEST(
+         COALESCE((
+           SELECT MAX(fiscal_doc_number) FROM fiscal_jobs
+           WHERE venue_id = $1 AND status = 'done' AND fiscal_doc_number IS NOT NULL
+         ), 0),
+         COALESCE((
+           SELECT MAX(fiscal_doc_number) FROM receipts
+           WHERE venue_id = $1 AND fiscal_doc_number IS NOT NULL
+         ), 0)
+       ) AS last_fd`,
+      [job.venue_id]
+    );
     await client.query('COMMIT');
 
     return c.json({
@@ -101,6 +114,7 @@ apiFiscal.get('/jobs/next', async (c) => {
         shiftId: job.shift_id,
         payload: job.payload,
         attempts: job.attempts + 1,
+        venueLastFiscalDocNumber: Number(watermarkRows[0]?.last_fd || 0),
       },
     });
   } catch (err) {
