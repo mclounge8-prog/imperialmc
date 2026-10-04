@@ -13,6 +13,9 @@ export const SUPERSEDED_OPEN_MSG =
 const STUCK_MINUTES = 2;
 const MAX_RECLAIM_ATTEMPTS = 8;
 
+export const STUCK_RECEIPT_MSG =
+  'Нет ответа кассы после отправки чека. Автоповтор отключён, чтобы не пробить дважды. Если чека нет на ленте — нажмите Повторить.';
+
 export async function hasNewerOpenShiftDone(client, venueId, shiftId) {
   if (!venueId || !shiftId) return false;
   const { rows } = await client.query(
@@ -92,10 +95,22 @@ export async function cancelSupersededShiftJobs(client, venueId = null) {
 
 export async function reclaimStuckInProgress(client, venueId = null) {
   await cancelSupersededShiftJobs(client, venueId);
+  // Чек, зависший после отправки на ККТ, нельзя возвращать в pending:
+  // касса часто уже пробила, а повторный sell даёт второй ФД (Карла 04.10).
+  await client.query(
+    `UPDATE fiscal_jobs
+     SET status = 'error', last_error = $1, updated_at = now()
+     WHERE status = 'in_progress'
+       AND type IN ('receipt', 'receipt_return')
+       AND updated_at < now() - ($2::text || ' minutes')::interval
+       AND ($3::int IS NULL OR venue_id = $3)`,
+    [STUCK_RECEIPT_MSG, String(STUCK_MINUTES), venueId]
+  );
   await client.query(
     `UPDATE fiscal_jobs
      SET status = 'pending', updated_at = now()
      WHERE status = 'in_progress'
+       AND type NOT IN ('receipt', 'receipt_return')
        AND updated_at < now() - ($1::text || ' minutes')::interval
        AND attempts < $2
        AND ($3::int IS NULL OR venue_id = $3)`,

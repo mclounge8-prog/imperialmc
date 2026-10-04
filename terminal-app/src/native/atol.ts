@@ -7,6 +7,7 @@ import { NativeModules, Platform } from 'react-native';
 // на этом же планшете) и возвращает её ответ как есть.
 type AtolNativeModule = {
   runTask(settingsJson: string, taskJson: string): Promise<string>;
+  queryLastDocument?(settingsJson: string): Promise<string>;
   isDriverAppInstalled(): Promise<boolean>;
 };
 
@@ -74,6 +75,27 @@ export function normalizeAtolTask(task: unknown): unknown {
     ...rest,
     items: rawItems.map(normalizePosition),
   };
+}
+
+export async function queryLastFiscalDocument(settings: AtolConnectionSettings): Promise<unknown> {
+  if (!AtolModule) {
+    throw new Error('Драйвер АТОЛ недоступен на этом устройстве (не Android или модуль не собран)');
+  }
+  const settingsJson = JSON.stringify(settings);
+  let responseText: string;
+  if (typeof AtolModule.queryLastDocument === 'function') {
+    responseText = await AtolModule.queryLastDocument(settingsJson);
+  } else {
+    responseText = await AtolModule.runTask(settingsJson, JSON.stringify({ type: '__queryLastDocument' }));
+  }
+  if (responseText == null || String(responseText).trim() === '') {
+    throw new Error('Касса не вернула последний документ ФН');
+  }
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    return responseText;
+  }
 }
 
 export async function runAtolTask(settings: AtolConnectionSettings, task: unknown): Promise<unknown> {

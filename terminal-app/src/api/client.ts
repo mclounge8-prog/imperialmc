@@ -854,6 +854,7 @@ export type FiscalJobType =
   | 'open_shift'
   | 'close_shift'
   | 'receipt'
+  | 'receipt_return'
   | 'x_report'
   | 'cash_in'
   | 'cash_out';
@@ -865,6 +866,7 @@ export type FiscalJob = {
   shiftId: number | null;
   payload: unknown;
   attempts: number;
+  venueLastFiscalDocNumber?: number | null;
 };
 
 export async function fetchNextFiscalJob(venueId: number, token: string): Promise<FiscalJob | null> {
