@@ -98,7 +98,7 @@ test('weekday ratio spreads the remainder by the usual evening shape', () => {
     'weekdayRatio',
     hourlyCtx({
       todayHours: hours({ 10: 1000 }),
-      currentHour: 10,
+      currentHour: 11,
       sameWeekday: [
         { hours: hours({ 10: 1000, 18: 100, 19: 300 }) },
         { hours: hours({ 10: 1000, 18: 100, 19: 300 }) },
@@ -120,7 +120,7 @@ test('yesterday ratio is capped so a tiny morning does not explode the day', () 
     hourlyCtx({
       todayHours: hours({ 10: 300 }),
       yesterdayHours: hours({ 10: 300, 18: 10000 }),
-      currentHour: 10,
+      currentHour: 11,
     })
   );
 
@@ -135,7 +135,7 @@ test('yesterday ratio refuses a morning with almost no base', () => {
     hourlyCtx({
       todayHours: hours({ 10: 50 }),
       yesterdayHours: hours({ 10: 40, 18: 5000 }),
-      currentHour: 10,
+      currentHour: 11,
     })
   );
 
@@ -149,7 +149,7 @@ test('ratio cap relaxes after noon', () => {
     hourlyCtx({
       todayHours: hours({ 14: 1000 }),
       yesterdayHours: hours({ 14: 1000, 19: 3000 }),
-      currentHour: 14,
+      currentHour: 15,
     })
   );
 

@@ -145,17 +145,19 @@ function predictWeekdayProfile(ctx) {
   if (days.length < config.minBaselineDays) {
     return fail('weekdayProfile', 'мало таких дней недели');
   }
-  const fact = sum(ctx.todayHours.slice(0, ctx.currentHour + 1));
-  const windowBaseline = median(days.map((day) => sum(day.hours.slice(0, ctx.currentHour + 1))));
+  const completedFact = sum(ctx.todayHours.slice(0, ctx.currentHour));
+  const partial = Number(ctx.todayHours[ctx.currentHour]) || 0;
+  const fact = completedFact + partial;
+  const windowBaseline = median(days.map((day) => sum(day.hours.slice(0, ctx.currentHour))));
   const closeBaseline = median(days.map((day) => sum(day.hours)));
-  const pace = paceFactor(fact, windowBaseline, config.paceDamping);
+  const pace = paceFactor(completedFact, windowBaseline, config.paceDamping);
   const shape = hoursMedian(days);
   const projected = Array.from({ length: 24 }, (_, hour) => {
     if (hour <= ctx.currentHour) return null;
     return shape[hour] * pace;
   });
   const closeForecast = fact + sum(projected);
-  const trend = direction(fact, windowBaseline);
+  const trend = direction(completedFact, windowBaseline);
   return baseResult('weekdayProfile', ctx, {
     compareWith: 'weekday',
     baselineDays: days.length,
@@ -176,7 +178,9 @@ function predictRatio(modelId, ctx, shapeHours, windowBaseline, closeBaseline, c
   if (!(windowBaseline >= config.minWindowRevenue)) {
     return fail(modelId, 'к этому часу в базе ещё мало выручки');
   }
-  const fact = sum(ctx.todayHours.slice(0, ctx.currentHour + 1));
+  const completedFact = sum(ctx.todayHours.slice(0, ctx.currentHour));
+  const partial = Number(ctx.todayHours[ctx.currentHour]) || 0;
+  const fact = completedFact + partial;
   let ratio = closeBaseline / windowBaseline;
   let capped = false;
   const ceiling = ctx.currentHour < config.lowConfidenceUntilHour ? config.maxRatio : config.maxRatioLate;
@@ -184,9 +188,9 @@ function predictRatio(modelId, ctx, shapeHours, windowBaseline, closeBaseline, c
     ratio = ceiling;
     capped = true;
   }
-  const closeForecast = fact * ratio;
+  const closeForecast = completedFact * ratio + partial;
   const projected = projectRemainder(ctx.currentHour, closeForecast, fact, shapeHours);
-  const trend = direction(fact, windowBaseline);
+  const trend = direction(completedFact, windowBaseline);
   return baseResult(modelId, ctx, {
     compareWith,
     baselineDays,
@@ -209,7 +213,7 @@ function predictWeekdayRatio(ctx) {
     return fail('weekdayRatio', 'мало таких дней недели');
   }
   const shape = hoursMedian(days);
-  const windowBaseline = median(days.map((day) => sum(day.hours.slice(0, ctx.currentHour + 1))));
+  const windowBaseline = median(days.map((day) => sum(day.hours.slice(0, ctx.currentHour))));
   const closeBaseline = median(days.map((day) => sum(day.hours)));
   return predictRatio('weekdayRatio', ctx, shape, windowBaseline, closeBaseline, 'weekday', days.length);
 }
@@ -217,7 +221,7 @@ function predictWeekdayRatio(ctx) {
 /** То же самое, но база — только вчера, без оглядки на день недели. */
 function predictYesterdayRatio(ctx) {
   const yesterday = ctx.yesterdayHours || [];
-  const windowBaseline = sum(yesterday.slice(0, ctx.currentHour + 1));
+  const windowBaseline = sum(yesterday.slice(0, ctx.currentHour));
   const closeBaseline = sum(yesterday);
   if (!(closeBaseline > 0)) return fail('yesterdayRatio', 'вчера продаж не было');
   return predictRatio('yesterdayRatio', ctx, yesterday, windowBaseline, closeBaseline, 'yesterday', 1);
