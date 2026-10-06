@@ -9,6 +9,7 @@ export const CHART_COLORS = {
   accent2Fill: 'rgba(63, 99, 230, 0.22)',
   muted: '#98979f',
   mutedFill: 'rgba(152, 151, 159, 0.12)',
+  forecast: '#e2b15a',
   grid: '#34343c',
   text: '#98979f',
   bg: '#1b1b1f',
@@ -48,16 +49,33 @@ function scaleY(value, maxValue, height, padTop) {
   return height - (value / maxValue) * usable;
 }
 
-function buildLinePath(values, maxValue, width, height, padTop) {
-  if (values.length === 0) return '';
-  const stepX = values.length > 1 ? width / (values.length - 1) : 0;
-  return values
-    .map((v, i) => {
-      const x = i * stepX;
-      const y = scaleY(v, maxValue, height, padTop);
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
+function seriesMax(lists) {
+  let max = 1;
+  for (const list of lists) {
+    if (!list) continue;
+    for (const value of list) {
+      if (typeof value === 'number' && Number.isFinite(value) && value > max) max = value;
+    }
+  }
+  return max;
+}
+
+function buildLinePath(values, maxValue, width, height, padTop, slotCount = values.length) {
+  if (!values.length) return '';
+  const stepX = slotCount > 1 ? width / (slotCount - 1) : 0;
+  let path = '';
+  let penDown = false;
+  values.forEach((value, i) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      penDown = false;
+      return;
+    }
+    const x = i * stepX;
+    const y = scaleY(value, maxValue, height, padTop);
+    path += `${penDown ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`;
+    penDown = true;
+  });
+  return path;
 }
 
 function gridLinesSvg(width, height, padTop) {
@@ -152,10 +170,11 @@ function hoverLayer(points, height, svg) {
 export function renderLineAreaChart({ labels, values, formatValue = (v) => String(v), height = 200 }) {
   const width = CHART_WIDTH;
   const padTop = 14;
-  const maxValue = Math.max(1, ...values);
+  const maxValue = seriesMax([values]);
   const linePath = buildLinePath(values, maxValue, width, height, padTop);
-  const areaPath = values.length ? `${linePath} L${width},${height} L0,${height} Z` : '';
   const stepX = values.length > 1 ? width / (values.length - 1) : 0;
+  const lastX = values.length > 0 ? (values.length - 1) * stepX : 0;
+  const areaPath = linePath ? `${linePath} L${lastX.toFixed(1)},${height} L0,${height} Z` : '';
 
   const dots = values
     .map((v, i) => {
@@ -238,20 +257,24 @@ export function renderDualLineChart({
   labels,
   seriesA,
   seriesB,
+  seriesC = null,
   labelA,
   labelB,
+  labelC = 'Прогноз',
   formatValue = (v) => String(v),
   height = 200,
 }) {
   const width = CHART_WIDTH;
   const padTop = 14;
-  const maxValue = Math.max(1, ...seriesA, ...seriesB);
+  const maxValue = seriesMax([seriesA, seriesB, seriesC]);
   const pathA = buildLinePath(seriesA, maxValue, width, height, padTop);
   const pathB = buildLinePath(seriesB, maxValue, width, height, padTop);
+  const pathC = seriesC ? buildLinePath(seriesC, maxValue, width, height, padTop) : '';
   const stepX = seriesA.length > 1 ? width / (seriesA.length - 1) : 0;
 
   const dotsA = seriesA
     .map((v, i) => {
+      if (typeof v !== 'number' || !Number.isFinite(v)) return '';
       const x = i * stepX;
       const y = scaleY(v, maxValue, height, padTop);
       return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${CHART_COLORS.accent2}" />`;
@@ -262,29 +285,48 @@ export function renderDualLineChart({
     <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="chart-svg" role="img" aria-label="График">
       ${gridLinesSvg(width, height, padTop)}
       <path d="${pathB}" fill="none" stroke="${CHART_COLORS.muted}" stroke-width="2" stroke-dasharray="6 5" stroke-linejoin="round" stroke-linecap="round" />
+      <path d="${pathC}" fill="none" stroke="${CHART_COLORS.forecast}" stroke-width="2.5" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round" />
       <path d="${pathA}" fill="none" stroke="${CHART_COLORS.accent2}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
       ${dotsA}
     </svg>
   `;
 
-  const points = seriesA.map((v, i) => ({
-    xPct: stepX ? (i / (seriesA.length - 1)) * 100 : 50,
-    label: labels[i] || '',
-    rows: [
-      {
+  const points = seriesA.map((v, i) => {
+    const rows = [];
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      rows.push({
         name: labelA,
         value: formatValue(v),
         color: CHART_COLORS.accent2,
         yPct: (scaleY(v, maxValue, height, padTop) / height) * 100,
-      },
-      {
+      });
+    }
+    if (typeof seriesB[i] === 'number' && Number.isFinite(seriesB[i])) {
+      rows.push({
         name: labelB,
-        value: formatValue(seriesB[i] ?? 0),
+        value: formatValue(seriesB[i]),
         color: CHART_COLORS.muted,
-        yPct: (scaleY(seriesB[i] ?? 0, maxValue, height, padTop) / height) * 100,
-      },
-    ],
-  }));
+        yPct: (scaleY(seriesB[i], maxValue, height, padTop) / height) * 100,
+      });
+    }
+    if (seriesC && typeof seriesC[i] === 'number' && Number.isFinite(seriesC[i])) {
+      rows.push({
+        name: labelC,
+        value: formatValue(seriesC[i]),
+        color: CHART_COLORS.forecast,
+        yPct: (scaleY(seriesC[i], maxValue, height, padTop) / height) * 100,
+      });
+    }
+    return {
+      xPct: stepX ? (i / (seriesA.length - 1)) * 100 : 50,
+      label: labels[i] || '',
+      rows,
+    };
+  });
+
+  const forecastLegend = seriesC
+    ? `<span class="chart-legend-item"><span class="chart-legend-dot chart-legend-dot-dashed" style="border-color:${CHART_COLORS.forecast}"></span>${escapeHtml(labelC)}</span>`
+    : '';
 
   return `
     <div class="chart-wrap">
@@ -296,6 +338,7 @@ export function renderDualLineChart({
       <div class="chart-legend">
         <span class="chart-legend-item"><span class="chart-legend-dot" style="background:${CHART_COLORS.accent2}"></span>${escapeHtml(labelA)}</span>
         <span class="chart-legend-item"><span class="chart-legend-dot chart-legend-dot-dashed" style="border-color:${CHART_COLORS.muted}"></span>${escapeHtml(labelB)}</span>
+        ${forecastLegend}
       </div>
     </div>
   `;

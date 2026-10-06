@@ -7,6 +7,7 @@ import {
   renderTopItemsList,
   renderDonutChart,
 } from './charts.js';
+import { listHourlyModels, listSeriesModels, weekdayPhrase } from '../services/revenueForecast.js';
 
 const PERIOD_TABS = [
   ['day', 'День'],
@@ -30,6 +31,150 @@ function renderWidgetTabs(widgetId, activePeriod, venueId, endpoint) {
         >${label}</button>
       `
       ).join('')}
+    </div>
+  `;
+}
+
+function qs(params) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  }
+  return query.toString();
+}
+
+function renderForecastModels({ models, activeId, target, urlFor }) {
+  return `
+    <div class="forecast-models">
+      ${models
+        .map(
+          (model) => `
+        <button
+          type="button"
+          class="forecast-model${model.id === activeId ? ' is-active' : ''}"
+          title="${escapeHtml(model.hint)}"
+          hx-get="${urlFor(model.id)}"
+          hx-target="${target}"
+          hx-swap="outerHTML"
+        >${escapeHtml(model.label)}</button>`
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+const SERIES_PERIOD_COPY = {
+  day: { unit: 'дней', tail: 'Текущий день не входит' },
+  week: { unit: 'недель', tail: 'Текущая неделя не входит' },
+  month: { unit: 'месяцев', tail: 'Текущий месяц не входит' },
+};
+
+function renderSeriesForecastStrip({ forecast, period, venueId, seriesModel }) {
+  const copy = SERIES_PERIOD_COPY[period] || SERIES_PERIOD_COPY.week;
+  const activeId = forecast?.requestedModelId || seriesModel;
+  const buttons = renderForecastModels({
+    models: listSeriesModels(),
+    activeId,
+    target: '#revenue-widget',
+    urlFor: (id) => `/stats/revenue?${qs({ period, venueId, seriesModel: id })}`,
+  });
+
+  let headline = 'Направление';
+  let note = forecast?.reason || 'Недостаточно закрытых периодов';
+  if (forecast?.ok) {
+    const pointText =
+      forecast.pointKind === 'slope'
+        ? `Ориентир по наклону закрытых ${copy.unit}: <strong>${formatMoney(forecast.nextValue)}</strong>. ${copy.tail}.`
+        : `Ориентир — средний уровень второй половины закрытых ${copy.unit}: <strong>${formatMoney(forecast.nextValue)}</strong>. ${copy.tail}.`;
+    headline = `Направление ${renderDeltaBadge(forecast.trendCurrent, forecast.trendBaseline)}`;
+    note = pointText;
+  }
+
+  return `
+    <div class="forecast-strip" data-forecast="series" data-forecast-model="${escapeHtml(activeId || '')}">
+      <div class="forecast-strip-head">
+        <span class="forecast-test-badge">Тест</span>
+        <span>${headline}</span>
+      </div>
+      <p class="forecast-note">${note}</p>
+      ${buttons}
+      <input type="hidden" id="series-model-field" name="seriesModel" value="${escapeHtml(activeId || '')}">
+    </div>
+  `;
+}
+
+function hourlyCompareLabels(forecast) {
+  if (forecast.compareWith === 'yesterday') {
+    return { pace: 'к вчерашнему часу', close: 'к вчерашнему дню' };
+  }
+  const days = weekdayPhrase(forecast.weekday);
+  return { pace: `к обычным ${days}`, close: `к обычным ${days}` };
+}
+
+function hourlyForecastSeries(hourly, forecast) {
+  if (!forecast?.ok || !forecast.projected) return null;
+  const hasFuture = forecast.projected.some((value, hour) => hour > hourly.currentHour && value != null);
+  if (!hasFuture) return null;
+  return forecast.projected.map((value, hour) => {
+    if (hour < hourly.currentHour) return null;
+    if (hour === hourly.currentHour) return hourly.todayHours[hour];
+    return value;
+  });
+}
+
+function renderHourlyForecastStrip({ forecast, venueId, hourlyModel }) {
+  const activeId = forecast?.requestedModelId || hourlyModel;
+  const buttons = renderForecastModels({
+    models: listHourlyModels(),
+    activeId,
+    target: '#hourly-widget',
+    urlFor: (id) => `/stats/hourly?${qs({ venueId, hourlyModel: id })}`,
+  });
+
+  if (!forecast?.ok) {
+    return `
+      <div class="forecast-strip" data-forecast="hourly" data-forecast-model="${escapeHtml(activeId || '')}">
+        <div class="forecast-strip-head">
+          <span class="forecast-test-badge">Тест</span>
+          <span>Прогноз к закрытию</span>
+        </div>
+        <p class="forecast-note">${escapeHtml(forecast?.reason || 'Нет базы для прогноза')}</p>
+        ${buttons}
+        <input type="hidden" id="hourly-model-field" name="hourlyModel" value="${escapeHtml(activeId || '')}">
+      </div>
+    `;
+  }
+
+  const labels = hourlyCompareLabels(forecast);
+  const notes = [];
+  if (forecast.fellBack) {
+    const requested = listHourlyModels().find((model) => model.id === forecast.requestedModelId);
+    notes.push(
+      `${requested?.label || 'Выбранная модель'} недоступна (${forecast.fallbackReason}). Показано: ${forecast.modelLabel}.`
+    );
+  }
+  if (forecast.confidence === 'low') notes.push('До 12:00 цифра легко сдвигается.');
+  if (forecast.confidence === 'early') notes.push('До набора выручки показан обычный ход дня.');
+  if (forecast.capped) notes.push('Коэффициент ограничен: утро ещё слишком короткое для такого множителя.');
+  if (forecast.compareWith === 'weekday') notes.push(`База: ${forecast.baselineDays} таких же дней.`);
+  const noteText = notes.filter(Boolean).join(' ');
+  const pace =
+    forecast.confidence === 'early'
+      ? ''
+      : `<p class="forecast-note">К этому часу ${renderDeltaBadge(forecast.trendCurrent, forecast.trendBaseline)} ${escapeHtml(labels.pace)}</p>`;
+
+  return `
+    <div class="forecast-strip" data-forecast="hourly" data-forecast-model="${escapeHtml(forecast.modelId)}">
+      <div class="forecast-strip-head">
+        <span class="forecast-test-badge">Тест</span>
+        <span>К закрытию <strong>${formatMoney(forecast.closeForecast)}</strong></span>
+        ${renderDeltaBadge(forecast.closeForecast, forecast.closeBaseline)}
+        <span class="forecast-note">${escapeHtml(labels.close)}</span>
+      </div>
+      ${pace}
+      ${noteText ? `<p class="forecast-note">${escapeHtml(noteText)}</p>` : ''}
+      ${buttons}
+      <input type="hidden" id="hourly-model-field" name="hourlyModel" value="${escapeHtml(activeId || '')}">
     </div>
   `;
 }
@@ -60,7 +205,7 @@ function renderPeriodTotalsFooter(periodTotals) {
 
 /* ---------- Выручка (тренд + график) ---------- */
 
-export function renderRevenueWidgetBody(trend, periodTotals, activePeriod = 'week') {
+export function renderRevenueWidgetBody(trend, periodTotals, activePeriod = 'week', forecast = null, venueId = '', seriesModel = 'halfCompare') {
   const labels = trend.map((t) => t.label);
   const values = trend.map((t) => t.revenue);
   const total = values.reduce((s, v) => s + v, 0);
@@ -68,12 +213,36 @@ export function renderRevenueWidgetBody(trend, periodTotals, activePeriod = 'wee
     activePeriod === 'month' ? 'за месяцы на графике' : activePeriod === 'week' ? 'за недели на графике' : 'за дни на графике';
 
   return `
+    ${renderSeriesForecastStrip({ forecast, period: activePeriod, venueId, seriesModel })}
     <div class="stat-card-summary">
       <div class="stat-card-value">${formatMoney(total)}</div>
       <div class="stat-card-caption">${periodLabel}</div>
     </div>
     ${renderLineAreaChart({ labels, values, formatValue: (v) => formatMoney(v), height: 180 })}
     ${renderPeriodTotalsFooter(periodTotals)}
+  `;
+}
+
+export function renderRevenueCard({ trend, periodTotals, activePeriod = 'week', venueId = '', forecast = null, seriesModel = 'halfCompare' }) {
+  const tabs = PERIOD_TABS.map(
+    ([key, label]) => `
+        <button
+          type="button"
+          class="widget-tab${key === activePeriod ? ' widget-tab-active' : ''}"
+          hx-get="/stats/revenue?${qs({ period: key, venueId, seriesModel })}"
+          hx-target="#revenue-widget"
+          hx-swap="outerHTML"
+        >${label}</button>`
+  ).join('');
+
+  return `
+    <div class="stat-card" id="revenue-widget">
+      <div class="widget-header">
+        <h2>Выручка</h2>
+        <div class="widget-tabs">${tabs}</div>
+      </div>
+      <div id="revenue-widget-body">${renderRevenueWidgetBody(trend, periodTotals, activePeriod, forecast, venueId, seriesModel)}</div>
+    </div>
   `;
 }
 
@@ -90,7 +259,8 @@ export function renderTopItemsDonutBody(items) {
 /* ---------- Сегодня ---------- */
 
 function renderTodayWidget(today) {
-  const delta = renderDeltaBadge(today.revenue, today.yesterdayRevenue || 0);
+  const sameWindow = today.yesterdaySameWindow ?? today.yesterdayRevenue ?? 0;
+  const delta = renderDeltaBadge(today.revenue, sameWindow);
   return `
     <div class="stat-card today-card">
       <div class="widget-header">
@@ -99,7 +269,7 @@ function renderTodayWidget(today) {
       <div class="today-hero">
         <div class="today-hero-value">${formatMoney(today.revenue, { decimals: 2 })}</div>
         <div class="today-hero-compare">
-          вчера ${formatMoney(today.yesterdayRevenue || 0, { decimals: 2 })}
+          к этому часу вчера ${formatMoney(sameWindow, { decimals: 2 })}
           ${delta}
         </div>
       </div>
@@ -117,7 +287,7 @@ function renderTodayWidget(today) {
           <div class="today-metric-value">${formatMoney(today.avgCheck)}</div>
         </div>
         <div class="today-metric">
-          <div class="today-metric-label">Вчера</div>
+          <div class="today-metric-label">Вчера целиком</div>
           <div class="today-metric-value">${formatMoney(today.yesterdayRevenue || 0)}</div>
         </div>
       </div>
@@ -176,14 +346,17 @@ function hourLabel(h) {
   return `${String(h).padStart(2, '0')}`;
 }
 
-function renderHourlyWidget(hourly) {
+export function renderHourlyWidget({ hourly, forecast = null, venueId = '', hourlyModel = 'weekdayProfile' }) {
   const labels = Array.from({ length: 24 }, (_, h) => hourLabel(h));
+  const todaySeries = hourly.todayHours.map((value, hour) => (hour <= hourly.currentHour ? value : null));
   const chart = renderDualLineChart({
     labels,
-    seriesA: hourly.todayHours,
+    seriesA: todaySeries,
     seriesB: hourly.yesterdayHours,
+    seriesC: hourlyForecastSeries(hourly, forecast),
     labelA: 'Сегодня',
     labelB: 'Вчера',
+    labelC: 'Прогноз',
     formatValue: (v) => formatMoney(v),
     height: 200,
   });
@@ -197,6 +370,7 @@ function renderHourlyWidget(hourly) {
           <p class="hint">К этому часу: <strong>${formatMoney(hourly.todayTotalSoFar)}</strong> ${delta} к вчера (${formatMoney(hourly.yesterdayTotalSameWindow)})</p>
         </div>
       </div>
+      ${renderHourlyForecastStrip({ forecast, venueId, hourlyModel })}
       ${chart}
     </div>
   `;
@@ -209,6 +383,10 @@ export function renderDashboardSection({
   venueId,
   today,
   hourly,
+  hourlyForecast,
+  hourlyModel,
+  seriesForecast,
+  seriesModel,
   revenueTrend,
   topItems,
   periodTotals,
@@ -236,6 +414,7 @@ export function renderDashboardSection({
         hx-trigger="change"
         hx-target="#main-content"
         hx-swap="innerHTML"
+        hx-include="#hourly-model-field,#series-model-field"
       >${venueOptions}</select>
     </header>
 
@@ -244,15 +423,15 @@ export function renderDashboardSection({
     </div>
 
     <div class="board-row board-row-2">
-      ${renderHourlyWidget(hourly)}
-
-      <div class="stat-card" id="revenue-widget">
-        <div class="widget-header">
-          <h2>Выручка</h2>
-          ${renderWidgetTabs('revenue-widget', 'week', venueId, '/stats/revenue')}
-        </div>
-        <div id="revenue-widget-body">${renderRevenueWidgetBody(revenueTrend, periodTotals, 'week')}</div>
-      </div>
+      ${renderHourlyWidget({ hourly, forecast: hourlyForecast, venueId, hourlyModel })}
+      ${renderRevenueCard({
+        trend: revenueTrend,
+        periodTotals,
+        activePeriod: 'week',
+        venueId,
+        forecast: seriesForecast,
+        seriesModel,
+      })}
     </div>
 
     <div class="board-row board-row-3">
