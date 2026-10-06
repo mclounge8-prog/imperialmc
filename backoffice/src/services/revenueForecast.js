@@ -387,3 +387,103 @@ export function runSeriesForecast(modelId, ctx) {
     modelLabel: model.label,
   };
 }
+
+function hourlyCompareLabels(result) {
+  if (result.compareWith === 'yesterday') {
+    return { pace: 'к вчерашнему часу', close: 'к вчерашнему дню' };
+  }
+  const days = weekdayPhrase(result.weekday);
+  return { pace: `к обычным ${days}`, close: `к обычным ${days}` };
+}
+
+/** JSON для PWA и других клиентов: без HTML, с подписями и рядом для графика. */
+export function presentHourlyForecast(result, todayHours = null) {
+  const models = listHourlyModels();
+  if (!result?.ok) {
+    return {
+      ok: false,
+      reason: result?.reason || 'Нет базы для прогноза',
+      requestedModelId: result?.requestedModelId || result?.modelId || null,
+      modelId: result?.modelId || null,
+      modelLabel: result?.modelLabel || null,
+      models,
+    };
+  }
+
+  const labels = hourlyCompareLabels(result);
+  const closeDir = direction(result.closeForecast, result.closeBaseline);
+  const notes = [];
+  if (result.fellBack) {
+    const requested = models.find((model) => model.id === result.requestedModelId);
+    notes.push(
+      `${requested?.label || 'Выбранная модель'} недоступна (${result.fallbackReason}). Показано: ${result.modelLabel}.`
+    );
+  }
+  if (result.confidence === 'low') notes.push('До 12:00 цифра легко сдвигается.');
+  if (result.confidence === 'early') notes.push('До набора выручки показан обычный ход дня.');
+  if (result.capped) notes.push('Коэффициент ограничен: утро ещё слишком короткое для такого множителя.');
+  if (result.compareWith === 'weekday') notes.push(`База: ${result.baselineDays} таких же дней.`);
+
+  let chart = null;
+  const hasFuture = (result.projected || []).some((value, hour) => hour > result.currentHour && value != null);
+  if (hasFuture && todayHours) {
+    chart = result.projected.map((value, hour) => {
+      if (hour < result.currentHour) return null;
+      if (hour === result.currentHour) return Number(todayHours[hour]) || 0;
+      return value;
+    });
+  }
+
+  return {
+    ok: true,
+    modelId: result.modelId,
+    requestedModelId: result.requestedModelId,
+    modelLabel: result.modelLabel,
+    fellBack: Boolean(result.fellBack),
+    models,
+    closeForecast: result.closeForecast,
+    closeBaseline: result.closeBaseline,
+    closeSign: closeDir.sign,
+    closePct: closeDir.pct,
+    paceSign: result.sign,
+    pacePct: result.pct,
+    showPace: result.confidence !== 'early',
+    paceLabel: labels.pace,
+    closeLabel: labels.close,
+    confidence: result.confidence,
+    notes,
+    chart,
+    asOfHour: result.currentHour,
+  };
+}
+
+/** Направление ряда «Выручка» по закрытым неделям. */
+export function presentSeriesForecast(result) {
+  const models = listSeriesModels();
+  if (!result?.ok) {
+    return {
+      ok: false,
+      reason: result?.reason || 'Мало закрытых периодов',
+      requestedModelId: result?.requestedModelId || result?.modelId || null,
+      modelId: result?.modelId || null,
+      modelLabel: result?.modelLabel || null,
+      models,
+    };
+  }
+  const note =
+    result.pointKind === 'slope'
+      ? 'Ориентир по наклону закрытых недель. Текущая неделя не входит.'
+      : 'Ориентир — средний уровень второй половины закрытых недель. Текущая неделя не входит.';
+  return {
+    ok: true,
+    modelId: result.modelId,
+    requestedModelId: result.requestedModelId,
+    modelLabel: result.modelLabel,
+    models,
+    sign: result.sign,
+    pct: result.pct,
+    nextValue: result.nextValue,
+    pointKind: result.pointKind,
+    note,
+  };
+}

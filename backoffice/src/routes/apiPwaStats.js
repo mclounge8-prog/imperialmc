@@ -9,6 +9,7 @@ import {
   venueTodayISO,
 } from '../utils/timezone.js';
 import { fetchCashOnHand } from '../services/cashOnHand.js';
+import { loadDashboardForecast } from './stats.js';
 
 /**
  * JSON-версия статистики «Главной» для мобильного PWA (public/pwa/).
@@ -195,6 +196,13 @@ apiPwa.get('/stats', async (c) => {
 
   const trendDates = allBuckets.slice(COMPARE_OFFSET_DAYS).map((b) => b.date);
   const cashOnHand = await fetchCashOnHand(venueId);
+  const forecast =
+    selectedDay === venueTodayISO()
+      ? await loadDashboardForecast(venueId, {
+          hourlyModel: c.req.query('hourlyModel'),
+          seriesModel: c.req.query('seriesModel'),
+        })
+      : null;
 
   return c.json({
     date: selectedDay,
@@ -203,6 +211,7 @@ apiPwa.get('/stats', async (c) => {
     hourLabels,
     compareOffsetDays: COMPARE_OFFSET_DAYS,
     venueId: venueId || null,
+    forecast,
     metrics: {
       cashOnHand: {
         value: cashOnHand.total,

@@ -27,6 +27,8 @@ import {
   resolveSeriesModel,
   runHourlyForecast,
   runSeriesForecast,
+  presentHourlyForecast,
+  presentSeriesForecast,
 } from '../services/revenueForecast.js';
 import { readForecastModels, writeForecastModels } from '../utils/preferences.js';
 
@@ -290,6 +292,31 @@ function forecastChoice(c) {
     });
   }
   return { hourlyModel, seriesModel };
+}
+
+export async function loadDashboardForecast(venueId, choice = {}) {
+  const hourlyModel = resolveHourlyModel(choice.hourlyModel);
+  const seriesModel = resolveSeriesModel(choice.seriesModel);
+  const hourly = await fetchHourlyContext(venueId);
+  const trend = await fetchTrend('week', venueId);
+  const hourlyForecast = runHourlyForecast(hourlyModel, {
+    todayHours: hourly.todayHours,
+    yesterdayHours: hourly.yesterdayHours,
+    currentHour: hourly.currentHour,
+    sameWeekday: hourly.sameWeekday,
+    weekday: hourly.weekday,
+  });
+  const seriesForecast = runSeriesForecast(seriesModel, {
+    values: trend.map((point) => point.revenue),
+  });
+  return {
+    testMode: forecastConfig.testMode,
+    asOfHour: hourly.currentHour,
+    hourlyModel,
+    seriesModel,
+    hourly: presentHourlyForecast(hourlyForecast, hourly.todayHours),
+    series: presentSeriesForecast(seriesForecast),
+  };
 }
 
 async function buildDashboardData(venueId, choice) {

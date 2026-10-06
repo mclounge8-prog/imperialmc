@@ -5,6 +5,8 @@ import {
   runHourlyForecast,
   runSeriesForecast,
   resolveHourlyModel,
+  presentHourlyForecast,
+  presentSeriesForecast,
 } from './revenueForecast.js';
 import { renderHourlyWidget, renderRevenueCard } from '../views/statsView.js';
 
@@ -181,6 +183,33 @@ test('linear slope projects the next closed step and ignores the open tail', () 
 test('series forecast waits until four closed periods exist', () => {
   const result = runSeriesForecast('halfCompare', { values: [10, 20, 30] });
   assert.equal(result.ok, false);
+});
+
+test('presenters expose close, pace and a chart that starts at the current hour', () => {
+  const result = runHourlyForecast(
+    'weekdayProfile',
+    hourlyCtx({
+      todayHours: hours({ 10: 2000 }),
+      currentHour: 11,
+      sameWeekday: [
+        { hours: hours({ 10: 1000, 18: 100, 19: 300 }) },
+        { hours: hours({ 10: 1000, 18: 300, 19: 500 }) },
+      ],
+    })
+  );
+  const view = presentHourlyForecast(result, hours({ 10: 2000 }));
+  assert.equal(view.ok, true);
+  assert.equal(view.closeForecast, 2900);
+  assert.equal(view.chart[10], null);
+  assert.equal(view.chart[11], 0);
+  assert.equal(view.chart[18], 300);
+  assert.equal(view.closeLabel.includes('вторник'), true);
+  assert.ok(view.models.some((model) => model.id === 'yesterdayRatio'));
+
+  const series = presentSeriesForecast(runSeriesForecast('halfCompare', { values: [10, 20, 30, 40, 50, 99] }));
+  assert.equal(series.ok, true);
+  assert.equal(series.nextValue, 40);
+  assert.match(series.note, /не входит/);
 });
 
 test('widgets render the test switcher and the hourly forecast line', () => {
