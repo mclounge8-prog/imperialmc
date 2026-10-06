@@ -1899,6 +1899,32 @@ input[type="radio"] {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.forecast-plain-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.forecast-plain-title.up { color: #3ecf7e; }
+.forecast-plain-title.down { color: var(--danger); }
+.forecast-plain-title.flat { color: var(--text); }
+
+.forecast-close {
+  margin: 8px 0 0;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.forecast-close strong {
+  font-family: var(--font-display);
+  font-weight: 650;
+}
+
+.forecast-note.up { color: #3ecf7e; }
+.forecast-note.down { color: var(--danger); }
+
 .forecast-strip {
   display: flex;
   flex-direction: column;

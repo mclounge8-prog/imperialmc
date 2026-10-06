@@ -74,7 +74,7 @@
   // Версия этой оболочки — должна совпадать с /pwa/version.json и CACHE_VERSION в sw.js.
   // Не берём «истину» только из localStorage: после авто-reload от SW старое
   // значение в storage вечно показывало «Доступна новая версия».
-  var SHELL_VERSION = 'v17';
+  var SHELL_VERSION = 'v18';
   var APP_VERSION = SHELL_VERSION;
   var pendingSwRegistration = null;
   var updateToastVisible = false;
@@ -876,12 +876,16 @@
     }).join(' ');
   }
 
-  function trendClassOf(sign) {
-    return sign === 'up' ? 'up' : sign === 'down' ? 'down' : 'flat';
+  function trendTitle(sign, pct, ongoing) {
+    var n = Math.abs(Math.round(Number(pct) || 0));
+    var head = ongoing ? 'Пока тренд' : 'Тренд';
+    if (sign === 'up') return head + ' на рост, +' + n + '%';
+    if (sign === 'down') return head + ' на спад, −' + n + '%';
+    return ongoing ? 'Пока тренд ровный' : 'Тренд ровный';
   }
 
-  function trendArrow(sign) {
-    return sign === 'up' ? '\u25B2' : sign === 'down' ? '\u25BC' : '\u25CF';
+  function trendClassOf(sign) {
+    return sign === 'up' ? 'up' : sign === 'down' ? 'down' : 'flat';
   }
 
   function forecastChips(models, activeId, kind) {
@@ -907,22 +911,19 @@
     var closeBlock;
     if (!hourly.ok) {
       closeBlock =
-        '<div class="forecast-close">К закрытию</div>' +
-        '<p class="forecast-line">' + escapeHtml(hourly.reason || 'Нет базы') + '</p>';
+        '<p class="forecast-plain-title flat">Пока без прогноза на день</p>' +
+        '<p class="forecast-line">' + escapeHtml(hourly.reason || 'Не с чем сравнить') + '</p>';
     } else {
-      var closeClass = trendClassOf(hourly.closeSign);
       closeBlock =
-        '<div class="forecast-close">' + formatMoney(hourly.closeForecast) + '</div>' +
-        '<p class="forecast-line ' + closeClass + '">' +
-          trendArrow(hourly.closeSign) + ' ' + Math.abs(hourly.closePct).toFixed(0) + '% ' +
-          escapeHtml(hourly.closeLabel || '') +
+        '<p class="forecast-plain-title ' + trendClassOf(hourly.showPace ? hourly.paceSign : 'flat') + '">' +
+          escapeHtml(hourly.paceTitle || '') +
         '</p>' +
-        (hourly.showPace
-          ? '<p class="forecast-line ' + trendClassOf(hourly.paceSign) + '">К этому часу ' +
-              trendArrow(hourly.paceSign) + ' ' + Math.abs(hourly.pacePct).toFixed(0) + '% ' +
-              escapeHtml(hourly.paceLabel || '') +
-            '</p>'
-          : '') +
+        '<p class="forecast-line">' + escapeHtml(hourly.paceHint || '') + '</p>' +
+        '<p class="forecast-close">К закрытию около ' + formatMoney(hourly.closeForecast) + '</p>' +
+        '<p class="forecast-line ' + trendClassOf(hourly.closeSign) + '">' +
+          escapeHtml(hourly.closeTitle || '') + '. ' + escapeHtml(hourly.closeHint || '') +
+        '</p>' +
+        (hourly.modelPlain ? '<p class="forecast-line">' + escapeHtml(hourly.modelPlain) + '</p>' : '') +
         ((hourly.notes && hourly.notes.length)
           ? '<p class="forecast-line">' + escapeHtml(hourly.notes.join(' ')) + '</p>'
           : '');
@@ -933,18 +934,19 @@
       if (!series.ok) {
         seriesBlock =
           '<div class="forecast-split">' +
-            '<p class="forecast-line">Направление недель: ' + escapeHtml(series.reason || 'мало данных') + '</p>' +
+            '<p class="forecast-plain-title flat">По неделям пока неясно</p>' +
+            '<p class="forecast-line">' + escapeHtml(series.reason || 'Мало закрытых недель') + '</p>' +
             forecastChips(series.models, series.requestedModelId, 'series') +
           '</div>';
       } else {
         seriesBlock =
           '<div class="forecast-split">' +
-            '<p class="forecast-line ' + trendClassOf(series.sign) + '">Направление недель ' +
-              trendArrow(series.sign) + ' ' + Math.abs(series.pct).toFixed(0) + '%' +
+            '<p class="forecast-line">По неделям</p>' +
+            '<p class="forecast-plain-title ' + trendClassOf(series.sign) + '">' + escapeHtml(series.title || '') + '</p>' +
+            '<p class="forecast-line">' + escapeHtml(series.hint || series.note || '') +
+              (series.nextValue != null ? ' Ориентир ' + formatMoney(series.nextValue) + '.' : '') +
             '</p>' +
-            '<p class="forecast-line">' + escapeHtml(series.note || '') +
-              (series.nextValue != null ? ' <strong>' + formatMoney(series.nextValue) + '</strong>' : '') +
-            '</p>' +
+            (series.modelPlain ? '<p class="forecast-line">' + escapeHtml(series.modelPlain) + '</p>' : '') +
             forecastChips(series.models, series.requestedModelId, 'series') +
           '</div>';
       }
@@ -952,7 +954,6 @@
 
     return (
       '<div class="forecast-panel" data-forecast="1">' +
-        '<div class="forecast-panel-kicker"><span class="forecast-test-badge">Тест</span><span>К закрытию дня</span></div>' +
         closeBlock +
         forecastChips(hourly.models, hourly.requestedModelId, 'hourly') +
         seriesBlock +
@@ -984,7 +985,8 @@
       }
 
       var trendClass = m.deltaPct > 0.5 ? 'up' : m.deltaPct < -0.5 ? 'down' : 'flat';
-      var arrow = trendClass === 'up' ? '\u25B2' : trendClass === 'down' ? '\u25BC' : '\u25CF';
+      var ongoing = !!state.forecast;
+      var trendText = trendTitle(trendClass, m.deltaPct, ongoing);
       var lineColor = trendClass === 'up' ? 'var(--success)' : trendClass === 'down' ? 'var(--danger)' : COLOR_SELECTED;
       var scale = sparkScaleDual(m.trend, m.compareTrend, 110, 44);
       var pathCompare = pathFromSeries(m.compareTrend, scale);
@@ -997,8 +999,8 @@
             '<div class="stat-card-label">' + escapeHtml(def.label) + '</div>' +
             '<div class="stat-card-value">' + def.formatter(m.value) + '</div>' +
             '<div class="stat-card-delta ' + trendClass + '">' +
-              '<span>' + arrow + ' ' + Math.abs(m.deltaPct).toFixed(2) + '%</span>' +
-              '<span class="stat-card-delta-abs">' + def.deltaFormatter(m.deltaAbs) + '</span>' +
+              '<span class="stat-card-trend">' + trendText + '</span>' +
+              '<span class="stat-card-trend-hint">к тому же дню неделю назад · ' + def.deltaFormatter(m.deltaAbs) + '</span>' +
             '</div>' +
           '</div>' +
           '<div class="sparkline-wrap">' +

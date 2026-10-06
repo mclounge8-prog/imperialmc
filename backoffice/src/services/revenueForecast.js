@@ -44,6 +44,15 @@ export function weekdayPhrase(weekday) {
   return WEEKDAY_PLURAL[weekday] || 'таким дням';
 }
 
+/** Короткая фраза для экрана: «Пока тренд на спад, −8%». */
+export function trendWords(sign, pct, { ongoing = false } = {}) {
+  const n = Math.round(Math.abs(Number(pct) || 0));
+  const head = ongoing ? 'Пока тренд' : 'Тренд';
+  if (sign === 'up') return { sign: 'up', title: `${head} на рост, +${n}%` };
+  if (sign === 'down') return { sign: 'down', title: `${head} на спад, −${n}%` };
+  return { sign: 'flat', title: ongoing ? 'Пока тренд ровный' : 'Тренд ровный' };
+}
+
 function sum(values) {
   let total = 0;
   for (const value of values) {
@@ -232,18 +241,21 @@ export const HOURLY_MODELS = {
     id: 'weekdayProfile',
     label: 'Профиль дня',
     hint: 'Оставшиеся часы как в такие же дни недели. Вечер сдвигается только наполовину от темпа утра.',
+    plain: 'Смотрим обычные такие дни: как идёт день сейчас, так чуть поправляем вечер.',
     predict: predictWeekdayProfile,
   },
   weekdayRatio: {
     id: 'weekdayRatio',
     label: 'Доля дня',
     hint: 'Факт умножается на то, какую долю дня обычно уже сделали к этому часу.',
+    plain: 'Смотрим, какую долю дня обычно уже сделали к этому часу, и так дорисовываем остаток.',
     predict: predictWeekdayRatio,
   },
   yesterdayRatio: {
     id: 'yesterdayRatio',
     label: 'Как вчера',
     hint: 'Та же доля, но база — вчерашний день, без поправки на день недели.',
+    plain: 'Смотрим вчерашний день и прикидываем, что сегодня закончится так же.',
     predict: predictYesterdayRatio,
   },
 };
@@ -320,22 +332,24 @@ export const SERIES_MODELS = {
     id: 'halfCompare',
     label: 'Половины',
     hint: 'Средняя второй половины закрытых периодов против первой. Текущий период не входит.',
+    plain: 'Сравниваем недавние закрытые недели с более ранними.',
     predict: predictHalfCompare,
   },
   linearSlope: {
     id: 'linearSlope',
     label: 'Наклон',
     hint: 'Прямая по закрытым периодам и один шаг вперёд. Текущий период не входит.',
+    plain: 'Смотрим, вверх или вниз ползут закрытые недели, и продлеваем эту линию.',
     predict: predictLinearSlope,
   },
 };
 
 export function listHourlyModels() {
-  return Object.values(HOURLY_MODELS).map(({ id, label, hint }) => ({ id, label, hint }));
+  return Object.values(HOURLY_MODELS).map(({ id, label, hint, plain }) => ({ id, label, hint, plain }));
 }
 
 export function listSeriesModels() {
-  return Object.values(SERIES_MODELS).map(({ id, label, hint }) => ({ id, label, hint }));
+  return Object.values(SERIES_MODELS).map(({ id, label, hint, plain }) => ({ id, label, hint, plain }));
 }
 
 export function resolveHourlyModel(id) {
@@ -416,17 +430,22 @@ export function presentHourlyForecast(result, todayHours = null) {
 
   const labels = hourlyCompareLabels(result);
   const closeDir = direction(result.closeForecast, result.closeBaseline);
+  const paceWords = trendWords(result.sign, result.pct, { ongoing: true });
+  const closeWords = trendWords(closeDir.sign, closeDir.pct);
+  const activeModel = models.find((model) => model.id === result.modelId);
   const notes = [];
   if (result.fellBack) {
     const requested = models.find((model) => model.id === result.requestedModelId);
     notes.push(
-      `${requested?.label || 'Выбранная модель'} недоступна (${result.fallbackReason}). Показано: ${result.modelLabel}.`
+      `${requested?.label || 'Этот способ'} сейчас не посчитать (${result.fallbackReason}). Показан способ «${result.modelLabel}».`
     );
   }
-  if (result.confidence === 'low') notes.push('До 12:00 цифра легко сдвигается.');
-  if (result.confidence === 'early') notes.push('До набора выручки показан обычный ход дня.');
-  if (result.capped) notes.push('Коэффициент ограничен: утро ещё слишком короткое для такого множителя.');
-  if (result.compareWith === 'weekday') notes.push(`База: ${result.baselineDays} таких же дней.`);
+  if (result.confidence === 'low') notes.push('До полудня процент ещё легко меняется.');
+  if (result.confidence === 'early') notes.push('До выручки показываем, как обычно заканчивается такой день.');
+  if (result.capped) notes.push('Утро ещё короткое, слишком резкий скачок мы придержали.');
+  if (result.compareWith === 'weekday') {
+    notes.push(`Считаем по ${result.baselineDays} обычным ${weekdayPhrase(result.weekday)}.`);
+  }
 
   let chart = null;
   const hasFuture = (result.projected || []).some((value, hour) => hour > result.currentHour && value != null);
@@ -451,9 +470,17 @@ export function presentHourlyForecast(result, todayHours = null) {
     closePct: closeDir.pct,
     paceSign: result.sign,
     pacePct: result.pct,
+    paceTitle: result.confidence === 'early' ? 'День ещё не разошёлся' : paceWords.title,
+    paceHint:
+      result.confidence === 'early'
+        ? 'Рано говорить, выше сегодня обычного или ниже.'
+        : `По уже закрытым часам, ${labels.pace}.`,
     showPace: result.confidence !== 'early',
     paceLabel: labels.pace,
+    closeTitle: closeWords.title,
+    closeHint: `К закрытию дня, ${labels.close}.`,
     closeLabel: labels.close,
+    modelPlain: activeModel?.plain || '',
     confidence: result.confidence,
     notes,
     chart,
@@ -474,20 +501,25 @@ export function presentSeriesForecast(result) {
       models,
     };
   }
-  const note =
+  const words = trendWords(result.sign, result.pct);
+  const hint =
     result.pointKind === 'slope'
-      ? 'Ориентир по наклону закрытых недель. Текущая неделя не входит.'
-      : 'Ориентир — средний уровень второй половины закрытых недель. Текущая неделя не входит.';
+      ? 'Так ползут уже закрытые недели. Текущая неделя не входит.'
+      : 'Недавние закрытые недели против предыдущих. Текущая неделя не входит.';
+  const activeModel = models.find((model) => model.id === result.modelId);
   return {
     ok: true,
     modelId: result.modelId,
     requestedModelId: result.requestedModelId,
     modelLabel: result.modelLabel,
+    modelPlain: activeModel?.plain || '',
     models,
     sign: result.sign,
     pct: result.pct,
+    title: words.title,
+    hint,
     nextValue: result.nextValue,
     pointKind: result.pointKind,
-    note,
+    note: hint,
   };
 }

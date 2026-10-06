@@ -1,13 +1,13 @@
 import { escapeHtml } from './escapeHtml.js';
 import {
   formatMoney,
-  renderDeltaBadge,
+  formatDelta,
   renderLineAreaChart,
   renderDualLineChart,
   renderTopItemsList,
   renderDonutChart,
 } from './charts.js';
-import { listHourlyModels, listSeriesModels, weekdayPhrase } from '../services/revenueForecast.js';
+import { listHourlyModels, listSeriesModels, weekdayPhrase, trendWords } from '../services/revenueForecast.js';
 
 const PERIOD_TABS = [
   ['day', 'День'],
@@ -79,24 +79,18 @@ function renderSeriesForecastStrip({ forecast, period, venueId, seriesModel }) {
     urlFor: (id) => `/stats/revenue?${qs({ period, venueId, seriesModel: id })}`,
   });
 
-  let headline = 'Направление';
-  let note = forecast?.reason || 'Недостаточно закрытых периодов';
-  if (forecast?.ok) {
-    const pointText =
-      forecast.pointKind === 'slope'
-        ? `Ориентир по наклону закрытых ${copy.unit}: <strong>${formatMoney(forecast.nextValue)}</strong>. ${copy.tail}.`
-        : `Ориентир — средний уровень второй половины закрытых ${copy.unit}: <strong>${formatMoney(forecast.nextValue)}</strong>. ${copy.tail}.`;
-    headline = `Направление ${renderDeltaBadge(forecast.trendCurrent, forecast.trendBaseline)}`;
-    note = pointText;
-  }
+  const words = forecast?.ok ? trendWords(forecast.sign, forecast.pct) : null;
+  const modelPlain = listSeriesModels().find((model) => model.id === (forecast?.modelId || activeId))?.plain || '';
+  const headline = words ? words.title : 'Пока мало закрытых периодов';
+  const note = forecast?.ok
+    ? `${forecast.pointKind === 'slope' ? 'Так ползут уже закрытые' : 'Недавние закрытые'} ${copy.unit} против предыдущих. ${copy.tail}. Ориентир ${formatMoney(forecast.nextValue)}.`
+    : escapeHtml(forecast?.reason || 'Недостаточно закрытых периодов');
 
   return `
     <div class="forecast-strip" data-forecast="series" data-forecast-model="${escapeHtml(activeId || '')}">
-      <div class="forecast-strip-head">
-        <span class="forecast-test-badge">Тест</span>
-        <span>${headline}</span>
-      </div>
+      <div class="forecast-plain-title ${words ? words.sign : 'flat'}">${escapeHtml(headline)}</div>
       <p class="forecast-note">${note}</p>
+      ${modelPlain ? `<p class="forecast-note">${escapeHtml(modelPlain)}</p>` : ''}
       ${buttons}
       <input type="hidden" id="series-model-field" name="seriesModel" value="${escapeHtml(activeId || '')}">
     </div>
@@ -134,10 +128,7 @@ function renderHourlyForecastStrip({ forecast, venueId, hourlyModel }) {
   if (!forecast?.ok) {
     return `
       <div class="forecast-strip" data-forecast="hourly" data-forecast-model="${escapeHtml(activeId || '')}">
-        <div class="forecast-strip-head">
-          <span class="forecast-test-badge">Тест</span>
-          <span>Прогноз к закрытию</span>
-        </div>
+        <div class="forecast-plain-title flat">Пока без прогноза на день</div>
         <p class="forecast-note">${escapeHtml(forecast?.reason || 'Нет базы для прогноза')}</p>
         ${buttons}
         <input type="hidden" id="hourly-model-field" name="hourlyModel" value="${escapeHtml(activeId || '')}">
@@ -146,32 +137,36 @@ function renderHourlyForecastStrip({ forecast, venueId, hourlyModel }) {
   }
 
   const labels = hourlyCompareLabels(forecast);
+  const paceWords = trendWords(forecast.sign, forecast.pct, { ongoing: true });
+  const closeDelta = formatDelta(forecast.closeForecast, forecast.closeBaseline);
+  const closeWords = trendWords(closeDelta.sign, closeDelta.pct);
+  const closeSign = closeWords.sign;
+  const modelPlain = listHourlyModels().find((model) => model.id === forecast.modelId)?.plain || '';
   const notes = [];
   if (forecast.fellBack) {
     const requested = listHourlyModels().find((model) => model.id === forecast.requestedModelId);
     notes.push(
-      `${requested?.label || 'Выбранная модель'} недоступна (${forecast.fallbackReason}). Показано: ${forecast.modelLabel}.`
+      `${requested?.label || 'Этот способ'} сейчас не посчитать. Показан способ «${forecast.modelLabel}».`
     );
   }
-  if (forecast.confidence === 'low') notes.push('До 12:00 цифра легко сдвигается.');
-  if (forecast.confidence === 'early') notes.push('До набора выручки показан обычный ход дня.');
-  if (forecast.capped) notes.push('Коэффициент ограничен: утро ещё слишком короткое для такого множителя.');
-  if (forecast.compareWith === 'weekday') notes.push(`База: ${forecast.baselineDays} таких же дней.`);
+  if (forecast.confidence === 'low') notes.push('До полудня процент ещё легко меняется.');
+  if (forecast.confidence === 'early') notes.push('До выручки показываем, как обычно заканчивается такой день.');
+  if (forecast.capped) notes.push('Утро ещё короткое, слишком резкий скачок мы придержали.');
+  if (forecast.compareWith === 'weekday') notes.push(`Считаем по ${forecast.baselineDays} обычным ${weekdayPhrase(forecast.weekday)}.`);
   const noteText = notes.filter(Boolean).join(' ');
-  const pace =
+  const paceTitle = forecast.confidence === 'early' ? 'День ещё не разошёлся' : paceWords.title;
+  const paceHint =
     forecast.confidence === 'early'
-      ? ''
-      : `<p class="forecast-note">К этому часу ${renderDeltaBadge(forecast.trendCurrent, forecast.trendBaseline)} ${escapeHtml(labels.pace)}</p>`;
+      ? 'Рано говорить, выше сегодня обычного или ниже.'
+      : `По уже закрытым часам, ${labels.pace}.`;
 
   return `
     <div class="forecast-strip" data-forecast="hourly" data-forecast-model="${escapeHtml(forecast.modelId)}">
-      <div class="forecast-strip-head">
-        <span class="forecast-test-badge">Тест</span>
-        <span>К закрытию <strong>${formatMoney(forecast.closeForecast)}</strong></span>
-        ${renderDeltaBadge(forecast.closeForecast, forecast.closeBaseline)}
-        <span class="forecast-note">${escapeHtml(labels.close)}</span>
-      </div>
-      ${pace}
+      <div class="forecast-plain-title ${forecast.confidence === 'early' ? 'flat' : paceWords.sign}">${escapeHtml(paceTitle)}</div>
+      <p class="forecast-note">${escapeHtml(paceHint)}</p>
+      <p class="forecast-close">К закрытию около <strong>${formatMoney(forecast.closeForecast)}</strong></p>
+      <p class="forecast-note ${closeWords.sign}">${escapeHtml(closeWords.title)}. ${escapeHtml(labels.close)}.</p>
+      ${modelPlain ? `<p class="forecast-note">${escapeHtml(modelPlain)}</p>` : ''}
       ${noteText ? `<p class="forecast-note">${escapeHtml(noteText)}</p>` : ''}
       ${buttons}
       <input type="hidden" id="hourly-model-field" name="hourlyModel" value="${escapeHtml(activeId || '')}">
@@ -260,7 +255,8 @@ export function renderTopItemsDonutBody(items) {
 
 function renderTodayWidget(today) {
   const sameWindow = today.yesterdaySameWindow ?? today.yesterdayRevenue ?? 0;
-  const delta = renderDeltaBadge(today.revenue, sameWindow);
+  const delta = formatDelta(today.revenue, sameWindow);
+  const words = trendWords(delta.sign, delta.pct, { ongoing: true });
   return `
     <div class="stat-card today-card">
       <div class="widget-header">
@@ -269,8 +265,8 @@ function renderTodayWidget(today) {
       <div class="today-hero">
         <div class="today-hero-value">${formatMoney(today.revenue, { decimals: 2 })}</div>
         <div class="today-hero-compare">
-          к этому часу вчера ${formatMoney(sameWindow, { decimals: 2 })}
-          ${delta}
+          <span class="forecast-plain-title ${words.sign}">${escapeHtml(words.title)}</span>
+          <span>к вчерашнему часу, тогда было ${formatMoney(sameWindow, { decimals: 2 })}</span>
         </div>
       </div>
       <div class="today-metrics">
@@ -360,14 +356,13 @@ export function renderHourlyWidget({ hourly, forecast = null, venueId = '', hour
     formatValue: (v) => formatMoney(v),
     height: 200,
   });
-  const delta = renderDeltaBadge(hourly.todayTotalSoFar, hourly.yesterdayTotalSameWindow);
 
   return `
     <div class="stat-card" id="hourly-widget">
       <div class="widget-header">
         <div>
           <h2>Выручка по часам</h2>
-          <p class="hint">К этому часу: <strong>${formatMoney(hourly.todayTotalSoFar)}</strong> ${delta} к вчера (${formatMoney(hourly.yesterdayTotalSameWindow)})</p>
+          <p class="hint">Сейчас <strong>${formatMoney(hourly.todayTotalSoFar)}</strong>, вчера к этому часу ${formatMoney(hourly.yesterdayTotalSameWindow)}</p>
         </div>
       </div>
       ${renderHourlyForecastStrip({ forecast, venueId, hourlyModel })}

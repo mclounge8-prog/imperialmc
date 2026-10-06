@@ -204,12 +204,15 @@ test('presenters expose close, pace and a chart that starts at the current hour'
   assert.equal(view.chart[11], 0);
   assert.equal(view.chart[18], 300);
   assert.equal(view.closeLabel.includes('вторник'), true);
+  assert.match(view.paceTitle, /тренд/i);
+  assert.match(view.closeTitle, /тренд/i);
   assert.ok(view.models.some((model) => model.id === 'yesterdayRatio'));
 
   const series = presentSeriesForecast(runSeriesForecast('halfCompare', { values: [10, 20, 30, 40, 50, 99] }));
   assert.equal(series.ok, true);
   assert.equal(series.nextValue, 40);
   assert.match(series.note, /не входит/);
+  assert.match(series.title, /Тренд/);
 });
 
 test('widgets render the test switcher and the hourly forecast line', () => {
@@ -236,8 +239,9 @@ test('widgets render the test switcher and the hourly forecast line', () => {
     venueId: '5',
     hourlyModel: 'weekdayProfile',
   });
-  assert.match(hourlyHtml, /forecast-test-badge/);
-  assert.match(hourlyHtml, /К закрытию/);
+  assert.match(hourlyHtml, /[Тт]ренд/);
+  assert.match(hourlyHtml, /К закрытию около/);
+  assert.doesNotMatch(hourlyHtml, /forecast-test-badge/);
   assert.match(hourlyHtml, /#e2b15a/);
   assert.match(hourlyHtml, /hourlyModel=weekdayRatio/);
   assert.match(hourlyHtml, /id="hourly-model-field"/);
@@ -251,7 +255,8 @@ test('widgets render the test switcher and the hourly forecast line', () => {
     forecast: series,
     seriesModel: 'halfCompare',
   });
-  assert.match(revenueHtml, /Направление/);
+  assert.match(revenueHtml, /Тренд/);
+  assert.doesNotMatch(revenueHtml, /forecast-test-badge/);
   assert.match(revenueHtml, /seriesModel=linearSlope/);
   assert.match(revenueHtml, /id="series-model-field"/);
   assert.match(revenueHtml, /Текущая неделя не входит/);
