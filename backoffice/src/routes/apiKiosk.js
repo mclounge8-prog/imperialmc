@@ -568,10 +568,19 @@ apiKiosk.post('/tickets/:id/status', requireStaffToken, async (c) => {
     }
 
     if (nextStatus === 'cancelled') {
-      const { rows: itemRows } = await client.query(
-        'SELECT id, qty FROM kiosk_ticket_items WHERE ticket_id = $1',
-        [ticketId]
-      );
+      let guestAlreadyCancelled = false;
+      if (ticket.guest_id) {
+        const { rows: guestRows } = await client.query(
+          'SELECT status FROM order_guests WHERE id = $1',
+          [ticket.guest_id]
+        );
+        guestAlreadyCancelled = guestRows[0]?.status === 'cancelled';
+      }
+      // Если чек гостя уже отменили через кассу, склад вернули там.
+      // Повторно с киоска не возвращаем, иначе остаток удвоится.
+      const { rows: itemRows } = guestAlreadyCancelled
+        ? { rows: [] }
+        : await client.query('SELECT id, qty FROM kiosk_ticket_items WHERE ticket_id = $1', [ticketId]);
       for (const item of itemRows) {
         // eslint-disable-next-line no-await-in-loop
         const { rows: mods } = await client.query(
