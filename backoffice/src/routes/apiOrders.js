@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { pool } from '../db.js';
+import { stockDeltasForItems } from '../services/warehouseStock.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { enqueuePrecheckFiscalJob, enqueueReceiptFiscalJob } from '../services/fiscalQueue.js';
 import {
@@ -740,6 +741,15 @@ apiOrders.post('/orders/:orderId/guests/:guestId/cancel', requireStaffToken, asy
     }
 
     const items = await fetchGuestItemsSnapshot(guestId, client);
+    // Списание было при добавлении в чек. Отмена до оплаты — в том числе
+    // после пречека — должна вернуть тот же объём. Иначе склад остаётся
+    // уменьшенным, хотя продажи нет.
+    if (guest.venue_id) {
+      for (const delta of stockDeltasForItems(items)) {
+        // eslint-disable-next-line no-await-in-loop
+        await applyStockDelta(client, guest.venue_id, delta.warehouseItemId, delta.deltaQty);
+      }
+    }
     const subtotal = items.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
     await createReceipt(client, {
       guest,

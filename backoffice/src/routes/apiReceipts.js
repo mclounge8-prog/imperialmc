@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { pool } from '../db.js';
+import { stockDeltasForItems } from '../services/warehouseStock.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import {
   enqueueReceiptReturnFiscalJob,
@@ -131,15 +132,13 @@ async function applyStockDelta(client, venueId, warehouseItemId, deltaQty) {
 
 /** Возврат склада по снапшоту чека (то, что реально списывалось при добавлении). */
 async function returnReceiptStock(client, venueId, items) {
-  for (const item of items) {
-    const itemQty = Number(item.qty) || 1;
-    for (const mod of item.modifiers || []) {
-      const warehouseItemId = mod.warehouse_item_id ?? mod.warehouseItemId ?? null;
-      const perUnitQty = Number(mod.qty) || 0;
-      if (!warehouseItemId || perUnitQty <= 0) continue;
-      // eslint-disable-next-line no-await-in-loop
-      await applyStockDelta(client, venueId, warehouseItemId, perUnitQty * itemQty);
-    }
+  const normalized = (items || []).map((item) => ({
+    ...item,
+    qty: Number(item.qty) > 0 ? Number(item.qty) : 1,
+  }));
+  for (const delta of stockDeltasForItems(normalized)) {
+    // eslint-disable-next-line no-await-in-loop
+    await applyStockDelta(client, venueId, delta.warehouseItemId, delta.deltaQty);
   }
 }
 
