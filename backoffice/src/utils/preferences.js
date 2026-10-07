@@ -30,6 +30,26 @@ export function writeSelectedVenueId(c, venueId) {
   setCookie(c, VENUE_COOKIE, String(venueId), { path: '/', maxAge: COOKIE_MAX_AGE, sameSite: 'Lax' });
 }
 
+const FORECAST_HOURLY_COOKIE = 'imc_forecast_hourly';
+const FORECAST_SERIES_COOKIE = 'imc_forecast_series';
+
+/** Какая тестовая модель прогноза выбрана на главной. Пустая строка — брать значение по умолчанию. */
+export function readForecastModels(c) {
+  return {
+    hourlyModel: getCookie(c, FORECAST_HOURLY_COOKIE) || null,
+    seriesModel: getCookie(c, FORECAST_SERIES_COOKIE) || null,
+  };
+}
+
+export function writeForecastModels(c, { hourlyModel, seriesModel }) {
+  if (hourlyModel) {
+    setCookie(c, FORECAST_HOURLY_COOKIE, hourlyModel, { path: '/', maxAge: COOKIE_MAX_AGE, sameSite: 'Lax' });
+  }
+  if (seriesModel) {
+    setCookie(c, FORECAST_SERIES_COOKIE, seriesModel, { path: '/', maxAge: COOKIE_MAX_AGE, sameSite: 'Lax' });
+  }
+}
+
 /** Сохранённое в cookie заведение, если оно всё ещё существует в списке,
  *  иначе первое по списку (или null, если заведений нет вообще). */
 export function resolveSelectedVenue(venues, requestedId) {

@@ -3,7 +3,8 @@ import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
 import {
   renderDashboardSection,
-  renderRevenueWidgetBody,
+  renderRevenueCard,
+  renderHourlyWidget,
   renderTopItemsWidgetBody,
   renderTopItemsDonutBody,
 } from '../views/statsView.js';
@@ -17,8 +18,19 @@ import {
   venueQuarterStartISO,
   venueShiftDaysISO,
   venueTodayISO,
+  venueIsoWeekday,
 } from '../utils/timezone.js';
 import { fetchCashOnHand } from '../services/cashOnHand.js';
+import {
+  forecastConfig,
+  resolveHourlyModel,
+  resolveSeriesModel,
+  runHourlyForecast,
+  runSeriesForecast,
+  presentHourlyForecast,
+  presentSeriesForecast,
+} from '../services/revenueForecast.js';
+import { readForecastModels, writeForecastModels } from '../utils/preferences.js';
 
 const stats = new Hono();
 stats.use('*', requireAuthApi);
@@ -171,12 +183,19 @@ async function fetchTodayStats(venueId) {
   const revenue = todayRows.reduce((sum, r) => sum + Number(r.total), 0);
   const yesterdayRevenue = yesterdayRows.reduce((sum, r) => sum + Number(r.total), 0);
 
+  const currentHour = venueHour(now);
+  const yesterdaySameWindow = yesterdayRows.reduce((sum, row) => {
+    if (venueHour(new Date(row.closed_at)) <= currentHour) return sum + Number(row.total);
+    return sum;
+  }, 0);
+
   return {
     revenue,
     receiptCount,
     guestCount: receiptCount,
     avgCheck: receiptCount > 0 ? revenue / receiptCount : 0,
     yesterdayRevenue,
+    yesterdaySameWindow,
   };
 }
 
@@ -207,68 +226,188 @@ async function fetchPeriodTotals(venueId) {
   return { day, week, month, quarter };
 }
 
-async function fetchHourlyComparison(venueId) {
+async function fetchHourlyContext(venueId, lookbackWeeks = forecastConfig.weekdayLookback) {
   const now = new Date();
   const todayISO = venueTodayISO(now);
   const yesterdayISO = venueShiftDaysISO(todayISO, -1);
-  const { start: todayStart, end: tomorrowStart } = venueDayRange(todayISO);
-  const { start: yesterdayStart } = venueDayRange(yesterdayISO);
-  const rows = await fetchPaidReceiptsInRange(yesterdayStart, tomorrowStart, venueId);
+  const weekday = venueIsoWeekday(todayISO);
+  const baselineDays = [];
+  for (let week = 1; week <= lookbackWeeks; week += 1) {
+    baselineDays.push(venueShiftDaysISO(todayISO, -7 * week));
+  }
+  const oldestISO = baselineDays[baselineDays.length - 1] || yesterdayISO;
+  const startISO = oldestISO < yesterdayISO ? oldestISO : yesterdayISO;
+  const { start } = venueDayRange(startISO);
+  const { end: tomorrowStart } = venueDayRange(todayISO);
+  const rows = await fetchPaidReceiptsInRange(start, tomorrowStart, venueId);
 
-  const todayHours = new Array(24).fill(0);
-  const yesterdayHours = new Array(24).fill(0);
-  const currentHour = venueHour(now);
+  const buckets = new Map();
+  const touch = (day) => {
+    if (!buckets.has(day)) buckets.set(day, new Array(24).fill(0));
+    return buckets.get(day);
+  };
+  touch(todayISO);
+  touch(yesterdayISO);
+  for (const day of baselineDays) touch(day);
 
-  for (const r of rows) {
-    const closedAt = new Date(r.closed_at);
-    const hour = venueHour(closedAt);
-    const amount = Number(r.total);
-    if (closedAt >= todayStart) {
-      todayHours[hour] += amount;
-    } else {
-      yesterdayHours[hour] += amount;
-    }
+  for (const row of rows) {
+    const closedAt = new Date(row.closed_at);
+    const day = venueTodayISO(closedAt);
+    const bucket = buckets.get(day);
+    if (!bucket) continue;
+    bucket[venueHour(closedAt)] += Number(row.total);
   }
 
-  const todayTotalSoFar = todayHours.slice(0, currentHour + 1).reduce((s, v) => s + v, 0);
-  const yesterdayTotalSameWindow = yesterdayHours.slice(0, currentHour + 1).reduce((s, v) => s + v, 0);
+  const todayHours = buckets.get(todayISO);
+  const yesterdayHours = buckets.get(yesterdayISO);
+  const currentHour = venueHour(now);
+  const todayTotalSoFar = todayHours.slice(0, currentHour + 1).reduce((total, value) => total + value, 0);
+  const yesterdayTotalSameWindow = yesterdayHours.slice(0, currentHour + 1).reduce((total, value) => total + value, 0);
+  const sameWeekday = baselineDays.map((day) => ({
+    day,
+    hours: buckets.get(day),
+  }));
 
-  return { todayHours, yesterdayHours, currentHour, todayTotalSoFar, yesterdayTotalSameWindow };
+  return {
+    todayHours,
+    yesterdayHours,
+    currentHour,
+    todayTotalSoFar,
+    yesterdayTotalSameWindow,
+    sameWeekday,
+    weekday,
+  };
 }
 
-async function buildDashboardData(venueId) {
+function forecastChoice(c) {
+  const saved = readForecastModels(c);
+  const hourlyFromQuery = c.req.query('hourlyModel');
+  const seriesFromQuery = c.req.query('seriesModel');
+  const hourlyModel = resolveHourlyModel(hourlyFromQuery || saved.hourlyModel);
+  const seriesModel = resolveSeriesModel(seriesFromQuery || saved.seriesModel);
+  if (hourlyFromQuery || seriesFromQuery) {
+    writeForecastModels(c, {
+      hourlyModel: hourlyFromQuery ? hourlyModel : saved.hourlyModel,
+      seriesModel: seriesFromQuery ? seriesModel : saved.seriesModel,
+    });
+  }
+  return { hourlyModel, seriesModel };
+}
+
+export async function loadDashboardForecast(venueId, choice = {}) {
+  const hourlyModel = resolveHourlyModel(choice.hourlyModel);
+  const seriesModel = resolveSeriesModel(choice.seriesModel);
+  const hourly = await fetchHourlyContext(venueId);
+  const trend = await fetchTrend('week', venueId);
+  const hourlyForecast = runHourlyForecast(hourlyModel, {
+    todayHours: hourly.todayHours,
+    yesterdayHours: hourly.yesterdayHours,
+    currentHour: hourly.currentHour,
+    sameWeekday: hourly.sameWeekday,
+    weekday: hourly.weekday,
+  });
+  const seriesForecast = runSeriesForecast(seriesModel, {
+    values: trend.map((point) => point.revenue),
+  });
+  return {
+    testMode: forecastConfig.testMode,
+    asOfHour: hourly.currentHour,
+    hourlyModel,
+    seriesModel,
+    hourly: presentHourlyForecast(hourlyForecast, hourly.todayHours),
+    series: presentSeriesForecast(seriesForecast),
+  };
+}
+
+async function buildDashboardData(venueId, choice) {
   const { rows: venues } = await pool.query('SELECT id, name FROM venues ORDER BY name');
+  const { hourlyModel, seriesModel } = choice;
 
   const [today, hourly, revenueTrend, topItems, periodTotals, cashOnHand] = await Promise.all([
     fetchTodayStats(venueId),
-    fetchHourlyComparison(venueId),
+    fetchHourlyContext(venueId),
     fetchTrend('week', venueId),
     fetchTopItems('day', venueId, 5),
     fetchPeriodTotals(venueId),
     fetchCashOnHand(venueId),
   ]);
 
-  return { venues, venueId, today, hourly, revenueTrend, topItems, periodTotals, cashOnHand };
+  const hourlyForecast = runHourlyForecast(hourlyModel, {
+    todayHours: hourly.todayHours,
+    yesterdayHours: hourly.yesterdayHours,
+    currentHour: hourly.currentHour,
+    sameWeekday: hourly.sameWeekday,
+    weekday: hourly.weekday,
+  });
+  const seriesForecast = runSeriesForecast(seriesModel, {
+    values: revenueTrend.map((point) => point.revenue),
+  });
+
+  return {
+    venues,
+    venueId,
+    today,
+    hourly,
+    hourlyForecast,
+    hourlyModel,
+    seriesForecast,
+    seriesModel,
+    revenueTrend,
+    topItems,
+    periodTotals,
+    cashOnHand,
+  };
 }
 
-export async function renderDashboardFragment(venueId) {
-  const data = await buildDashboardData(venueId);
+export async function renderDashboardFragment(venueId, choice = {}) {
+  const resolved = {
+    hourlyModel: resolveHourlyModel(choice.hourlyModel),
+    seriesModel: resolveSeriesModel(choice.seriesModel),
+  };
+  const data = await buildDashboardData(venueId, resolved);
   return renderDashboardSection(data);
 }
 
 stats.get('/', async (c) => {
   const venueId = c.req.query('venueId') || null;
-  return c.html(await renderDashboardFragment(venueId));
+  return c.html(await renderDashboardFragment(venueId, forecastChoice(c)));
+});
+
+stats.get('/hourly', async (c) => {
+  const venueId = c.req.query('venueId') || null;
+  const { hourlyModel } = forecastChoice(c);
+  const hourly = await fetchHourlyContext(venueId);
+  const forecast = runHourlyForecast(hourlyModel, {
+    todayHours: hourly.todayHours,
+    yesterdayHours: hourly.yesterdayHours,
+    currentHour: hourly.currentHour,
+    sameWeekday: hourly.sameWeekday,
+    weekday: hourly.weekday,
+  });
+  return c.html(renderHourlyWidget({ hourly, forecast, venueId: venueId || '', hourlyModel }));
 });
 
 stats.get('/revenue', async (c) => {
   const venueId = c.req.query('venueId') || null;
   const period = normalizePeriod(c.req.query('period'));
+  const { seriesModel } = forecastChoice(c);
   const [trend, periodTotals] = await Promise.all([
     fetchTrend(period, venueId),
     fetchPeriodTotals(venueId),
   ]);
-  return c.html(renderRevenueWidgetBody(trend, periodTotals, period));
+  const forecast = runSeriesForecast(seriesModel, {
+    values: trend.map((point) => point.revenue),
+  });
+  return c.html(
+    renderRevenueCard({
+      trend,
+      periodTotals,
+      activePeriod: period,
+      venueId: venueId || '',
+      forecast,
+      seriesModel,
+    })
+  );
 });
 
 stats.get('/top-items', async (c) => {

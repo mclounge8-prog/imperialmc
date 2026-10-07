@@ -23,6 +23,7 @@
   var chartSheetX = document.getElementById('chartSheetX');
   var chartLegendSelected = document.getElementById('chartLegendSelected');
   var chartLegendCompare = document.getElementById('chartLegendCompare');
+  var chartLegendForecastItem = document.getElementById('chartLegendForecastItem');
   var chartSheetLegend = chartLegendSelected
     ? chartLegendSelected.closest('.chart-sheet-legend')
     : null;
@@ -57,6 +58,9 @@
     dates: [],
     hourLabels: [],
     metrics: null,
+    forecast: null,
+    hourlyModel: storedForecastModel('pwa-forecast-hourly'),
+    seriesModel: storedForecastModel('pwa-forecast-series'),
     reportKind: 'items',
     reportPreset: 'last7',
     reportFrom: null,
@@ -70,7 +74,7 @@
   // Версия этой оболочки — должна совпадать с /pwa/version.json и CACHE_VERSION в sw.js.
   // Не берём «истину» только из localStorage: после авто-reload от SW старое
   // значение в storage вечно показывало «Доступна новая версия».
-  var SHELL_VERSION = 'v16';
+  var SHELL_VERSION = 'v18';
   var APP_VERSION = SHELL_VERSION;
   var pendingSwRegistration = null;
   var updateToastVisible = false;
@@ -79,6 +83,20 @@
   // вернуть форму входа поверх уже открытой статистики (типичная гонка на iPhone).
   var authEpoch = 0;
   var isAuthenticated = false;
+
+  function storedForecastModel(key) {
+    try {
+      return localStorage.getItem(key) || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function saveForecastModel(key, value) {
+    try {
+      if (value) localStorage.setItem(key, value);
+    } catch (e) { /* приватный режим */ }
+  }
 
   var MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
@@ -778,6 +796,8 @@
     var params = new URLSearchParams();
     if (state.date) params.set('date', state.date);
     if (state.venueId) params.set('venueId', state.venueId);
+    if (state.hourlyModel) params.set('hourlyModel', state.hourlyModel);
+    if (state.seriesModel) params.set('seriesModel', state.seriesModel);
 
     return apiFetch('/api/pwa/stats?' + params.toString())
       .then(function (res) {
@@ -794,6 +814,7 @@
         state.dates = data.dates || [];
         state.hourLabels = data.hourLabels || [];
         state.metrics = data.metrics || null;
+        state.forecast = data.forecast || null;
         dateInput.value = data.date;
         updateDateLabels(data.compareDate);
         renderCards(data.metrics);
@@ -823,6 +844,7 @@
 
   var COLOR_SELECTED = '#3f63e6';
   var COLOR_COMPARE = '#c9a227';
+  var COLOR_FORECAST = '#7ddea8';
   var COLOR_GRID = '#34343c';
 
   function sparkScaleDual(seriesA, seriesB, width, height) {
@@ -854,8 +876,93 @@
     }).join(' ');
   }
 
+  function trendTitle(sign, pct, ongoing) {
+    var n = Math.abs(Math.round(Number(pct) || 0));
+    var head = ongoing ? 'Пока тренд' : 'Тренд';
+    if (sign === 'up') return head + ' на рост, +' + n + '%';
+    if (sign === 'down') return head + ' на спад, −' + n + '%';
+    return ongoing ? 'Пока тренд ровный' : 'Тренд ровный';
+  }
+
+  function trendClassOf(sign) {
+    return sign === 'up' ? 'up' : sign === 'down' ? 'down' : 'flat';
+  }
+
+  function forecastChips(models, activeId, kind) {
+    return (
+      '<div class="forecast-chips">' +
+      (models || []).map(function (model) {
+        var on = model.id === activeId ? ' is-active' : '';
+        return (
+          '<button type="button" class="forecast-chip' + on + '" data-forecast-kind="' + kind +
+            '" data-forecast-model="' + escapeHtml(model.id) + '">' +
+            escapeHtml(model.label) +
+          '</button>'
+        );
+      }).join('') +
+      '</div>'
+    );
+  }
+
+  function renderForecastPanel(forecast) {
+    if (!forecast || !forecast.hourly) return '';
+    var hourly = forecast.hourly;
+    var series = forecast.series;
+    var closeBlock;
+    if (!hourly.ok) {
+      closeBlock =
+        '<p class="forecast-plain-title flat">Пока без прогноза на день</p>' +
+        '<p class="forecast-line">' + escapeHtml(hourly.reason || 'Не с чем сравнить') + '</p>';
+    } else {
+      closeBlock =
+        '<p class="forecast-plain-title ' + trendClassOf(hourly.showPace ? hourly.paceSign : 'flat') + '">' +
+          escapeHtml(hourly.paceTitle || '') +
+        '</p>' +
+        '<p class="forecast-line">' + escapeHtml(hourly.paceHint || '') + '</p>' +
+        '<p class="forecast-close">К закрытию около ' + formatMoney(hourly.closeForecast) + '</p>' +
+        '<p class="forecast-line ' + trendClassOf(hourly.closeSign) + '">' +
+          escapeHtml(hourly.closeTitle || '') + '. ' + escapeHtml(hourly.closeHint || '') +
+        '</p>' +
+        (hourly.modelPlain ? '<p class="forecast-line">' + escapeHtml(hourly.modelPlain) + '</p>' : '') +
+        ((hourly.notes && hourly.notes.length)
+          ? '<p class="forecast-line">' + escapeHtml(hourly.notes.join(' ')) + '</p>'
+          : '');
+    }
+
+    var seriesBlock = '';
+    if (series) {
+      if (!series.ok) {
+        seriesBlock =
+          '<div class="forecast-split">' +
+            '<p class="forecast-plain-title flat">По неделям пока неясно</p>' +
+            '<p class="forecast-line">' + escapeHtml(series.reason || 'Мало закрытых недель') + '</p>' +
+            forecastChips(series.models, series.requestedModelId, 'series') +
+          '</div>';
+      } else {
+        seriesBlock =
+          '<div class="forecast-split">' +
+            '<p class="forecast-line">По неделям</p>' +
+            '<p class="forecast-plain-title ' + trendClassOf(series.sign) + '">' + escapeHtml(series.title || '') + '</p>' +
+            '<p class="forecast-line">' + escapeHtml(series.hint || series.note || '') +
+              (series.nextValue != null ? ' Ориентир ' + formatMoney(series.nextValue) + '.' : '') +
+            '</p>' +
+            (series.modelPlain ? '<p class="forecast-line">' + escapeHtml(series.modelPlain) + '</p>' : '') +
+            forecastChips(series.models, series.requestedModelId, 'series') +
+          '</div>';
+      }
+    }
+
+    return (
+      '<div class="forecast-panel" data-forecast="1">' +
+        closeBlock +
+        forecastChips(hourly.models, hourly.requestedModelId, 'hourly') +
+        seriesBlock +
+      '</div>'
+    );
+  }
+
   function renderCards(metrics) {
-    cardsEl.innerHTML = CARD_DEFS.map(function (def) {
+    cardsEl.innerHTML = renderForecastPanel(state.forecast) + CARD_DEFS.map(function (def) {
       var m = metrics[def.key] || { value: 0, deltaPct: 0, deltaAbs: 0, trend: [], compareTrend: [] };
 
       if (def.kind === 'cashOnHand') {
@@ -878,7 +985,8 @@
       }
 
       var trendClass = m.deltaPct > 0.5 ? 'up' : m.deltaPct < -0.5 ? 'down' : 'flat';
-      var arrow = trendClass === 'up' ? '\u25B2' : trendClass === 'down' ? '\u25BC' : '\u25CF';
+      var ongoing = !!state.forecast;
+      var trendText = trendTitle(trendClass, m.deltaPct, ongoing);
       var lineColor = trendClass === 'up' ? 'var(--success)' : trendClass === 'down' ? 'var(--danger)' : COLOR_SELECTED;
       var scale = sparkScaleDual(m.trend, m.compareTrend, 110, 44);
       var pathCompare = pathFromSeries(m.compareTrend, scale);
@@ -891,8 +999,8 @@
             '<div class="stat-card-label">' + escapeHtml(def.label) + '</div>' +
             '<div class="stat-card-value">' + def.formatter(m.value) + '</div>' +
             '<div class="stat-card-delta ' + trendClass + '">' +
-              '<span>' + arrow + ' ' + Math.abs(m.deltaPct).toFixed(2) + '%</span>' +
-              '<span class="stat-card-delta-abs">' + def.deltaFormatter(m.deltaAbs) + '</span>' +
+              '<span class="stat-card-trend">' + trendText + '</span>' +
+              '<span class="stat-card-trend-hint">к тому же дню неделю назад · ' + def.deltaFormatter(m.deltaAbs) + '</span>' +
             '</div>' +
           '</div>' +
           '<div class="sparkline-wrap">' +
@@ -916,9 +1024,15 @@
     return String(Math.round(num));
   }
 
-  function buildHourlyDetailChart(m, formatter) {
-    var selected = (m.hours && m.hours.selected) || [];
+  function buildHourlyDetailChart(m, formatter, forecastChart) {
+    var selected = ((m.hours && m.hours.selected) || []).slice();
     var compare = (m.hours && m.hours.compare) || [];
+    var forecast = forecastChart || null;
+    if (forecast && forecast.length) {
+      selected = selected.map(function (value, hour) {
+        return hour <= (state.forecast && state.forecast.asOfHour) ? value : null;
+      });
+    }
     if (!selected.length && !compare.length) {
       return '<p class="empty-state">Нет данных за период</p>';
     }
@@ -928,25 +1042,42 @@
     });
     var height = 200;
     var padTop = 14;
-    var maxValue = Math.max(1, Math.max.apply(null, selected.concat(compare)));
-    var n = Math.max(selected.length, compare.length, 1);
+    var maxValue = 1;
+    [selected, compare, forecast || []].forEach(function (series) {
+      (series || []).forEach(function (value) {
+        if (typeof value === 'number' && isFinite(value) && value > maxValue) maxValue = value;
+      });
+    });
+    var n = Math.max(selected.length, compare.length, (forecast && forecast.length) || 0, 1);
     var stepXPct = n > 1 ? 100 / (n - 1) : 0;
 
     function yPct(v) {
       return ((height - (v / maxValue) * (height - padTop)) / height) * 100;
     }
 
+    function isNum(v) {
+      return typeof v === 'number' && isFinite(v);
+    }
+
     var points = [];
     for (var i = 0; i < n; i += 1) {
-      var sel = selected[i] || 0;
-      var cmp = compare[i] || 0;
+      var sel = selected[i];
+      var cmp = compare[i];
+      var fut = forecast ? forecast[i] : null;
+      var rows = [];
+      if (isNum(sel)) {
+        rows.push({ name: formatDateLabel(state.date), value: formatter(sel), color: COLOR_SELECTED, yPct: yPct(sel), raw: sel });
+      }
+      if (isNum(cmp)) {
+        rows.push({ name: formatDateLabel(state.compareDate), value: formatter(cmp), color: COLOR_COMPARE, yPct: yPct(cmp), raw: cmp });
+      }
+      if (isNum(fut) && (!isNum(sel) || i > (state.forecast && state.forecast.asOfHour))) {
+        rows.push({ name: 'Прогноз', value: formatter(fut), color: COLOR_FORECAST, yPct: yPct(fut), raw: fut });
+      }
       points.push({
         xPct: stepXPct ? i * stepXPct : 50,
         label: (labels[i] || String(i)) + ':00',
-        rows: [
-          { name: formatDateLabel(state.date), value: formatter(sel), color: COLOR_SELECTED, yPct: yPct(sel), raw: sel },
-          { name: formatDateLabel(state.compareDate), value: formatter(cmp), color: COLOR_COMPARE, yPct: yPct(cmp), raw: cmp },
-        ],
+        rows: rows,
       });
     }
 
@@ -960,9 +1091,17 @@
     }
 
     function linePath(series) {
-      return series.map(function (v, idx) {
-        return (idx === 0 ? 'M' : 'L') + scaleX(idx).toFixed(1) + ',' + scaleY(v).toFixed(1);
-      }).join(' ');
+      var pen = false;
+      var path = '';
+      (series || []).forEach(function (v, idx) {
+        if (!isNum(v)) {
+          pen = false;
+          return;
+        }
+        path += (pen ? 'L' : 'M') + scaleX(idx).toFixed(1) + ',' + scaleY(v).toFixed(1);
+        pen = true;
+      });
+      return path;
     }
 
     var grid = [0, 0.25, 0.5, 0.75, 1].map(function (f) {
@@ -972,6 +1111,7 @@
     }).join('');
 
     var dotsSelected = selected.map(function (v, idx) {
+      if (!isNum(v)) return '';
       return '<circle cx="' + scaleX(idx).toFixed(1) + '" cy="' + scaleY(v).toFixed(1) +
         '" r="3.2" fill="' + COLOR_SELECTED + '" />';
     }).join('');
@@ -987,10 +1127,14 @@
       return '<span>' + String(h).padStart(2, '0') + '</span>';
     }).join('');
 
+    var forecastPath = forecast ? linePath(forecast) : '';
     var svg =
       '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none" class="detail-chart-svg" role="img">' +
         grid +
         '<path d="' + linePath(compare) + '" fill="none" stroke="' + COLOR_COMPARE + '" stroke-width="2" stroke-dasharray="6 5" stroke-linejoin="round" stroke-linecap="round" />' +
+        (forecastPath
+          ? '<path d="' + forecastPath + '" fill="none" stroke="' + COLOR_FORECAST + '" stroke-width="2.5" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round" />'
+          : '') +
         '<path d="' + linePath(selected) + '" fill="none" stroke="' + COLOR_SELECTED + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />' +
         dotsSelected +
       '</svg>';
@@ -1146,11 +1290,16 @@
     }
 
     if (chartSheetLegend) chartSheetLegend.style.display = '';
-    chartSheetCompare.textContent =
-      'По часам · сравнение с ' + formatDateLabel(state.compareDate) + ' (тот же день неделю назад)';
+    var forecastChart = metricKey === 'revenue' && state.forecast && state.forecast.hourly && state.forecast.hourly.chart
+      ? state.forecast.hourly.chart
+      : null;
+    chartSheetCompare.textContent = forecastChart
+      ? 'По часам · факт до текущего часа, дальше прогноз к закрытию'
+      : 'По часам · сравнение с ' + formatDateLabel(state.compareDate) + ' (тот же день неделю назад)';
     if (chartLegendSelected) chartLegendSelected.textContent = formatDateLabel(state.date);
     if (chartLegendCompare) chartLegendCompare.textContent = formatDateLabel(state.compareDate) + ' · неделя назад';
-    chartSheetPlot.innerHTML = buildHourlyDetailChart(m, def.formatter);
+    if (chartLegendForecastItem) chartLegendForecastItem.classList.toggle('screen-hidden', !forecastChart);
+    chartSheetPlot.innerHTML = buildHourlyDetailChart(m, def.formatter, forecastChart);
     var wrap = chartSheetPlot.querySelector('.detail-chart-wrap');
     if (wrap) bindChartInteractions(wrap);
     chartSheet.classList.remove('screen-hidden');
@@ -1166,6 +1315,20 @@
   }
 
   cardsEl.addEventListener('click', function (event) {
+    var chip = event.target.closest('[data-forecast-model]');
+    if (chip && cardsEl.contains(chip)) {
+      var kind = chip.getAttribute('data-forecast-kind');
+      var modelId = chip.getAttribute('data-forecast-model');
+      if (kind === 'series') {
+        state.seriesModel = modelId;
+        saveForecastModel('pwa-forecast-series', modelId);
+      } else {
+        state.hourlyModel = modelId;
+        saveForecastModel('pwa-forecast-hourly', modelId);
+      }
+      loadStats();
+      return;
+    }
     var card = event.target.closest('.stat-card');
     if (!card || !cardsEl.contains(card)) return;
     openChartSheet(card.getAttribute('data-metric'));
