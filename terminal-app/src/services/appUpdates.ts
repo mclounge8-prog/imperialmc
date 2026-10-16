@@ -8,49 +8,15 @@ import {
   isUpdatesAvailable,
   openUnknownSourcesSettings,
 } from '../native/updates';
+import { chooseUpdatePlan } from './updatePlan';
+import type { RemoteUpdatesManifest, UpdateChannel, UpdatePlan } from './updatePlan';
 
-export type RemoteApkInfo = {
-  versionCode: number;
-  versionName: string;
-  url: string | null;
-  mandatory: boolean;
-  notes: string;
-  sha256: string | null;
-};
-
-export type RemoteUpdatesManifest = {
-  apk: RemoteApkInfo;
-  js: {
-    version: number;
-    minApkVersionCode: number;
-    url: string | null;
-    mandatory: boolean;
-    notes: string;
-    sha256: string | null;
-  };
-  kiosk?: {
-    versionCode: number;
-    versionName: string;
-    url: string | null;
-    notes: string;
-    sha256: string | null;
-  };
-};
-
-export type UpdatePlan =
-  | { kind: 'none' }
-  | {
-      kind: 'apk';
-      remote: RemoteUpdatesManifest['apk'];
-      localVersionCode: number;
-      localVersionName: string;
-    }
-  | {
-      kind: 'js';
-      remote: RemoteUpdatesManifest['js'];
-      localJsVersion: number;
-      localVersionCode: number;
-    };
+export type {
+  RemoteApkInfo,
+  RemoteUpdatesManifest,
+  UpdateChannel,
+  UpdatePlan,
+} from './updatePlan';
 
 export async function fetchUpdatesManifest(): Promise<RemoteUpdatesManifest> {
   const response = await fetch(`${API_BASE_URL}/api/terminal/updates`, {
@@ -62,57 +28,10 @@ export async function fetchUpdatesManifest(): Promise<RemoteUpdatesManifest> {
   return response.json();
 }
 
-export async function planUpdate(channel: 'staff' | 'kiosk' = 'staff'): Promise<UpdatePlan> {
+export async function planUpdate(channel: UpdateChannel = 'staff'): Promise<UpdatePlan> {
   if (!isUpdatesAvailable()) return { kind: 'none' };
-
   const [local, remote] = await Promise.all([getAppVersion(), fetchUpdatesManifest()]);
-
-  if (channel === 'kiosk') {
-    const kiosk = remote.kiosk;
-    if (kiosk?.url && Number(kiosk.versionCode) > Number(local.versionCode)) {
-      return {
-        kind: 'apk',
-        remote: {
-          versionCode: Number(kiosk.versionCode),
-          versionName: String(kiosk.versionName || ''),
-          url: kiosk.url,
-          mandatory: false,
-          notes: String(kiosk.notes || ''),
-          sha256: kiosk.sha256 || null,
-        },
-        localVersionCode: local.versionCode,
-        localVersionName: local.versionName,
-      };
-    }
-    return { kind: 'none' };
-  }
-
-  if (
-    remote.apk.url &&
-    Number(remote.apk.versionCode) > Number(local.versionCode)
-  ) {
-    return {
-      kind: 'apk',
-      remote: remote.apk,
-      localVersionCode: local.versionCode,
-      localVersionName: local.versionName,
-    };
-  }
-
-  if (
-    remote.js.url &&
-    Number(remote.js.version) > Number(local.jsOtaVersion) &&
-    Number(local.versionCode) >= Number(remote.js.minApkVersionCode)
-  ) {
-    return {
-      kind: 'js',
-      remote: remote.js,
-      localJsVersion: local.jsOtaVersion,
-      localVersionCode: local.versionCode,
-    };
-  }
-
-  return { kind: 'none' };
+  return chooseUpdatePlan(channel, local, remote);
 }
 
 export async function applyApkUpdate(plan: Extract<UpdatePlan, { kind: 'apk' }>): Promise<void> {

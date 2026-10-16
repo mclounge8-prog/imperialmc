@@ -30,6 +30,14 @@ const DEFAULT_MANIFEST = {
     versionCode: 1,
     versionName: '1.0.0',
     file: null,
+    mandatory: true,
+    notes: '',
+  },
+  kitchenJs: {
+    version: 0,
+    minApkVersionCode: 3,
+    file: null,
+    mandatory: true,
     notes: '',
   },
 };
@@ -53,6 +61,7 @@ export async function readManifest() {
       js: { ...DEFAULT_MANIFEST.js, ...(parsed.js || {}) },
       kiosk: { ...DEFAULT_MANIFEST.kiosk, ...(parsed.kiosk || {}) },
       kitchen: { ...DEFAULT_MANIFEST.kitchen, ...(parsed.kitchen || {}) },
+      kitchenJs: { ...DEFAULT_MANIFEST.kitchenJs, ...(parsed.kitchenJs || {}) },
     };
   } catch {
     return structuredClone(DEFAULT_MANIFEST);
@@ -77,6 +86,7 @@ export function manifestForClient(manifest, baseUrl) {
   const jsFile = manifest.js?.file;
   const kioskFile = manifest.kiosk?.file;
   const kitchenFile = manifest.kitchen?.file;
+  const kitchenJsFile = manifest.kitchenJs?.file;
   return {
     apk: {
       versionCode: Number(manifest.apk?.versionCode) || 1,
@@ -105,8 +115,17 @@ export function manifestForClient(manifest, baseUrl) {
       versionCode: Number(manifest.kitchen?.versionCode) || 1,
       versionName: String(manifest.kitchen?.versionName || '1.0.0'),
       url: kitchenFile ? `${baseUrl}/updates/${kitchenFile}` : `${baseUrl}/updates/kitchen.apk`,
+      mandatory: manifest.kitchen?.mandatory !== false,
       notes: String(manifest.kitchen?.notes || ''),
       sha256: manifest.kitchen?.sha256 || null,
+    },
+    kitchenJs: {
+      version: Number(manifest.kitchenJs?.version) || 0,
+      minApkVersionCode: Number(manifest.kitchenJs?.minApkVersionCode) || 3,
+      url: kitchenJsFile ? `${baseUrl}/updates/${kitchenJsFile}` : null,
+      mandatory: manifest.kitchenJs?.mandatory !== false,
+      notes: String(manifest.kitchenJs?.notes || ''),
+      sha256: manifest.kitchenJs?.sha256 || null,
     },
   };
 }

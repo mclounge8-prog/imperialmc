@@ -73,7 +73,7 @@ const buf = fs.readFileSync("/app/public/updates/" + file);
 const sha256 = crypto.createHash("sha256").update(buf).digest("hex");
 let manifest = { apk: {}, js: {}, kiosk: {}, kitchen: {} };
 try { manifest = JSON.parse(fs.readFileSync(path, "utf8")); } catch (_) {}
-manifest.kitchen = { versionCode, versionName, file, sha256, notes };
+manifest.kitchen = { versionCode, versionName, file, sha256, notes, mandatory: true };
 fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + "\\n");
 console.log("Published kitchen APK", JSON.stringify(manifest.kitchen));
 '

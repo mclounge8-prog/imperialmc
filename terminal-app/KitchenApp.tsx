@@ -20,6 +20,10 @@ import {
   type Zone,
 } from './src/api/client';
 import { layoutTablesOnViewport, normalizeTableSize, snapToGrid, layoutSizeForTable } from './src/utils/tableLayout';
+import { kitchenTiming, moreUrgent, type KitchenTimingState } from './src/kitchen/timing';
+import AppUpdateGate from './src/components/AppUpdateGate';
+import UpdateCheckRow from './src/components/UpdateCheckRow';
+import { requestUpdateCheck } from './src/services/updateEvents';
 
 const VENUE_KEY = 'imperial-mc:kitchen-venue';
 
@@ -42,7 +46,7 @@ function modifierLine(mod: { name: string; qty: number; unit: string | null }): 
   return mod.name;
 }
 
-function Pulse({ style }: { style?: object }) {
+function Pulse({ style, color }: { style?: object; color?: string }) {
   const opacity = useRef(new Animated.Value(0.25)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -54,7 +58,7 @@ function Pulse({ style }: { style?: object }) {
     loop.start();
     return () => loop.stop();
   }, [opacity]);
-  return <Animated.View pointerEvents="none" style={[styles.pulse, style, { opacity }]} />;
+  return <Animated.View pointerEvents="none" style={[styles.pulse, style, color ? { backgroundColor: color } : null, { opacity }]} />;
 }
 
 function KitchenRoot() {
@@ -67,6 +71,7 @@ function KitchenRoot() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [now, setNow] = useState(() => Date.now());
   const venueIdRef = useRef<number | null>(null);
   venueIdRef.current = venueId;
 
@@ -104,6 +109,11 @@ function KitchenRoot() {
     } finally {
       if (!opts?.silent) setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -164,10 +174,13 @@ function KitchenRoot() {
       : null;
 
   const newByTable = new Map<number, number>();
+  const timingByTable = new Map<number, KitchenTimingState>();
   for (const ticket of board?.tickets ?? []) {
-    if (ticket.tableId && ticket.items.some((item) => !item.ready)) {
-      newByTable.set(ticket.tableId, (newByTable.get(ticket.tableId) || 0) + 1);
-    }
+    const pending = ticket.items.some((item) => !item.ready);
+    if (!ticket.tableId || !pending) continue;
+    newByTable.set(ticket.tableId, (newByTable.get(ticket.tableId) || 0) + 1);
+    const timing = kitchenTiming(new Date(ticket.createdAt).getTime(), now, true);
+    timingByTable.set(ticket.tableId, moreUrgent(timingByTable.get(ticket.tableId), timing.state));
   }
 
   if (loading && !board && venues.length === 0) {
@@ -197,7 +210,10 @@ function KitchenRoot() {
   return (
     <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Кухня</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>Кухня</Text>
+        </View>
+        <UpdateCheckRow channel="kitchen" />
         <Text style={styles.venueTitle} numberOfLines={1}>
           {board?.venueName || 'Нет зала с включённой кухней'}
         </Text>
@@ -238,6 +254,16 @@ function KitchenRoot() {
               {layout
                 ? layout.tables.map((table) => {
                     const fresh = newByTable.get(table.id) || 0;
+                    const timing = timingByTable.get(table.id);
+                    const urgent = timing === 'late' || timing === 'warn';
+                    const borderColor =
+                      timing === 'late'
+                        ? colors.danger
+                        : timing === 'warn'
+                          ? '#f0c14b'
+                          : fresh
+                            ? colors.accent2
+                            : STATUS_COLORS[table.status] || colors.border;
                     return (
                       <View
                         key={table.id}
@@ -248,15 +274,25 @@ function KitchenRoot() {
                             top: table.top,
                             width: table.tileWidth,
                             height: table.tileHeight,
-                            borderColor: fresh ? colors.accent2 : STATUS_COLORS[table.status] || colors.border,
+                            borderColor,
                           },
                         ]}
                       >
-                        {fresh ? <Pulse /> : null}
+                        {timing === 'late' ? <Pulse color={colors.danger} /> : null}
+                        {timing === 'warn' ? <Pulse color="#f0c14b" /> : null}
+                        {!urgent && fresh ? <Pulse /> : null}
                         <Text style={styles.tileName} numberOfLines={2}>
                           {table.name}
                         </Text>
-                        <Text style={styles.tileMeta}>{fresh ? `${fresh} новых` : `${table.capacity} мест`}</Text>
+                        <Text style={[styles.tileMeta, timing === 'late' && styles.tileLate, timing === 'warn' && styles.tileWarn]}>
+                          {timing === 'late'
+                            ? 'сверх 20 мин'
+                            : timing === 'warn'
+                              ? 'время выходит'
+                              : fresh
+                                ? `${fresh} новых`
+                                : `${table.capacity} мест`}
+                        </Text>
                       </View>
                     );
                   })
@@ -273,13 +309,34 @@ function KitchenRoot() {
               {(board.tickets.length ? board.tickets : []).map((ticket) => {
                 const pending = ticket.items.some((item) => !item.ready);
                 const readyCount = ticket.items.filter((item) => item.ready).length;
+                const timing = kitchenTiming(new Date(ticket.createdAt).getTime(), now, pending);
                 return (
-                  <View key={ticket.id} style={[styles.card, pending && styles.cardNew]}>
-                    {pending ? <Pulse style={styles.cardPulse} /> : null}
+                  <View
+                    key={ticket.id}
+                    style={[
+                      styles.card,
+                      pending && timing.state === 'ok' && styles.cardNew,
+                      timing.state === 'warn' && styles.cardWarn,
+                      timing.state === 'late' && styles.cardLate,
+                    ]}
+                  >
+                    {timing.state === 'late' ? <Pulse style={styles.cardPulse} color={colors.danger} /> : null}
+                    {timing.state === 'warn' ? <Pulse style={styles.cardPulse} color="#f0c14b" /> : null}
+                    {pending && timing.state === 'ok' ? <Pulse style={styles.cardPulse} /> : null}
                     <View style={styles.cardTop}>
                       <Text style={styles.cardTable}>{ticket.tableName}</Text>
                       <Text style={styles.cardTime}>{formatTime(ticket.createdAt)}</Text>
                     </View>
+                    <Text
+                      style={[
+                        styles.timer,
+                        timing.state === 'warn' && styles.timerWarn,
+                        timing.state === 'late' && styles.timerLate,
+                        timing.state === 'done' && styles.timerDone,
+                      ]}
+                    >
+                      {timing.label}
+                    </Text>
                     <Text style={styles.cardGuest}>
                       {ticket.guestLabel}
                       {pending
@@ -328,10 +385,16 @@ function KitchenRoot() {
 }
 
 export default function KitchenApp() {
+  useEffect(() => {
+    const timer = setInterval(() => requestUpdateCheck(), 5 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
       <KitchenRoot />
+      <AppUpdateGate autoCheck channel="kitchen" />
     </SafeAreaProvider>
   );
 }
@@ -339,7 +402,8 @@ export default function KitchenApp() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: colors.bg },
-  header: { paddingHorizontal: 16, paddingBottom: 8, gap: 4 },
+  header: { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { color: colors.text, fontSize: 22, fontWeight: '700' },
   venueTitle: { color: colors.textMuted, fontSize: 14 },
   hint: { color: colors.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 20 },
@@ -375,7 +439,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   tileName: { color: colors.text, fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  tileMeta: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  tileMeta: { color: colors.textMuted, fontSize: 11, marginTop: 2, fontWeight: '700' },
+  tileWarn: { color: '#ffe08a' },
+  tileLate: { color: '#ffb4b4' },
   pulse: {
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.accent2,
@@ -398,7 +464,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardNew: { borderColor: colors.accent2 },
+  cardWarn: {
+    borderWidth: 2,
+    borderColor: '#f0c14b',
+    backgroundColor: 'rgba(240, 193, 75, 0.22)',
+  },
+  cardLate: {
+    borderWidth: 2,
+    borderColor: colors.danger,
+    backgroundColor: 'rgba(225, 76, 76, 0.28)',
+  },
   cardPulse: { borderRadius: 12 },
+  timer: { color: colors.text, fontSize: 16, fontWeight: '800', marginTop: 4 },
+  timerWarn: { color: '#ffe08a', fontSize: 20 },
+  timerLate: { color: '#ffd0d0', fontSize: 20 },
+  timerDone: { color: '#6ee7a8', fontSize: 14, fontWeight: '700' },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTable: { color: colors.text, fontSize: 16, fontWeight: '700' },
   cardTime: { color: colors.textMuted, fontSize: 12 },

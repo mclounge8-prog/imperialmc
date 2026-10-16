@@ -14,9 +14,10 @@ import com.imperialmcterminal.updates.UpdatePackage
 class MainApplication : Application(), ReactApplication {
 
   override val reactHost: ReactHost by lazy {
-    // В debug всегда Metro. В release — OTA-бандл, если он есть и совместим с APK.
+    // В debug всегда Metro. В release — свой OTA-бандл, если он есть и совместим с APK.
+    // Киоск обновляется только целым APK. Кухня — своим APK и своим JS, не бандлом зала.
     val otaBundle =
-      if (BuildConfig.DEBUG || BuildConfig.IS_KIOSK || BuildConfig.IS_KITCHEN) null
+      if (BuildConfig.DEBUG || BuildConfig.IS_KIOSK) null
       else UpdateModule.resolveJsBundlePath(applicationContext)
 
     getDefaultReactHost(
