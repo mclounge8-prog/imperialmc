@@ -17,14 +17,31 @@ export function formatClock(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+export function kitchenFinishedAt(readyAt: string | null | undefined, itemReadyAts: Array<string | null | undefined>): number | null {
+  const ticketAt = readyAt ? Date.parse(readyAt) : NaN;
+  if (Number.isFinite(ticketAt)) return ticketAt;
+  let latest = NaN;
+  for (const value of itemReadyAts) {
+    const at = value ? Date.parse(value) : NaN;
+    if (Number.isFinite(at) && !(at < latest)) latest = at;
+  }
+  return Number.isFinite(latest) ? latest : null;
+}
+
 export function kitchenTiming(
   createdAtMs: number,
   nowMs: number,
-  pending: boolean
+  pending: boolean,
+  readyAtMs: number | null = null
 ): { state: KitchenTimingState; label: string } {
+  if (!pending) {
+    if (readyAtMs == null || !Number.isFinite(readyAtMs) || !Number.isFinite(createdAtMs)) {
+      return { state: 'done', label: 'готов' };
+    }
+    return { state: 'done', label: `готов за ${formatClock(Math.max(0, readyAtMs - createdAtMs))}` };
+  }
   const age = Number.isFinite(createdAtMs) && Number.isFinite(nowMs) ? Math.max(0, nowMs - createdAtMs) : 0;
   const clock = formatClock(age);
-  if (!pending) return { state: 'done', label: `готов за ${clock}` };
   if (age >= KITCHEN_LIMIT_MS) return { state: 'late', label: `сверх 20 мин · ${clock}` };
   if (age >= KITCHEN_WARN_MS) return { state: 'warn', label: `время выходит · ${clock}` };
   return { state: 'ok', label: `осталось ${formatClock(KITCHEN_LIMIT_MS - age)}` };

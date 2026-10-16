@@ -94,6 +94,7 @@ async function loadBoard(venueId) {
       name: item.name,
       qty: Number(item.qty),
       ready: item.ready_at != null,
+      readyAt: item.ready_at ? new Date(item.ready_at).toISOString() : null,
       modifiers: modifiers.map((mod) => ({
         name: mod.name,
         qty: Number(mod.qty) || 0,

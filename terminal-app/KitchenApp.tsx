@@ -20,7 +20,7 @@ import {
   type Zone,
 } from './src/api/client';
 import { layoutTablesOnViewport, normalizeTableSize, snapToGrid, layoutSizeForTable } from './src/utils/tableLayout';
-import { kitchenTiming, moreUrgent, type KitchenTimingState } from './src/kitchen/timing';
+import { kitchenFinishedAt, kitchenTiming, moreUrgent, type KitchenTimingState } from './src/kitchen/timing';
 import AppUpdateGate from './src/components/AppUpdateGate';
 import UpdateCheckRow from './src/components/UpdateCheckRow';
 import { requestUpdateCheck } from './src/services/updateEvents';
@@ -309,7 +309,12 @@ function KitchenRoot() {
               {(board.tickets.length ? board.tickets : []).map((ticket) => {
                 const pending = ticket.items.some((item) => !item.ready);
                 const readyCount = ticket.items.filter((item) => item.ready).length;
-                const timing = kitchenTiming(new Date(ticket.createdAt).getTime(), now, pending);
+                const timing = kitchenTiming(
+                  new Date(ticket.createdAt).getTime(),
+                  now,
+                  pending,
+                  pending ? null : kitchenFinishedAt(ticket.readyAt, ticket.items.map((item) => item.readyAt))
+                );
                 return (
                   <View
                     key={ticket.id}

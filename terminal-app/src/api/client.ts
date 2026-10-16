@@ -1133,6 +1133,7 @@ export type KitchenTicketItem = {
   name: string;
   qty: number;
   ready: boolean;
+  readyAt: string | null;
   modifiers: KitchenModifier[];
 };
 
