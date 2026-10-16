@@ -71,6 +71,7 @@ docker exec \\
   -e JS_VERSION='${JS_VERSION}' \\
   -e MIN_APK='${MIN_APK}' \\
   -e NOTES=$(printf %q "$NOTES") \\
+  -e MANDATORY='${MANDATORY:-0}' \\
   '${APP_CONTAINER}' node -e '
 const fs = require("fs");
 const crypto = require("crypto");
@@ -83,7 +84,7 @@ const buf = fs.readFileSync("/app/public/updates/" + file);
 const sha256 = crypto.createHash("sha256").update(buf).digest("hex");
 let manifest = { apk: {}, js: {} };
 try { manifest = JSON.parse(fs.readFileSync(path, "utf8")); } catch (_) {}
-manifest.js = { version, minApkVersionCode, file, sha256, mandatory: false, notes };
+manifest.js = { version, minApkVersionCode, file, sha256, mandatory: process.env.MANDATORY === "1", notes };
 fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + "\\n");
 console.log("Published JS OTA", JSON.stringify(manifest.js));
 '

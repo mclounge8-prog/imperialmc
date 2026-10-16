@@ -73,6 +73,7 @@ export async function loginWithPin(pin: string, deviceToken: string): Promise<St
 export type DeviceStatus = {
   active: boolean;
   kind?: 'staff' | 'kiosk';
+  kitchenEnabled?: boolean;
   venue: {
     id: number;
     name: string;
@@ -1086,4 +1087,132 @@ export async function fetchMyKioskTickets(
   deviceToken: string
 ): Promise<{ tickets: KioskTicket[] }> {
   return deviceRequest('/api/kiosk/mine', deviceToken);
+}
+
+export async function setDeviceKitchen(
+  deviceToken: string,
+  enabled: boolean
+): Promise<{ kitchenEnabled: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/api/devices/kitchen`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${deviceToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ enabled }),
+  });
+  const data = await parseJsonResponse(response);
+  if (!response.ok) {
+    const body = data as ApiErrorBody;
+    throw new ApiRequestError(body.error || 'Не удалось переключить кухню', {
+      status: response.status,
+      code: body.code,
+    });
+  }
+  return data as { kitchenEnabled: boolean };
+}
+
+export type KitchenModifier = { name: string; qty: number; unit: string | null };
+
+export type KitchenTicketItem = {
+  id: number;
+  name: string;
+  qty: number;
+  modifiers: KitchenModifier[];
+};
+
+export type KitchenTicket = {
+  id: number;
+  orderId: number;
+  guestId: number;
+  guestLabel: string;
+  tableId: number | null;
+  tableName: string;
+  status: 'new' | 'ready';
+  createdAt: string;
+  readyAt: string | null;
+  items: KitchenTicketItem[];
+};
+
+export type KitchenBoard = {
+  venueId: number;
+  venueName: string;
+  shiftOpen: boolean;
+  zones: Zone[];
+  tickets: KitchenTicket[];
+};
+
+export type KitchenBoardResponse = {
+  venues: { id: number; name: string; shiftOpen: boolean }[];
+  board: KitchenBoard | null;
+};
+
+async function publicKitchenRequest<T>(path: string, options: { method?: string } = {}): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, { method: options.method || 'GET' });
+  const data = await parseJsonResponse(response);
+  if (!response.ok) {
+    const body = data as ApiErrorBody;
+    throw new ApiRequestError(body.error || 'Ошибка запроса', {
+      status: response.status,
+      code: body.code,
+    });
+  }
+  return data as T;
+}
+
+export async function fetchKitchenBoard(venueId?: number): Promise<KitchenBoardResponse> {
+  const query = venueId ? `?venueId=${venueId}` : '';
+  return publicKitchenRequest(`/api/kitchen/board${query}`);
+}
+
+export async function markKitchenTicketReady(ticketId: number): Promise<{ ticket: { id: number; status: string } }> {
+  return publicKitchenRequest(`/api/kitchen/tickets/${ticketId}/ready`, { method: 'POST' });
+}
+
+export async function fetchKitchenReady(
+  venueId: number,
+  token: string
+): Promise<{ tableIds: number[] }> {
+  return authorizedRequest(`/api/kitchen/ready?venueId=${venueId}`, token);
+}
+
+export type KitchenSentState = {
+  items: { orderItemId: number; sentQty: number }[];
+  readyGuestIds: number[];
+};
+
+export async function fetchKitchenSent(orderId: number, token: string): Promise<KitchenSentState> {
+  return authorizedRequest(`/api/kitchen/orders/${orderId}`, token);
+}
+
+export async function sendGuestToKitchen(
+  orderId: number,
+  guestId: number,
+  staffToken: string,
+  deviceToken: string
+): Promise<{ ticket: { id: number; itemCount: number }; items: { orderItemId: number; sentQty: number }[] }> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/orders/${orderId}/guests/${guestId}/kitchen`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${staffToken}`,
+        'X-Device-Token': deviceToken,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    }
+  );
+  const data = await parseJsonResponse(response);
+  if (!response.ok) {
+    const body = data as ApiErrorBody;
+    throw new ApiRequestError(body.error || 'Не удалось отправить на кухню', {
+      status: response.status,
+      code: body.code,
+    });
+  }
+  return data as {
+    ticket: { id: number; itemCount: number };
+    items: { orderItemId: number; sentQty: number }[];
+  };
 }

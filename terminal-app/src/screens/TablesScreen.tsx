@@ -19,6 +19,7 @@ import {
   fetchTables,
   fetchOpenOrders,
   fetchPaidReceipts,
+  fetchKitchenReady,
   fetchKioskTickets,
   setKioskTicketStatus,
   closeKioskTicket,
@@ -31,6 +32,7 @@ import StaffPaymentModal from '../components/StaffPaymentModal';
 import { guestStatusLabel, isActiveKioskStatus, paymentMethodLabel, paymentMethodTint } from '../kiosk/status';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
+import KitchenEnableSwitch from '../components/KitchenEnableSwitch';
 import { layoutSizeForTable, layoutTablesOnViewport, normalizeTableSize, snapToGrid } from '../utils/tableLayout';
 import type { RootStackParamList } from '../../App';
 
@@ -70,6 +72,7 @@ export default function TablesScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [readyTableIds, setReadyTableIds] = useState<Set<number>>(new Set());
   const hasLoadedRef = useRef(false);
 
   const load = useCallback(
@@ -85,12 +88,13 @@ export default function TablesScreen() {
         setError(null);
       }
       try {
-        const [tablesData, ordersData, paidData, kioskData] = await Promise.all([
+        const [tablesData, ordersData, paidData, kioskData, kitchenReady] = await Promise.all([
           fetchTables(venue.id, session.token),
           fetchOpenOrders(venue.id, session.token),
           // Чеки текущей открытой смены (бэкенд фильтрует по shift_id).
           fetchPaidReceipts(venue.id, session.token),
           fetchKioskTickets(venue.id, session.token).catch(() => ({ tickets: [] as KioskTicket[], shiftOpen: false })),
+          fetchKitchenReady(venue.id, session.token).catch(() => ({ tableIds: [] as number[] })),
         ]);
         const nextZones = tablesData.zones.map((zone) => ({
           ...zone,
@@ -115,6 +119,7 @@ export default function TablesScreen() {
         setOpenOrders(ordersData.orders);
         setKioskTickets(kioskData.tickets.filter((t) => isActiveKioskStatus(t.status)));
         setPaidReceipts(paidData);
+        setReadyTableIds(new Set(kitchenReady.tableIds));
         hasLoadedRef.current = true;
         if (silent) setError(null);
       } catch (e) {
@@ -239,6 +244,7 @@ export default function TablesScreen() {
     <ScreenSwipeHost screen="Tables">
     <View style={styles.container}>
       <View style={styles.leftPane}>
+        <KitchenEnableSwitch variant="button" />
         <Pressable style={styles.quickOrderWrapper} onPress={handleQuickOrder}>
           <LinearGradient
             colors={GRADIENT_BLUE}
@@ -301,28 +307,12 @@ export default function TablesScreen() {
                       />
                     ))}
                     {layout.tables.map((table) => (
-                      <Pressable
+                      <FloorTable
                         key={table.id}
-                        style={[
-                          styles.tableTile,
-                          {
-                            left: table.left,
-                            top: table.top,
-                            width: table.tileWidth,
-                            height: table.tileHeight,
-                            borderColor: STATUS_COLORS[table.status],
-                          },
-                        ]}
+                        table={table}
+                        ready={readyTableIds.has(table.id)}
                         onPress={() => handleTablePress(table.id, table.name)}
-                      >
-                        <Text style={styles.tileName} numberOfLines={2}>
-                          {table.name}
-                        </Text>
-                        <Text style={styles.tileCapacity}>{table.capacity} мест</Text>
-                        <Text style={[styles.tileStatus, { color: STATUS_COLORS[table.status] }]}>
-                          {STATUS_LABELS[table.status] || table.status}
-                        </Text>
-                      </Pressable>
+                      />
                     ))}
                   </>
                 ) : null}
@@ -496,6 +486,64 @@ export default function TablesScreen() {
   );
 }
 
+function FloorTable({
+  table,
+  ready,
+  onPress,
+}: {
+  table: {
+    id: number;
+    name: string;
+    capacity: number;
+    status: string;
+    left: number;
+    top: number;
+    tileWidth: number;
+    tileHeight: number;
+  };
+  ready: boolean;
+  onPress: () => void;
+}) {
+  const pulse = useRef(new Animated.Value(0.2)).current;
+  useEffect(() => {
+    if (!ready) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.75, duration: 650, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.15, duration: 650, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse, ready]);
+
+  return (
+    <Pressable
+      style={[
+        styles.tableTile,
+        ready && styles.tableTileReady,
+        {
+          left: table.left,
+          top: table.top,
+          width: table.tileWidth,
+          height: table.tileHeight,
+          borderColor: ready ? '#6ee7a8' : STATUS_COLORS[table.status],
+        },
+      ]}
+      onPress={onPress}
+    >
+      {ready ? <Animated.View pointerEvents="none" style={[styles.readyGlow, { opacity: pulse }]} /> : null}
+      <Text style={styles.tileName} numberOfLines={2}>
+        {table.name}
+      </Text>
+      <Text style={styles.tileCapacity}>{table.capacity} мест</Text>
+      <Text style={[styles.tileStatus, { color: ready ? '#6ee7a8' : STATUS_COLORS[table.status] }]}>
+        {ready ? 'Готово' : STATUS_LABELS[table.status] || table.status}
+      </Text>
+    </Pressable>
+  );
+}
+
 function KioskPulseRow({ ticket, onPress }: { ticket: KioskTicket; onPress: () => void }) {
   const pulse = useRef(new Animated.Value(0.35)).current;
 
@@ -603,6 +651,11 @@ const styles = StyleSheet.create({
   tileName: { color: colors.text, fontSize: 13, fontWeight: '600', textAlign: 'center' },
   tileCapacity: { color: colors.textMuted, fontSize: 11 },
   tileStatus: { fontSize: 11, fontWeight: '500' },
+  tableTileReady: { borderWidth: 2 },
+  readyGlow: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: '#6ee7a8',
+  },
 
   ordersPane: {
     flex: 1,

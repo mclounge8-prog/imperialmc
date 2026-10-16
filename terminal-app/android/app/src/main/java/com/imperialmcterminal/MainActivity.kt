@@ -30,7 +30,9 @@ class MainActivity : ReactActivity() {
    * rendering of the component.
    */
   override fun getMainComponentName(): String =
-      if (BuildConfig.IS_KIOSK) "ImperialMcKiosk" else "ImperialMcTerminal"
+      if (BuildConfig.IS_KITCHEN) "ImperialMcKitchen"
+      else if (BuildConfig.IS_KIOSK) "ImperialMcKiosk"
+      else "ImperialMcTerminal"
 
   /**
    * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]
@@ -41,6 +43,10 @@ class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    if (BuildConfig.IS_KITCHEN) {
+      window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+      hideSystemNavigation()
+    }
     if (BuildConfig.IS_KIOSK) {
       window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
       hideSystemNavigation()
@@ -70,13 +76,14 @@ class MainActivity : ReactActivity() {
 
   override fun onWindowFocusChanged(hasFocus: Boolean) {
     super.onWindowFocusChanged(hasFocus)
-    if (hasFocus && BuildConfig.IS_KIOSK && kioskLocked) {
+    if (hasFocus && (BuildConfig.IS_KITCHEN || (BuildConfig.IS_KIOSK && kioskLocked))) {
       hideSystemNavigation()
     }
   }
 
   override fun onResume() {
     super.onResume()
+    if (BuildConfig.IS_KITCHEN) hideSystemNavigation()
     if (BuildConfig.IS_KIOSK && kioskLocked) hideSystemNavigation()
   }
 
@@ -91,7 +98,7 @@ class MainActivity : ReactActivity() {
    * (5 нажатий на название заведения).
    */
   private fun hideSystemNavigation() {
-    if (!BuildConfig.IS_KIOSK) return
+    if (!BuildConfig.IS_KIOSK && !BuildConfig.IS_KITCHEN) return
     WindowCompat.setDecorFitsSystemWindows(window, false)
     val controller = WindowInsetsControllerCompat(window, window.decorView)
     controller.hide(WindowInsetsCompat.Type.navigationBars())

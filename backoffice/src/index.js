@@ -23,6 +23,8 @@ import apiTerminalUpdatesRoutes from './routes/apiTerminalUpdates.js';
 import apiPwaStatsRoutes from './routes/apiPwaStats.js';
 import apiPwaReportsRoutes from './routes/apiPwaReports.js';
 import apiKioskRoutes from './routes/apiKiosk.js';
+import apiKitchenRoutes from './routes/apiKitchen.js';
+import { ensureKitchenSchema } from './services/kitchenSchema.js';
 import terminalUpdatesRoutes from './routes/terminalUpdates.js';
 import tobaccoTaresRoutes from './routes/tobaccoTares.js';
 import telegramRoutes from './routes/telegram.js';
@@ -70,6 +72,7 @@ app.route('/api', apiTerminalUpdatesRoutes); // манифест обновле�
 app.route('/api/pwa', apiPwaStatsRoutes); // JSON API для мобильной PWA «Показатели»
 app.route('/api/pwa', apiPwaReportsRoutes); // JSON API отчётов PWA: блюда / чеки
 app.route('/api/kiosk', apiKioskRoutes); // JSON API киоска самообслуживания
+app.route('/api', apiKitchenRoutes); // Кухня: отправка до пречека и экран без авторизации
 app.route('/reports', reportsRoutes); // Отчёты: чеки с фильтрами по заведению/датам
 app.route('/stats', statsRoutes); // Главный экран: сводная статистика продаж (графики)
 app.route('/preferences', preferencesRoutes); // Общий выбор заведения в шапке (cookie)
@@ -120,6 +123,8 @@ app.use('/updates/*', async (c, next) => {
 app.use('/*', serveStatic({ root: './public' }));
 
 const port = Number(process.env.PORT || 3000);
+
+await ensureKitchenSchema();
 
 serve({ fetch: app.fetch, port }, async (info) => {
   console.log(`Бэкофис запущен: http://localhost:${info.port}`);

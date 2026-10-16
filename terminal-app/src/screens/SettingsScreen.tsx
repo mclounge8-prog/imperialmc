@@ -6,6 +6,7 @@ import { colors } from '../theme/colors';
 import ShiftToggle from '../components/ShiftToggle';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
 import UpdateCheckRow from '../components/UpdateCheckRow';
+import KitchenEnableSwitch from '../components/KitchenEnableSwitch';
 import { useDevice } from '../context/DeviceContext';
 import type { RootStackParamList } from '../../App';
 
@@ -57,6 +58,11 @@ export default function SettingsScreen() {
     <ScreenSwipeHost screen="Settings">
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <ShiftToggle />
+
+        <Text style={styles.sectionLabel}>Кухня</Text>
+        <View style={styles.card}>
+          <KitchenEnableSwitch />
+        </View>
 
         <Text style={styles.sectionLabel}>Отчёты по смене</Text>
         <View style={styles.card}>

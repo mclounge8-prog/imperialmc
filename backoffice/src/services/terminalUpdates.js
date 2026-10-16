@@ -26,6 +26,12 @@ const DEFAULT_MANIFEST = {
     file: null,
     notes: '',
   },
+  kitchen: {
+    versionCode: 1,
+    versionName: '1.0.0',
+    file: null,
+    notes: '',
+  },
 };
 
 export async function ensureUpdatesDir() {
@@ -46,6 +52,7 @@ export async function readManifest() {
       apk: { ...DEFAULT_MANIFEST.apk, ...(parsed.apk || {}) },
       js: { ...DEFAULT_MANIFEST.js, ...(parsed.js || {}) },
       kiosk: { ...DEFAULT_MANIFEST.kiosk, ...(parsed.kiosk || {}) },
+      kitchen: { ...DEFAULT_MANIFEST.kitchen, ...(parsed.kitchen || {}) },
     };
   } catch {
     return structuredClone(DEFAULT_MANIFEST);
@@ -69,6 +76,7 @@ export function manifestForClient(manifest, baseUrl) {
   const apkFile = manifest.apk?.file;
   const jsFile = manifest.js?.file;
   const kioskFile = manifest.kiosk?.file;
+  const kitchenFile = manifest.kitchen?.file;
   return {
     apk: {
       versionCode: Number(manifest.apk?.versionCode) || 1,
@@ -92,6 +100,13 @@ export function manifestForClient(manifest, baseUrl) {
       url: kioskFile ? `${baseUrl}/updates/${kioskFile}` : `${baseUrl}/updates/kiosk.apk`,
       notes: String(manifest.kiosk?.notes || ''),
       sha256: manifest.kiosk?.sha256 || null,
+    },
+    kitchen: {
+      versionCode: Number(manifest.kitchen?.versionCode) || 1,
+      versionName: String(manifest.kitchen?.versionName || '1.0.0'),
+      url: kitchenFile ? `${baseUrl}/updates/${kitchenFile}` : `${baseUrl}/updates/kitchen.apk`,
+      notes: String(manifest.kitchen?.notes || ''),
+      sha256: manifest.kitchen?.sha256 || null,
     },
   };
 }

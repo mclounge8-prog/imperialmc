@@ -39,6 +39,8 @@ import {
   cancelGuest,
   printGuestPrecheck,
   fetchCurrentShift,
+  fetchKitchenSent,
+  sendGuestToKitchen,
 } from '../api/client';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import CommentPromptModal from '../components/CommentPromptModal';
@@ -94,8 +96,9 @@ function roundMoney(value: number): number {
 export default function OrderScreen({ route, navigation }: Props) {
   const { orderId, tableId, tableName } = route.params;
   const { session } = useSession();
-  const { status } = useDevice();
+  const { status, deviceToken } = useDevice();
   const venue = status?.venue ?? null;
+  const kitchenOn = Boolean(status?.kitchenEnabled);
   const insets = useSafeAreaInsets();
 
   const [order, setOrder] = useState<Order | null>(null);
@@ -120,6 +123,8 @@ export default function OrderScreen({ route, navigation }: Props) {
   const [compositionTarget, setCompositionTarget] = useState<CompositionTarget>(null);
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
   const [cancelCommentGuest, setCancelCommentGuest] = useState<OrderGuest | null>(null);
+  const [kitchenSent, setKitchenSent] = useState<Record<number, number>>({});
+  const [kitchenReadyGuests, setKitchenReadyGuests] = useState<number[]>([]);
 
   const showAlert = useCallback((title: string, message: string, buttons?: AlertButton[]) => {
     setAlertState({ title, message, buttons: buttons ?? [{ text: 'ОК' }] });
@@ -154,6 +159,30 @@ export default function OrderScreen({ route, navigation }: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const refreshKitchenSent = useCallback(async (id: number) => {
+    if (!session || !kitchenOn) return;
+    try {
+      const data = await fetchKitchenSent(id, session.token);
+      const next: Record<number, number> = {};
+      for (const item of data.items) next[item.orderItemId] = item.sentQty;
+      setKitchenSent(next);
+      setKitchenReadyGuests(data.readyGuestIds);
+    } catch {
+      /* кухня необязательна для кассы — молча ждём следующий опрос */
+    }
+  }, [kitchenOn, session]);
+
+  useEffect(() => {
+    if (!kitchenOn || !order) {
+      setKitchenSent({});
+      setKitchenReadyGuests([]);
+      return;
+    }
+    void refreshKitchenSent(order.id);
+    const timer = setInterval(() => void refreshKitchenSent(order.id), 4000);
+    return () => clearInterval(timer);
+  }, [kitchenOn, order, refreshKitchenSent]);
 
   // После рестарта OTA / возврата на экран — подтянуть актуальный состав с сервера.
   useEffect(() => {
@@ -492,6 +521,28 @@ export default function OrderScreen({ route, navigation }: Props) {
     setPaymentTarget(guest);
   };
 
+  const handleSendKitchen = async () => {
+    if (!session || !order || !deviceToken) return;
+    const guest = order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
+    if (!guest) return;
+    if (guest.precheckPrintedAt) {
+      showAlert('Пречек напечатан', 'На кухню отправляют до пречека.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await sendGuestToKitchen(order.id, guest.id, session.token, deviceToken);
+      const next: Record<number, number> = {};
+      for (const item of result.items) next[item.orderItemId] = item.sentQty;
+      setKitchenSent(next);
+      showAlert('Кухня', `Отправлено позиций: ${result.ticket.itemCount}`);
+    } catch (e) {
+      showAlert('Кухня', e instanceof Error ? e.message : 'Не удалось отправить на кухню');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handlePrecheck = async () => {
     if (!session || !order) return;
     const guest = order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
@@ -663,6 +714,12 @@ export default function OrderScreen({ route, navigation }: Props) {
     order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
   const precheckLocked = Boolean(selectedGuest?.precheckPrintedAt);
   const precheckMode = Boolean(order.precheckEnabled);
+  const kitchenUnsent = selectedGuest
+    ? selectedGuest.items.reduce(
+        (sum, item) => sum + Math.max(0, item.qty - (kitchenSent[item.id] || 0)),
+        0
+      )
+    : 0;
   const moveTargetGuests = moveTarget
     ? order.guests.filter((g) => g.id !== moveTarget.currentGuestId)
     : [];
@@ -722,6 +779,7 @@ export default function OrderScreen({ route, navigation }: Props) {
               >
                 {guest.total.toFixed(0)} ₽
                 {Number(guest.discountPercent) > 0 ? ` (−${guest.discountPercent}%)` : ''}
+                {kitchenReadyGuests.includes(guest.id) ? ' · готово' : ''}
               </Text>
             </Pressable>
           ))}
@@ -749,6 +807,14 @@ export default function OrderScreen({ route, navigation }: Props) {
                   onPress={() => handleOrderItemPress(item)}
                 >
                   <Text style={styles.orderItemName}>{item.name}</Text>
+                  {kitchenOn && (kitchenSent[item.id] || 0) > 0 ? (
+                    <Text style={styles.kitchenSentLabel}>
+                      на кухне {Math.min(item.qty, kitchenSent[item.id] || 0)}
+                      {(kitchenSent[item.id] || 0) < item.qty
+                        ? ` · ещё ${item.qty - (kitchenSent[item.id] || 0)}`
+                        : ''}
+                    </Text>
+                  ) : null}
                   {summary ? (
                     <Text style={styles.modifierSummary} numberOfLines={2}>
                       {summary}
@@ -838,6 +904,17 @@ export default function OrderScreen({ route, navigation }: Props) {
                 : ''}
             </Text>
           </Pressable>
+          {kitchenOn && !precheckLocked ? (
+            <Pressable
+              style={[styles.actionButton, styles.kitchenButton]}
+              disabled={busy || !selectedGuest || kitchenUnsent <= 0}
+              onPress={() => void handleSendKitchen()}
+            >
+              <Text style={styles.kitchenButtonText}>
+                {kitchenUnsent <= 0 ? 'На кухне' : 'Отправить на кухню'}
+              </Text>
+            </Pressable>
+          ) : null}
           {precheckMode && !precheckLocked ? (
             <Pressable
               style={[styles.actionButton, styles.precheckButton]}
@@ -1455,6 +1532,13 @@ const styles = StyleSheet.create({
     borderColor: colors.accent2,
   },
   precheckButtonText: { color: colors.accent2, fontSize: 16, fontWeight: '700' },
+  kitchenButton: {
+    backgroundColor: 'rgba(63, 99, 230, 0.16)',
+    borderWidth: 1,
+    borderColor: colors.accent2,
+  },
+  kitchenButtonText: { color: colors.accent2, fontSize: 16, fontWeight: '700' },
+  kitchenSentLabel: { color: colors.accent2, fontSize: 11, marginTop: 2 },
   discountButton: {
     backgroundColor: 'rgba(230, 160, 63, 0.1)',
     borderWidth: 1,
