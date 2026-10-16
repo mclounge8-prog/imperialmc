@@ -927,37 +927,32 @@ export default function OrderScreen({ route, navigation }: Props) {
             >
               <Text style={styles.precheckButtonText}>Пречек</Text>
             </Pressable>
-          ) : null}
-          <Pressable
-            style={styles.payButtonWrapper}
-            disabled={
-              busy ||
-              !selectedGuest ||
-              (selectedGuest.subtotal ?? selectedGuest.total) <= 0 ||
-              (precheckMode && !precheckLocked)
-            }
-            onPress={handlePay}
-          >
-            <LinearGradient
-              colors={GRADIENT_BLUE}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[
-                styles.actionButton,
-                (busy ||
-                  !selectedGuest ||
-                  (selectedGuest.subtotal ?? selectedGuest.total) <= 0 ||
-                  (precheckMode && !precheckLocked)) &&
-                  styles.actionButtonDisabled,
-              ]}
+          ) : (
+            <Pressable
+              style={styles.payButtonWrapper}
+              disabled={
+                busy ||
+                !selectedGuest ||
+                (selectedGuest.subtotal ?? selectedGuest.total) <= 0
+              }
+              onPress={handlePay}
             >
-              <Text style={styles.payButtonText}>
-                {precheckMode && !precheckLocked
-                  ? 'Сначала пречек'
-                  : `Оплата — ${selectedGuest?.label ?? ''}`}
-              </Text>
-            </LinearGradient>
-          </Pressable>
+              <LinearGradient
+                colors={GRADIENT_BLUE}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[
+                  styles.actionButton,
+                  (busy ||
+                    !selectedGuest ||
+                    (selectedGuest.subtotal ?? selectedGuest.total) <= 0) &&
+                    styles.actionButtonDisabled,
+                ]}
+              >
+                <Text style={styles.payButtonText}>Оплата — {selectedGuest?.label ?? ''}</Text>
+              </LinearGradient>
+            </Pressable>
+          )}
           <Pressable
             style={[styles.actionButton, styles.closeButton]}
             disabled={busy || !selectedGuest}
