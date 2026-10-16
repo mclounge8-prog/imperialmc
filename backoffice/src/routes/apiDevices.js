@@ -85,7 +85,32 @@ apiDevices.get('/me', requireDeviceToken, async (c) => {
       : null;
   }
 
-  return c.json({ active: device.is_active, kind: device.kind || 'staff', venue });
+  return c.json({
+    active: device.is_active,
+    kind: device.kind || 'staff',
+    kitchenEnabled: !!device.kitchen_enabled,
+    venue,
+  });
+});
+
+// Включение экрана кухни на этом терминале. Кухонный планшет без входа
+// смотрит смену именно тех терминалов, где флаг включён.
+apiDevices.post('/kitchen', requireDeviceToken, async (c) => {
+  const device = c.get('device');
+  const body = await c.req.json().catch(() => null);
+  const enabled = !!(body && body.enabled);
+
+  if (!device.is_active || !device.venue_id) {
+    c.status(409);
+    return c.json({ error: 'Терминал не назначен на заведение' });
+  }
+
+  await pool.query('UPDATE devices SET kitchen_enabled = $2, last_seen_at = now() WHERE id = $1', [
+    device.id,
+    enabled,
+  ]);
+
+  return c.json({ kitchenEnabled: enabled });
 });
 
 export default apiDevices;

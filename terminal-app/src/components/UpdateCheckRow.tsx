@@ -11,7 +11,7 @@ import { getAppVersion, isUpdatesAvailable } from '../native/updates';
 import { planUpdate } from '../services/appUpdates';
 import { requestUpdateCheck } from '../services/updateEvents';
 
-export default function UpdateCheckRow({ channel = 'staff' }: { channel?: 'staff' | 'kiosk' }) {
+export default function UpdateCheckRow({ channel = 'staff' }: { channel?: 'staff' | 'kiosk' | 'kitchen' }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [versionLabel, setVersionLabel] = useState<string>('');

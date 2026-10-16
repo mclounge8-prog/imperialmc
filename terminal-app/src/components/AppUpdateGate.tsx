@@ -21,7 +21,7 @@ import { CHECK_UPDATES_EVENT } from '../services/updateEvents';
 type Props = {
   /** Автопроверка при монтировании */
   autoCheck?: boolean;
-  channel?: 'staff' | 'kiosk';
+  channel?: 'staff' | 'kiosk' | 'kitchen';
 };
 
 export default function AppUpdateGate({ autoCheck = true, channel = 'staff' }: Props) {
@@ -116,7 +116,11 @@ export default function AppUpdateGate({ autoCheck = true, channel = 'staff' }: P
   const notes =
     plan.kind === 'apk'
       ? `${plan.remote.notes?.trim() || ''}\nПосле установки откройте приложение снова.`.trim()
-      : `${plan.remote.notes?.trim() || ''}\nУстановка перезапустит приложение (сессия сотрудника сохранится).`.trim();
+      : `${plan.remote.notes?.trim() || ''}\n${
+          channel === 'kitchen'
+            ? 'Установка перезапустит экран кухни.'
+            : 'Установка перезапустит приложение (сессия сотрудника сохранится).'
+        }`.trim();
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => canSkip && setDismissed(true)}>

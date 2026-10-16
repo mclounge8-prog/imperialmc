@@ -46,7 +46,7 @@ async function assertGuestEditable(clientOrPool, guestId) {
   const printedAt = await fetchGuestPrecheckState(clientOrPool, guestId);
   if (printedAt) {
     const err = new Error(
-      'Пречек уже напечатан — состав менять нельзя. Отмените чек с комментарием или проведите оплату.'
+      'Пречек уже напечатан — состав менять нельзя. Отмените пречек или проведите оплату.'
     );
     err.status = 409;
     err.code = 'PRECHECK_LOCKED';
@@ -889,6 +889,97 @@ apiOrders.post('/orders/:orderId/guests/:guestId/precheck', requireStaffToken, a
 
   const order = await fetchOrderDetail(orderId);
   return c.json({ order, fiscalJobId: jobId });
+});
+
+// Снять печать пречека. Чек и позиции остаются: это не отмена заказа и не возврат на склад.
+apiOrders.post('/orders/:orderId/guests/:guestId/precheck-cancel', requireStaffToken, async (c) => {
+  const { orderId, guestId } = c.req.param();
+  const staff = c.get('staff');
+  const body = await c.req.json().catch(() => null);
+  const cancelComment = body && typeof body.comment === 'string' ? body.comment.trim() : '';
+
+  if (cancelComment.length < 3) {
+    c.status(400);
+    return c.json({
+      error: 'Укажите комментарий к отмене пречека',
+      code: 'CANCEL_COMMENT_REQUIRED',
+    });
+  }
+
+  let notifyPayload = null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `SELECT og.id, og.label, og.status, og.precheck_printed_at, og.discount_percent,
+              o.venue_id, o.table_id, t.name AS table_name, v.name AS venue_name
+       FROM order_guests og
+       JOIN orders o ON o.id = og.order_id
+       LEFT JOIN tables t ON t.id = o.table_id
+       LEFT JOIN venues v ON v.id = o.venue_id
+       WHERE og.id = $1 AND og.order_id = $2
+       FOR UPDATE OF og`,
+      [guestId, orderId]
+    );
+    const guest = rows[0];
+    if (!guest || guest.status !== 'open') {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({ error: 'Гость не найден или уже закрыт' });
+    }
+    if (!guest.precheck_printed_at) {
+      await client.query('ROLLBACK');
+      c.status(409);
+      return c.json({ error: 'Пречек не напечатан', code: 'PRECHECK_ABSENT' });
+    }
+
+    const { rows: sumRows } = await client.query(
+      'SELECT COALESCE(SUM(price * qty), 0) AS subtotal FROM order_items WHERE guest_id = $1',
+      [guestId]
+    );
+
+    await client.query(
+      `UPDATE order_guests
+       SET precheck_printed_at = NULL,
+           precheck_printed_by = NULL,
+           precheck_printed_by_name = NULL
+       WHERE id = $1`,
+      [guestId]
+    );
+    await client.query('COMMIT');
+
+    notifyPayload = {
+      venueName: guest.venue_name,
+      venueId: guest.venue_id,
+      tableName: guest.table_name,
+      guestLabel: guest.label,
+      cashier: staff.name,
+      comment: cancelComment,
+      subtotal: Number(sumRows[0]?.subtotal || 0),
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  if (notifyPayload) {
+    notifyTelegramSafe(
+      buildPrecheckCancelMessage({
+        venueName: notifyPayload.venueName || (await fetchVenueName(notifyPayload.venueId)),
+        comment: notifyPayload.comment,
+        cashier: notifyPayload.cashier,
+        tableName: notifyPayload.tableName,
+        guestLabel: notifyPayload.guestLabel,
+        total: notifyPayload.subtotal,
+      }),
+      { venueId: notifyPayload.venueId }
+    );
+  }
+
+  const order = await fetchOrderDetail(orderId);
+  return c.json({ order });
 });
 
 // Назначить скидку конкретному гостю (до пречека / пока состав не зафиксирован).

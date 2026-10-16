@@ -3,7 +3,9 @@ import { pool } from '../db.js';
 
 export async function findDeviceByToken(token) {
   const { rows } = await pool.query(
-    `SELECT id, venue_id, is_active, token_hash, COALESCE(kind, 'staff') AS kind FROM devices`
+    `SELECT id, venue_id, is_active, token_hash, COALESCE(kind, 'staff') AS kind,
+            COALESCE(kitchen_enabled, false) AS kitchen_enabled
+     FROM devices`
   );
   for (const device of rows) {
     // eslint-disable-next-line no-await-in-loop

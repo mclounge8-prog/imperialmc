@@ -19,6 +19,7 @@ import {
   fetchTables,
   fetchOpenOrders,
   fetchPaidReceipts,
+  fetchKitchenReady,
   fetchKioskTickets,
   setKioskTicketStatus,
   closeKioskTicket,
@@ -70,6 +71,7 @@ export default function TablesScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [readyOrderIds, setReadyOrderIds] = useState<Set<number>>(new Set());
   const hasLoadedRef = useRef(false);
 
   const load = useCallback(
@@ -85,12 +87,13 @@ export default function TablesScreen() {
         setError(null);
       }
       try {
-        const [tablesData, ordersData, paidData, kioskData] = await Promise.all([
+        const [tablesData, ordersData, paidData, kioskData, kitchenReady] = await Promise.all([
           fetchTables(venue.id, session.token),
           fetchOpenOrders(venue.id, session.token),
           // Чеки текущей открытой смены (бэкенд фильтрует по shift_id).
           fetchPaidReceipts(venue.id, session.token),
           fetchKioskTickets(venue.id, session.token).catch(() => ({ tickets: [] as KioskTicket[], shiftOpen: false })),
+          fetchKitchenReady(venue.id, session.token).catch(() => ({ orderIds: [] as number[], tableIds: [] as number[] })),
         ]);
         const nextZones = tablesData.zones.map((zone) => ({
           ...zone,
@@ -115,6 +118,7 @@ export default function TablesScreen() {
         setOpenOrders(ordersData.orders);
         setKioskTickets(kioskData.tickets.filter((t) => isActiveKioskStatus(t.status)));
         setPaidReceipts(paidData);
+        setReadyOrderIds(new Set(kitchenReady.orderIds || []));
         hasLoadedRef.current = true;
         if (silent) setError(null);
       } catch (e) {
@@ -301,28 +305,11 @@ export default function TablesScreen() {
                       />
                     ))}
                     {layout.tables.map((table) => (
-                      <Pressable
+                      <FloorTable
                         key={table.id}
-                        style={[
-                          styles.tableTile,
-                          {
-                            left: table.left,
-                            top: table.top,
-                            width: table.tileWidth,
-                            height: table.tileHeight,
-                            borderColor: STATUS_COLORS[table.status],
-                          },
-                        ]}
+                        table={table}
                         onPress={() => handleTablePress(table.id, table.name)}
-                      >
-                        <Text style={styles.tileName} numberOfLines={2}>
-                          {table.name}
-                        </Text>
-                        <Text style={styles.tileCapacity}>{table.capacity} мест</Text>
-                        <Text style={[styles.tileStatus, { color: STATUS_COLORS[table.status] }]}>
-                          {STATUS_LABELS[table.status] || table.status}
-                        </Text>
-                      </Pressable>
+                      />
                     ))}
                   </>
                 ) : null}
@@ -364,18 +351,22 @@ export default function TablesScreen() {
                   onPress={() => setSelectedKioskId(ticket.id)}
                 />
               ))}
-              {openOrders.map((o) => (
-                <Pressable
-                  key={o.id}
-                  style={styles.openOrderRow}
-                  onPress={() => handleOpenOrderPress(o)}
-                >
-                  <Text style={styles.openOrderName} numberOfLines={1}>
-                    {o.tableName ?? `Быстрый заказ №${o.id}`}
-                  </Text>
-                  <Text style={styles.openOrderTotal}>{o.total.toFixed(0)} ₽</Text>
-                </Pressable>
-              ))}
+              {openOrders.map((o) =>
+                readyOrderIds.has(o.id) ? (
+                  <ReadyOrderRow key={o.id} order={o} onPress={() => handleOpenOrderPress(o)} />
+                ) : (
+                  <Pressable
+                    key={o.id}
+                    style={styles.openOrderRow}
+                    onPress={() => handleOpenOrderPress(o)}
+                  >
+                    <Text style={styles.openOrderName} numberOfLines={1}>
+                      {o.tableName ?? `Быстрый заказ №${o.id}`}
+                    </Text>
+                    <Text style={styles.openOrderTotal}>{o.total.toFixed(0)} ₽</Text>
+                  </Pressable>
+                )
+              )}
             </ScrollView>
           )
         ) : paidReceipts.length === 0 ? (
@@ -496,6 +487,74 @@ export default function TablesScreen() {
   );
 }
 
+function FloorTable({
+  table,
+  onPress,
+}: {
+  table: {
+    id: number;
+    name: string;
+    capacity: number;
+    status: string;
+    left: number;
+    top: number;
+    tileWidth: number;
+    tileHeight: number;
+  };
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={[
+        styles.tableTile,
+        {
+          left: table.left,
+          top: table.top,
+          width: table.tileWidth,
+          height: table.tileHeight,
+          borderColor: STATUS_COLORS[table.status],
+        },
+      ]}
+      onPress={onPress}
+    >
+      <Text style={styles.tileName} numberOfLines={2}>
+        {table.name}
+      </Text>
+      <Text style={styles.tileCapacity}>{table.capacity} мест</Text>
+      <Text style={[styles.tileStatus, { color: STATUS_COLORS[table.status] }]}>
+        {STATUS_LABELS[table.status] || table.status}
+      </Text>
+    </Pressable>
+  );
+}
+
+function ReadyOrderRow({ order, onPress }: { order: OpenOrderSummary; onPress: () => void }) {
+  const pulse = useRef(new Animated.Value(0.18)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.55, duration: 650, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.12, duration: 650, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  return (
+    <Pressable onPress={onPress} style={styles.openOrderReady}>
+      <Animated.View pointerEvents="none" style={[styles.readyRowGlow, { opacity: pulse }]} />
+      <View style={styles.readyOrderInfo}>
+        <Text style={styles.openOrderName} numberOfLines={1}>
+          {order.tableName ?? `Быстрый заказ №${order.id}`}
+        </Text>
+        <Text style={styles.readyBadge}>Готово</Text>
+      </View>
+      <Text style={styles.openOrderTotal}>{order.total.toFixed(0)} ₽</Text>
+    </Pressable>
+  );
+}
+
 function KioskPulseRow({ ticket, onPress }: { ticket: KioskTicket; onPress: () => void }) {
   const pulse = useRef(new Animated.Value(0.35)).current;
 
@@ -603,6 +662,26 @@ const styles = StyleSheet.create({
   tileName: { color: colors.text, fontSize: 13, fontWeight: '600', textAlign: 'center' },
   tileCapacity: { color: colors.textMuted, fontSize: 11 },
   tileStatus: { fontSize: 11, fontWeight: '500' },
+  openOrderReady: {
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: '#6ee7a8',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    overflow: 'hidden',
+  },
+  readyRowGlow: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: '#6ee7a8',
+  },
+  readyOrderInfo: { flex: 1 },
+  readyBadge: { color: '#6ee7a8', fontSize: 12, fontWeight: '700', marginTop: 2 },
 
   ordersPane: {
     flex: 1,
