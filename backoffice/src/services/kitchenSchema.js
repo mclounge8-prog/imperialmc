@@ -26,6 +26,19 @@ const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_kitchen_tickets_venue_status ON kitchen_tickets (venue_id, status, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_kitchen_tickets_order ON kitchen_tickets (order_id)`,
   `CREATE INDEX IF NOT EXISTS idx_kitchen_ticket_items_ticket ON kitchen_ticket_items (ticket_id)`,
+  `ALTER TABLE kitchen_ticket_items ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ`,
+  `ALTER TABLE kitchen_ticket_items ADD COLUMN IF NOT EXISTS acked_at TIMESTAMPTZ`,
+  // Уже отмеченные целиком тикеты переезжают на позиции, но не считаются просмотренными:
+  // плашка «Готово» останется в списке, пока стол не откроют.
+  `UPDATE kitchen_ticket_items kti
+   SET ready_at = COALESCE(kt.ready_at, kt.created_at)
+   FROM kitchen_tickets kt
+   WHERE kt.id = kti.ticket_id
+     AND kt.status = 'ready'
+     AND kti.ready_at IS NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_kitchen_ticket_items_unacked
+   ON kitchen_ticket_items (ticket_id)
+   WHERE ready_at IS NOT NULL AND acked_at IS NULL`,
 ];
 
 export async function ensureKitchenSchema() {

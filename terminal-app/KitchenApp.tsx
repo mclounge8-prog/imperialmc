@@ -15,9 +15,8 @@ import { colors } from './src/theme/colors';
 import {
   ApiRequestError,
   fetchKitchenBoard,
-  markKitchenTicketReady,
+  markKitchenItemReady,
   type KitchenBoard,
-  type KitchenTicket,
   type Zone,
 } from './src/api/client';
 import { layoutTablesOnViewport, normalizeTableSize, snapToGrid, layoutSizeForTable } from './src/utils/tableLayout';
@@ -131,14 +130,14 @@ function KitchenRoot() {
     await load();
   };
 
-  const markReady = async (ticket: KitchenTicket) => {
-    if (busyId || ticket.status === 'ready') return;
-    setBusyId(ticket.id);
+  const markItemReady = async (itemId: number) => {
+    if (busyId) return;
+    setBusyId(itemId);
     try {
-      await markKitchenTicketReady(ticket.id);
+      await markKitchenItemReady(itemId);
       await load({ silent: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось отметить готовность');
+      setError(e instanceof Error ? e.message : 'Не удалось отметить позицию');
     } finally {
       setBusyId(null);
     }
@@ -166,7 +165,7 @@ function KitchenRoot() {
 
   const newByTable = new Map<number, number>();
   for (const ticket of board?.tickets ?? []) {
-    if (ticket.status === 'new' && ticket.tableId) {
+    if (ticket.tableId && ticket.items.some((item) => !item.ready)) {
       newByTable.set(ticket.tableId, (newByTable.get(ticket.tableId) || 0) + 1);
     }
   }
@@ -272,23 +271,43 @@ function KitchenRoot() {
             <Text style={styles.listTitle}>Заказы</Text>
             <ScrollView contentContainerStyle={styles.listContent}>
               {(board.tickets.length ? board.tickets : []).map((ticket) => {
-                const isNew = ticket.status === 'new';
+                const pending = ticket.items.some((item) => !item.ready);
+                const readyCount = ticket.items.filter((item) => item.ready).length;
                 return (
-                  <View key={ticket.id} style={[styles.card, isNew && styles.cardNew]}>
-                    {isNew ? <Pulse style={styles.cardPulse} /> : null}
+                  <View key={ticket.id} style={[styles.card, pending && styles.cardNew]}>
+                    {pending ? <Pulse style={styles.cardPulse} /> : null}
                     <View style={styles.cardTop}>
                       <Text style={styles.cardTable}>{ticket.tableName}</Text>
                       <Text style={styles.cardTime}>{formatTime(ticket.createdAt)}</Text>
                     </View>
                     <Text style={styles.cardGuest}>
                       {ticket.guestLabel}
-                      {isNew ? ' · новый' : ' · готов'}
+                      {pending
+                        ? readyCount > 0
+                          ? ` · готово ${readyCount} из ${ticket.items.length}`
+                          : ' · новый'
+                        : ' · готов'}
                     </Text>
                     {ticket.items.map((item) => (
-                      <View key={item.id} style={styles.itemBlock}>
-                        <Text style={styles.itemName}>
-                          {item.qty}× {item.name}
-                        </Text>
+                      <View key={item.id} style={[styles.itemBlock, item.ready && styles.itemReady]}>
+                        <View style={styles.itemRow}>
+                          <Text style={styles.itemName}>
+                            {item.qty}× {item.name}
+                          </Text>
+                          {item.ready ? (
+                            <Text style={styles.itemReadyLabel}>Готово</Text>
+                          ) : (
+                            <Pressable
+                              style={styles.itemReadyButton}
+                              disabled={busyId != null}
+                              onPress={() => void markItemReady(item.id)}
+                            >
+                              <Text style={styles.itemReadyButtonText}>
+                                {busyId === item.id ? '…' : 'Готово'}
+                              </Text>
+                            </Pressable>
+                          )}
+                        </View>
                         {item.modifiers.map((mod, index) => (
                           <Text key={`${item.id}-${index}`} style={styles.mod}>
                             {modifierLine(mod)}
@@ -296,19 +315,6 @@ function KitchenRoot() {
                         ))}
                       </View>
                     ))}
-                    {isNew ? (
-                      <Pressable
-                        style={styles.readyButton}
-                        disabled={busyId === ticket.id}
-                        onPress={() => void markReady(ticket)}
-                      >
-                        <Text style={styles.readyText}>
-                          {busyId === ticket.id ? 'Отмечаем…' : 'Готово'}
-                        </Text>
-                      </Pressable>
-                    ) : (
-                      <Text style={styles.readyDone}>Отмечено готовым</Text>
-                    )}
                   </View>
                 );
               })}
@@ -397,18 +403,25 @@ const styles = StyleSheet.create({
   cardTable: { color: colors.text, fontSize: 16, fontWeight: '700' },
   cardTime: { color: colors.textMuted, fontSize: 12 },
   cardGuest: { color: colors.accent2, fontSize: 12, marginTop: 2, marginBottom: 6 },
-  itemBlock: { marginBottom: 4 },
-  itemName: { color: colors.text, fontSize: 15 },
-  mod: { color: colors.textMuted, fontSize: 12, marginLeft: 8 },
-  readyButton: {
-    marginTop: 10,
-    backgroundColor: colors.accent,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
+  itemBlock: { marginBottom: 8 },
+  itemReady: {
+    borderWidth: 1,
+    borderColor: '#6ee7a8',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
-  readyText: { color: '#f1f1f3', fontSize: 16, fontWeight: '700' },
-  readyDone: { color: '#6ee7a8', fontSize: 13, marginTop: 8, fontWeight: '600' },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  itemName: { color: colors.text, fontSize: 15, flex: 1 },
+  mod: { color: colors.textMuted, fontSize: 12, marginLeft: 8, marginTop: 2 },
+  itemReadyButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  itemReadyButtonText: { color: '#f1f1f3', fontSize: 14, fontWeight: '700' },
+  itemReadyLabel: { color: '#6ee7a8', fontSize: 13, fontWeight: '700' },
   zones: { gap: 8, paddingVertical: 6 },
   zoneChip: {
     borderWidth: 1,

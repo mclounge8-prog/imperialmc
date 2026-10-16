@@ -863,9 +863,14 @@ CREATE TABLE IF NOT EXISTS kitchen_ticket_items (
   order_item_id  INT REFERENCES order_items(id) ON DELETE SET NULL,
   name           VARCHAR(200) NOT NULL,
   qty            INT NOT NULL,
-  modifiers      JSONB NOT NULL DEFAULT '[]'::jsonb
+  modifiers      JSONB NOT NULL DEFAULT '[]'::jsonb,
+  ready_at       TIMESTAMPTZ,
+  acked_at       TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_kitchen_tickets_venue_status ON kitchen_tickets (venue_id, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_kitchen_tickets_order ON kitchen_tickets (order_id);
 CREATE INDEX IF NOT EXISTS idx_kitchen_ticket_items_ticket ON kitchen_ticket_items (ticket_id);
+CREATE INDEX IF NOT EXISTS idx_kitchen_ticket_items_unacked
+  ON kitchen_ticket_items (ticket_id)
+  WHERE ready_at IS NOT NULL AND acked_at IS NULL;

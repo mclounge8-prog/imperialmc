@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
@@ -41,6 +42,7 @@ import {
   printGuestPrecheck,
   fetchCurrentShift,
   fetchKitchenSent,
+  acknowledgeKitchenReady,
   sendGuestToKitchen,
 } from '../api/client';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
@@ -125,6 +127,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
   const [cancelCommentGuest, setCancelCommentGuest] = useState<OrderGuest | null>(null);
   const [kitchenSent, setKitchenSent] = useState<Record<number, number>>({});
+  const [kitchenReadyQty, setKitchenReadyQty] = useState<Record<number, number>>({});
   const [kitchenReadyGuests, setKitchenReadyGuests] = useState<number[]>([]);
 
   const showAlert = useCallback((title: string, message: string, buttons?: AlertButton[]) => {
@@ -162,28 +165,43 @@ export default function OrderScreen({ route, navigation }: Props) {
   }, [load]);
 
   const refreshKitchenSent = useCallback(async (id: number) => {
-    if (!session || !kitchenOn) return;
+    if (!session) return;
     try {
       const data = await fetchKitchenSent(id, session.token);
-      const next: Record<number, number> = {};
-      for (const item of data.items) next[item.orderItemId] = item.sentQty;
-      setKitchenSent(next);
+      const sent: Record<number, number> = {};
+      const ready: Record<number, number> = {};
+      for (const item of data.items) {
+        sent[item.orderItemId] = item.sentQty;
+        ready[item.orderItemId] = item.readyQty || 0;
+      }
+      setKitchenSent(sent);
+      setKitchenReadyQty(ready);
       setKitchenReadyGuests(data.readyGuestIds);
     } catch {
       /* кухня необязательна для кассы — молча ждём следующий опрос */
     }
-  }, [kitchenOn, session]);
+  }, [session]);
+
+  const ackToken = session?.token;
+  const ackOrderId = order?.id ?? null;
+  useFocusEffect(
+    useCallback(() => {
+      if (!ackToken || ackOrderId == null) return;
+      void acknowledgeKitchenReady(ackOrderId, ackToken).catch(() => {});
+    }, [ackToken, ackOrderId])
+  );
 
   useEffect(() => {
-    if (!kitchenOn || !order) {
+    if (!order) {
       setKitchenSent({});
+      setKitchenReadyQty({});
       setKitchenReadyGuests([]);
       return;
     }
     void refreshKitchenSent(order.id);
     const timer = setInterval(() => void refreshKitchenSent(order.id), 4000);
     return () => clearInterval(timer);
-  }, [kitchenOn, order, refreshKitchenSent]);
+  }, [order, refreshKitchenSent]);
 
   // После рестарта OTA / возврата на экран — подтянуть актуальный состав с сервера.
   useEffect(() => {
@@ -816,14 +834,21 @@ export default function OrderScreen({ route, navigation }: Props) {
               const canEditModifiers =
                 Boolean(menuItem && menuItem.modifierGroups.length > 0) && !precheckLocked;
               const summary = buildModifierSummary(item);
+              const readyQty = kitchenReadyQty[item.id] || 0;
+              const readyFull = readyQty >= item.qty && item.qty > 0;
               return (
-              <View key={item.id} style={styles.orderItemRow}>
+              <View key={item.id} style={[styles.orderItemRow, readyQty > 0 && styles.orderItemReady]}>
                 <Pressable
                   style={styles.orderItemInfo}
                   disabled={!canEditModifiers}
                   onPress={() => handleOrderItemPress(item)}
                 >
                   <Text style={styles.orderItemName}>{item.name}</Text>
+                  {readyQty > 0 ? (
+                    <Text style={styles.kitchenReadyLabel}>
+                      {readyFull ? 'Готово' : `Готово ${readyQty} из ${item.qty}`}
+                    </Text>
+                  ) : null}
                   {kitchenOn && (kitchenSent[item.id] || 0) > 0 ? (
                     <Text style={styles.kitchenSentLabel}>
                       на кухне {Math.min(item.qty, kitchenSent[item.id] || 0)}
@@ -1460,6 +1485,14 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: 8,
   },
+  orderItemReady: {
+    borderWidth: 2,
+    borderColor: '#6ee7a8',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    marginBottom: 6,
+    backgroundColor: 'rgba(110, 231, 168, 0.08)',
+  },
   orderItemInfo: { flex: 1 },
   orderItemName: { color: colors.text, fontSize: 14, fontWeight: '500' },
   compositionLink: { color: colors.accent2, fontSize: 11, marginTop: 2, fontWeight: '600' },
@@ -1551,6 +1584,7 @@ const styles = StyleSheet.create({
   },
   kitchenButtonText: { color: colors.accent2, fontSize: 16, fontWeight: '700' },
   kitchenSentLabel: { color: colors.accent2, fontSize: 11, marginTop: 2 },
+  kitchenReadyLabel: { color: '#6ee7a8', fontSize: 12, marginTop: 2, fontWeight: '700' },
   discountButton: {
     backgroundColor: 'rgba(230, 160, 63, 0.1)',
     borderWidth: 1,

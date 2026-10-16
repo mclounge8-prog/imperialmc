@@ -1132,6 +1132,7 @@ export type KitchenTicketItem = {
   id: number;
   name: string;
   qty: number;
+  ready: boolean;
   modifiers: KitchenModifier[];
 };
 
@@ -1183,15 +1184,26 @@ export async function markKitchenTicketReady(ticketId: number): Promise<{ ticket
   return publicKitchenRequest(`/api/kitchen/tickets/${ticketId}/ready`, { method: 'POST' });
 }
 
+export async function markKitchenItemReady(itemId: number): Promise<{ item: { id: number; ready: boolean } }> {
+  return publicKitchenRequest(`/api/kitchen/items/${itemId}/ready`, { method: 'POST' });
+}
+
 export async function fetchKitchenReady(
   venueId: number,
   token: string
-): Promise<{ tableIds: number[] }> {
+): Promise<{ orderIds: number[]; tableIds: number[] }> {
   return authorizedRequest(`/api/kitchen/ready?venueId=${venueId}`, token);
 }
 
+export async function acknowledgeKitchenReady(
+  orderId: number,
+  token: string
+): Promise<{ acked: number }> {
+  return authorizedRequest(`/api/kitchen/orders/${orderId}/ack`, token, { method: 'POST', body: {} });
+}
+
 export type KitchenSentState = {
-  items: { orderItemId: number; sentQty: number }[];
+  items: { orderItemId: number; sentQty: number; readyQty: number }[];
   readyGuestIds: number[];
 };
 

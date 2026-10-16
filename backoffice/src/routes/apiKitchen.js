@@ -76,7 +76,7 @@ async function loadBoard(venueId) {
   let itemRows = [];
   if (ticketIds.length) {
     const items = await pool.query(
-      `SELECT id, ticket_id, name, qty, modifiers
+      `SELECT id, ticket_id, name, qty, modifiers, ready_at
        FROM kitchen_ticket_items
        WHERE ticket_id = ANY($1::int[])
        ORDER BY id`,
@@ -93,6 +93,7 @@ async function loadBoard(venueId) {
       id: item.id,
       name: item.name,
       qty: Number(item.qty),
+      ready: item.ready_at != null,
       modifiers: modifiers.map((mod) => ({
         name: mod.name,
         qty: Number(mod.qty) || 0,
@@ -160,37 +161,137 @@ apiKitchen.get('/kitchen/board', async (c) => {
   return c.json({ venues, board });
 });
 
+async function stampTicketItemsReady(client, ticketId) {
+  await client.query(
+    `UPDATE kitchen_ticket_items
+     SET ready_at = COALESCE(ready_at, now())
+     WHERE ticket_id = $1`,
+    [ticketId]
+  );
+}
+
 apiKitchen.post('/kitchen/tickets/:id/ready', async (c) => {
   const ticketId = Number(c.req.param('id'));
   if (!Number.isInteger(ticketId)) {
     return sendError(c, 400, 'Некорректный заказ', 'BAD_TICKET');
   }
 
-  const { rows } = await pool.query(
-    `UPDATE kitchen_tickets kt
-     SET status = 'ready', ready_at = COALESCE(kt.ready_at, now())
-     WHERE kt.id = $1
-       AND kt.status IN ('new', 'ready')
-       AND EXISTS (
-         SELECT 1 FROM devices d
-         WHERE d.venue_id = kt.venue_id
-           AND d.is_active = true
-           AND COALESCE(d.kitchen_enabled, false) = true
-       )
-     RETURNING id, status, ready_at, table_id, venue_id`,
-    [ticketId]
-  );
-  if (!rows[0]) {
-    return sendError(c, 404, 'Заказ кухни не найден', 'NOT_FOUND');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `UPDATE kitchen_tickets kt
+       SET status = 'ready', ready_at = COALESCE(kt.ready_at, now())
+       WHERE kt.id = $1
+         AND kt.status IN ('new', 'ready')
+         AND EXISTS (
+           SELECT 1 FROM devices d
+           WHERE d.venue_id = kt.venue_id
+             AND d.is_active = true
+             AND COALESCE(d.kitchen_enabled, false) = true
+         )
+       RETURNING id, status, ready_at, table_id, venue_id`,
+      [ticketId]
+    );
+    if (!rows[0]) {
+      await client.query('ROLLBACK');
+      return sendError(c, 404, 'Заказ кухни не найден', 'NOT_FOUND');
+    }
+    // Старое приложение кухни отмечает весь тикет: позиции тоже становятся готовыми,
+    // иначе зал с новой логикой подсветки их не увидит.
+    await stampTicketItemsReady(client, ticketId);
+    await client.query('COMMIT');
+    return c.json({
+      ticket: {
+        id: rows[0].id,
+        status: rows[0].status,
+        readyAt: rows[0].ready_at ? new Date(rows[0].ready_at).toISOString() : null,
+        tableId: rows[0].table_id,
+      },
+    });
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      /* уже откатили */
+    }
+    console.error('kitchen ticket ready', err);
+    return sendError(c, 500, 'Не удалось отметить готовность', 'KITCHEN_READY_FAILED');
+  } finally {
+    client.release();
   }
-  return c.json({
-    ticket: {
-      id: rows[0].id,
-      status: rows[0].status,
-      readyAt: rows[0].ready_at ? new Date(rows[0].ready_at).toISOString() : null,
-      tableId: rows[0].table_id,
-    },
-  });
+});
+
+apiKitchen.post('/kitchen/items/:id/ready', async (c) => {
+  const itemId = Number(c.req.param('id'));
+  if (!Number.isInteger(itemId)) {
+    return sendError(c, 400, 'Некорректная позиция', 'BAD_ITEM');
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `UPDATE kitchen_ticket_items kti
+       SET ready_at = COALESCE(kti.ready_at, now())
+       FROM kitchen_tickets kt
+       WHERE kti.id = $1
+         AND kt.id = kti.ticket_id
+         AND kt.status IN ('new', 'ready')
+         AND EXISTS (
+           SELECT 1 FROM devices d
+           WHERE d.venue_id = kt.venue_id
+             AND d.is_active = true
+             AND COALESCE(d.kitchen_enabled, false) = true
+         )
+         AND EXISTS (
+           SELECT 1 FROM orders o
+           JOIN order_guests og ON og.id = kt.guest_id
+           WHERE o.id = kt.order_id AND o.status = 'open' AND og.status = 'open'
+         )
+       RETURNING kti.id, kti.ticket_id, kti.ready_at`,
+      [itemId]
+    );
+    if (!rows[0]) {
+      await client.query('ROLLBACK');
+      return sendError(c, 404, 'Позиция кухни не найдена', 'NOT_FOUND');
+    }
+    const ticketId = rows[0].ticket_id;
+    const { rows: pending } = await client.query(
+      `SELECT COUNT(*)::int AS left_count
+       FROM kitchen_ticket_items
+       WHERE ticket_id = $1 AND ready_at IS NULL`,
+      [ticketId]
+    );
+    const allReady = Number(pending[0].left_count) === 0;
+    const { rows: ticketRows } = await client.query(
+      `UPDATE kitchen_tickets
+       SET status = $2,
+           ready_at = CASE WHEN $2 = 'ready' THEN COALESCE(ready_at, now()) ELSE ready_at END
+       WHERE id = $1
+       RETURNING status, ready_at`,
+      [ticketId, allReady ? 'ready' : 'new']
+    );
+    await client.query('COMMIT');
+    return c.json({
+      item: {
+        id: rows[0].id,
+        ready: true,
+        ticketId,
+        ticketStatus: ticketRows[0]?.status || (allReady ? 'ready' : 'new'),
+      },
+    });
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      /* уже откатили */
+    }
+    console.error('kitchen item ready', err);
+    return sendError(c, 500, 'Не удалось отметить позицию', 'KITCHEN_ITEM_READY_FAILED');
+  } finally {
+    client.release();
+  }
 });
 
 apiKitchen.get('/kitchen/ready', requireStaffToken, async (c) => {
@@ -199,16 +300,36 @@ apiKitchen.get('/kitchen/ready', requireStaffToken, async (c) => {
     return sendError(c, 400, 'Не указано заведение', 'VENUE_REQUIRED');
   }
   const { rows } = await pool.query(
-    `SELECT DISTINCT kt.table_id
-     FROM kitchen_tickets kt
+    `SELECT DISTINCT kt.order_id
+     FROM kitchen_ticket_items kti
+     JOIN kitchen_tickets kt ON kt.id = kti.ticket_id
      JOIN orders o ON o.id = kt.order_id AND o.status = 'open'
      JOIN order_guests og ON og.id = kt.guest_id AND og.status = 'open'
      WHERE kt.venue_id = $1
-       AND kt.status = 'ready'
-       AND kt.table_id IS NOT NULL`,
+       AND kti.ready_at IS NOT NULL
+       AND kti.acked_at IS NULL`,
     [venueId]
   );
-  return c.json({ tableIds: rows.map((row) => row.table_id) });
+  // tableIds оставлен пустым: старые терминалы больше не зажигают плитку стола.
+  return c.json({ orderIds: rows.map((row) => row.order_id), tableIds: [] });
+});
+
+apiKitchen.post('/kitchen/orders/:orderId/ack', requireStaffToken, async (c) => {
+  const orderId = Number(c.req.param('orderId'));
+  if (!Number.isInteger(orderId)) {
+    return sendError(c, 400, 'Некорректный заказ', 'BAD_ORDER');
+  }
+  const { rowCount } = await pool.query(
+    `UPDATE kitchen_ticket_items kti
+     SET acked_at = now()
+     FROM kitchen_tickets kt
+     WHERE kt.id = kti.ticket_id
+       AND kt.order_id = $1
+       AND kti.ready_at IS NOT NULL
+       AND kti.acked_at IS NULL`,
+    [orderId]
+  );
+  return c.json({ acked: rowCount || 0 });
 });
 
 apiKitchen.get('/kitchen/orders/:orderId', requireStaffToken, async (c) => {
@@ -217,7 +338,9 @@ apiKitchen.get('/kitchen/orders/:orderId', requireStaffToken, async (c) => {
     return sendError(c, 400, 'Некорректный заказ', 'BAD_ORDER');
   }
   const { rows } = await pool.query(
-    `SELECT kti.order_item_id, SUM(kti.qty)::int AS sent_qty
+    `SELECT kti.order_item_id,
+            SUM(kti.qty)::int AS sent_qty,
+            SUM(CASE WHEN kti.ready_at IS NOT NULL THEN kti.qty ELSE 0 END)::int AS ready_qty
      FROM kitchen_ticket_items kti
      JOIN kitchen_tickets kt ON kt.id = kti.ticket_id
      WHERE kt.order_id = $1 AND kt.status IN ('new', 'ready') AND kti.order_item_id IS NOT NULL
@@ -225,17 +348,23 @@ apiKitchen.get('/kitchen/orders/:orderId', requireStaffToken, async (c) => {
     [orderId]
   );
   const { rows: guests } = await pool.query(
-    `SELECT guest_id
-     FROM kitchen_tickets
-     WHERE order_id = $1 AND status = 'ready' AND guest_id IS NOT NULL`,
+    `SELECT DISTINCT oi.guest_id
+     FROM kitchen_ticket_items kti
+     JOIN kitchen_tickets kt ON kt.id = kti.ticket_id
+     JOIN order_items oi ON oi.id = kti.order_item_id
+     WHERE kt.order_id = $1
+       AND kt.status IN ('new', 'ready')
+       AND kti.ready_at IS NOT NULL
+       AND oi.guest_id IS NOT NULL`,
     [orderId]
   );
   return c.json({
     items: rows.map((row) => ({
       orderItemId: row.order_item_id,
       sentQty: Number(row.sent_qty),
+      readyQty: Number(row.ready_qty) || 0,
     })),
-    readyGuestIds: [...new Set(guests.map((row) => row.guest_id))],
+    readyGuestIds: guests.map((row) => row.guest_id),
   });
 });
 
