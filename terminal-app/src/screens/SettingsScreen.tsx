@@ -59,8 +59,7 @@ export default function SettingsScreen() {
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <ShiftToggle />
 
-        <Text style={styles.sectionLabel}>Кухня</Text>
-        <View style={styles.card}>
+        <View style={[styles.card, styles.kitchenCard]}>
           <KitchenEnableSwitch />
         </View>
 
@@ -121,6 +120,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  kitchenCard: { marginTop: 12 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

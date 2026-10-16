@@ -457,6 +457,20 @@ export async function cancelGuest(
   return order;
 }
 
+export async function cancelGuestPrecheck(
+  orderId: number,
+  guestId: number,
+  token: string,
+  comment: string
+): Promise<Order> {
+  const { order } = await authorizedRequest<OrderEnvelope>(
+    `/api/orders/${orderId}/guests/${guestId}/precheck-cancel`,
+    token,
+    { method: 'POST', body: { comment } }
+  );
+  return order;
+}
+
 export async function printGuestPrecheck(
   orderId: number,
   guestId: number,

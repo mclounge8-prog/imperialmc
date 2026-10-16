@@ -32,7 +32,6 @@ import StaffPaymentModal from '../components/StaffPaymentModal';
 import { guestStatusLabel, isActiveKioskStatus, paymentMethodLabel, paymentMethodTint } from '../kiosk/status';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import ScreenSwipeHost from '../components/ScreenSwipeHost';
-import KitchenEnableSwitch from '../components/KitchenEnableSwitch';
 import { layoutSizeForTable, layoutTablesOnViewport, normalizeTableSize, snapToGrid } from '../utils/tableLayout';
 import type { RootStackParamList } from '../../App';
 
@@ -244,7 +243,6 @@ export default function TablesScreen() {
     <ScreenSwipeHost screen="Tables">
     <View style={styles.container}>
       <View style={styles.leftPane}>
-        <KitchenEnableSwitch variant="button" />
         <Pressable style={styles.quickOrderWrapper} onPress={handleQuickOrder}>
           <LinearGradient
             colors={GRADIENT_BLUE}

@@ -37,6 +37,7 @@ import {
   payGuest,
   setGuestDiscount,
   cancelGuest,
+  cancelGuestPrecheck,
   printGuestPrecheck,
   fetchCurrentShift,
   fetchKitchenSent,
@@ -648,6 +649,22 @@ export default function OrderScreen({ route, navigation }: Props) {
     }
   };
 
+  const performCancelPrecheck = async (guest: OrderGuest, comment: string) => {
+    if (!session || !order) return;
+    setBusy(true);
+    try {
+      const updated = await cancelGuestPrecheck(order.id, guest.id, session.token, comment);
+      setCancelCommentGuest(null);
+      setOrder(updated);
+      setSelectedGuestId(guest.id);
+      showAlert('Пречек снят', 'Чек и позиции остались. Состав снова можно менять.');
+    } catch (e) {
+      showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось снять пречек');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const performCancel = async (guest: OrderGuest, comment?: string) => {
     if (!session || !order) return;
     setBusy(true);
@@ -959,7 +976,7 @@ export default function OrderScreen({ route, navigation }: Props) {
             onPress={handleClose}
           >
             <Text style={styles.closeButtonText}>
-              {precheckLocked ? 'Отменить чек' : `Закрыть чек — ${selectedGuest?.label ?? ''}`}
+              {precheckLocked ? 'Отменить пречек' : `Закрыть чек — ${selectedGuest?.label ?? ''}`}
             </Text>
           </Pressable>
         </View>
@@ -1329,13 +1346,13 @@ export default function OrderScreen({ route, navigation }: Props) {
 
       <CommentPromptModal
         visible={cancelCommentGuest !== null}
-        title="Отмена после пречека"
-        subtitle={`Чек «${cancelCommentGuest?.label ?? ''}» будет отменён. Укажите причину — она сохранится в бэкофисе.`}
+        title="Отмена пречека"
+        subtitle={`Чек «${cancelCommentGuest?.label ?? ''}» останется, позиции не удалятся. Снимется только печать пречека.`}
         placeholder="Причина отмены"
-        confirmLabel="Отменить чек"
+        confirmLabel="Снять пречек"
         onCancel={() => setCancelCommentGuest(null)}
         onConfirm={(comment) => {
-          if (cancelCommentGuest) void performCancel(cancelCommentGuest, comment);
+          if (cancelCommentGuest) void performCancelPrecheck(cancelCommentGuest, comment);
         }}
       />
     </View>
