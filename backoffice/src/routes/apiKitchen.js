@@ -264,13 +264,19 @@ apiKitchen.post('/kitchen/items/:id/ready', async (c) => {
       [ticketId]
     );
     const allReady = Number(pending[0].left_count) === 0;
+    // $2 нельзя использовать и как varchar status, и в сравнении с text:
+    // PostgreSQL отвечает «inconsistent types deduced for parameter».
     const { rows: ticketRows } = await client.query(
-      `UPDATE kitchen_tickets
-       SET status = $2,
-           ready_at = CASE WHEN $2 = 'ready' THEN COALESCE(ready_at, now()) ELSE ready_at END
-       WHERE id = $1
-       RETURNING status, ready_at`,
-      [ticketId, allReady ? 'ready' : 'new']
+      allReady
+        ? `UPDATE kitchen_tickets
+           SET status = 'ready', ready_at = COALESCE(ready_at, now())
+           WHERE id = $1
+           RETURNING status, ready_at`
+        : `UPDATE kitchen_tickets
+           SET status = 'new'
+           WHERE id = $1
+           RETURNING status, ready_at`,
+      [ticketId]
     );
     await client.query('COMMIT');
     return c.json({
