@@ -1418,6 +1418,17 @@ input[type="radio"] {
   gap: 8px;
 }
 
+.item-name-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item-serve {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .item-thumb {
   width: 32px;
   height: 32px;

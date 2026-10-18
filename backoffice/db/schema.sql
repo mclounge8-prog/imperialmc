@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
   price        NUMERIC(10,2) NOT NULL,
   image_url    VARCHAR(500),
   is_active    BOOLEAN DEFAULT true,
+  serve_in     VARCHAR(80), -- бокал / стакан, не модификатор
   created_at   TIMESTAMPTZ DEFAULT now()
 );
 
@@ -149,6 +150,7 @@ CREATE TABLE IF NOT EXISTS modifiers (
   price             NUMERIC(10,2) NOT NULL DEFAULT 0,
   warehouse_item_id INT REFERENCES warehouse_items(id) ON DELETE SET NULL,
   qty               NUMERIC(10,3) NOT NULL DEFAULT 0, -- списание при выборе; 0 = не списывается
+  unit              VARCHAR(8), -- если нет складской позиции: g, ml, pcs
   created_at        TIMESTAMPTZ DEFAULT now()
 );
 
@@ -236,6 +238,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   name          VARCHAR(150) NOT NULL,
   price         NUMERIC(10,2) NOT NULL,
   qty           INT NOT NULL DEFAULT 1,
+  serve_in      VARCHAR(80), -- снапшот посуды на момент добавления
   created_at    TIMESTAMPTZ DEFAULT now()
 );
 
@@ -864,6 +867,7 @@ CREATE TABLE IF NOT EXISTS kitchen_ticket_items (
   name           VARCHAR(200) NOT NULL,
   qty            INT NOT NULL,
   modifiers      JSONB NOT NULL DEFAULT '[]'::jsonb,
+  serve_in       VARCHAR(80),
   ready_at       TIMESTAMPTZ,
   acked_at       TIMESTAMPTZ
 );

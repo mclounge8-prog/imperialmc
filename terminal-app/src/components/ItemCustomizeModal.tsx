@@ -192,6 +192,12 @@ export default function ItemCustomizeModal({
           <Text style={styles.title} numberOfLines={2}>
             {item.name}
           </Text>
+          {item.serveIn ? (
+            <View style={styles.serveBanner}>
+              <Text style={styles.serveLabel}>Посуда</Text>
+              <Text style={styles.serveValue}>{item.serveIn}</Text>
+            </View>
+          ) : null}
           {isEdit ? (
             <Text style={styles.editHint}>Изменение состава позиции в чеке</Text>
           ) : null}
@@ -209,8 +215,10 @@ export default function ItemCustomizeModal({
               const isRadio = group.maxSelect === 1;
               // Сначала то, что входит по умолчанию (галочки), ниже — допы.
               const orderedOptions = [...group.options].sort((a, b) => {
-                if (a.isDefault === b.isDefault) return a.name.localeCompare(b.name, 'ru');
-                return a.isDefault ? -1 : 1;
+                if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+                const sortDelta = (a.sortOrder || 0) - (b.sortOrder || 0);
+                if (sortDelta !== 0) return sortDelta;
+                return a.name.localeCompare(b.name, 'ru');
               });
               return (
                 <View key={key} style={styles.groupBlock}>
@@ -298,6 +306,18 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   title: { color: colors.text, fontSize: 17, fontWeight: '700', marginBottom: 8 },
+  serveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface2,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  serveLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
+  serveValue: { color: colors.text, fontSize: 15, fontWeight: '700' },
   editHint: { color: colors.textMuted, fontSize: 12, marginBottom: 10 },
   groupsScroll: { flexGrow: 0, flexShrink: 1, marginBottom: 8 },
   groupsScrollContent: { paddingBottom: 4 },

@@ -76,7 +76,7 @@ async function loadBoard(venueId) {
   let itemRows = [];
   if (ticketIds.length) {
     const items = await pool.query(
-      `SELECT id, ticket_id, name, qty, modifiers, ready_at
+      `SELECT id, ticket_id, name, qty, modifiers, serve_in, ready_at
        FROM kitchen_ticket_items
        WHERE ticket_id = ANY($1::int[])
        ORDER BY id`,
@@ -95,6 +95,7 @@ async function loadBoard(venueId) {
       qty: Number(item.qty),
       ready: item.ready_at != null,
       readyAt: item.ready_at ? new Date(item.ready_at).toISOString() : null,
+      serveIn: item.serve_in || null,
       modifiers: modifiers.map((mod) => ({
         name: mod.name,
         qty: Number(mod.qty) || 0,
@@ -427,7 +428,7 @@ apiKitchen.post('/orders/:orderId/guests/:guestId/kitchen', requireStaffToken, a
     }
 
     const { rows: itemRows } = await client.query(
-      `SELECT oi.id, oi.name, oi.qty,
+      `SELECT oi.id, oi.name, oi.qty, oi.serve_in,
               COALESCE(sent.sent_qty, 0)::int AS sent_qty
        FROM order_items oi
        LEFT JOIN (
@@ -451,8 +452,9 @@ apiKitchen.post('/orders/:orderId/guests/:guestId/kitchen', requireStaffToken, a
 
     const itemIds = fresh.map((item) => item.id);
     const { rows: modRows } = await client.query(
-      `SELECT oim.order_item_id, oim.name, oim.qty, wi.unit
+      `SELECT oim.order_item_id, oim.name, oim.qty, COALESCE(wi.unit, m.unit) AS unit
        FROM order_item_modifiers oim
+       LEFT JOIN modifiers m ON m.id = oim.modifier_id
        LEFT JOIN warehouse_items wi ON wi.id = oim.warehouse_item_id
        WHERE oim.order_item_id = ANY($1::int[])
        ORDER BY oim.id`,
@@ -489,9 +491,9 @@ apiKitchen.post('/orders/:orderId/guests/:guestId/kitchen', requireStaffToken, a
     for (const item of fresh) {
       const delta = Number(item.qty) - Number(item.sent_qty);
       await client.query(
-        `INSERT INTO kitchen_ticket_items (ticket_id, order_item_id, name, qty, modifiers)
-         VALUES ($1, $2, $3, $4, $5::jsonb)`,
-        [ticketId, item.id, item.name, delta, JSON.stringify(modsByItem.get(item.id) || [])]
+        `INSERT INTO kitchen_ticket_items (ticket_id, order_item_id, name, qty, modifiers, serve_in)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
+        [ticketId, item.id, item.name, delta, JSON.stringify(modsByItem.get(item.id) || []), item.serve_in || null]
       );
     }
 

@@ -844,6 +844,9 @@ export default function OrderScreen({ route, navigation }: Props) {
                   onPress={() => handleOrderItemPress(item)}
                 >
                   <Text style={styles.orderItemName}>{item.name}</Text>
+                  {item.serveIn ? (
+                    <Text style={styles.serveInLabel}>посуда: {item.serveIn}</Text>
+                  ) : null}
                   {readyQty > 0 ? (
                     <Text style={styles.kitchenReadyLabel}>
                       {readyFull ? 'Готово' : `Готово ${readyQty} из ${item.qty}`}
@@ -1496,6 +1499,7 @@ const styles = StyleSheet.create({
   orderItemInfo: { flex: 1 },
   orderItemName: { color: colors.text, fontSize: 14, fontWeight: '500' },
   compositionLink: { color: colors.accent2, fontSize: 11, marginTop: 2, fontWeight: '600' },
+  serveInLabel: { color: colors.accent2, fontSize: 12, fontWeight: '700', marginTop: 2 },
   modifierSummary: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
   orderItemPrice: { color: colors.text, fontSize: 14, fontWeight: '600' },
   qtyStepper: {

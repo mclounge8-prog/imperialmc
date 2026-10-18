@@ -75,6 +75,11 @@ export default function MenuBrowser({ menu, busy = false, onItemPress }: Props) 
             <Text style={styles.itemTileNameCompact} numberOfLines={1}>
               {item.name}
             </Text>
+            {item.serveIn ? (
+              <Text style={styles.itemTileServe} numberOfLines={1}>
+                {item.serveIn}
+              </Text>
+            ) : null}
             <Text style={styles.itemTilePrice}>{item.price.toFixed(2)} ₽</Text>
           </View>
         </>
@@ -83,6 +88,11 @@ export default function MenuBrowser({ menu, busy = false, onItemPress }: Props) 
           <Text style={styles.itemTileName} numberOfLines={2}>
             {item.name}
           </Text>
+          {item.serveIn ? (
+            <Text style={styles.itemTileServe} numberOfLines={1}>
+              {item.serveIn}
+            </Text>
+          ) : null}
           <Text style={styles.itemTilePrice}>{item.price.toFixed(2)} ₽</Text>
         </View>
       )}
@@ -231,5 +241,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   itemTileName: { color: colors.text, fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  itemTileServe: { color: colors.accent2, fontSize: 12, fontWeight: '700', textAlign: 'center' },
   itemTilePrice: { color: colors.accent2, fontSize: 13, fontWeight: '600' },
 });

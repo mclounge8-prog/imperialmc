@@ -14,7 +14,7 @@ export async function fetchVenueMenu(venueId) {
     [venueId]
   );
   const { rows: itemRows } = await pool.query(
-    'SELECT id, category_id, name, price, image_url FROM menu_items WHERE is_active = true ORDER BY name'
+    'SELECT id, category_id, name, price, image_url, serve_in FROM menu_items WHERE is_active = true ORDER BY name'
   );
 
   const { rows: modifierRows } = await pool.query(
@@ -22,12 +22,13 @@ export async function fetchVenueMenu(venueId) {
             m.name, m.group_id, mg.name AS group_name, mg.min_select, mg.max_select,
             COALESCE(mim.price_override, m.price) AS price,
             COALESCE(mim.qty_override, m.qty) AS qty,
-            wi.unit AS warehouse_unit
+            mim.sort_order,
+            COALESCE(wi.unit, m.unit) AS warehouse_unit
      FROM menu_item_modifiers mim
      JOIN modifiers m ON m.id = mim.modifier_id
      LEFT JOIN modifier_groups mg ON mg.id = m.group_id
      LEFT JOIN warehouse_items wi ON wi.id = m.warehouse_item_id
-     ORDER BY mg.name NULLS FIRST, m.name`
+     ORDER BY mg.name NULLS FIRST, mim.sort_order, m.name`
   );
 
   const modifierRowsByItem = new Map();
@@ -57,6 +58,7 @@ export async function fetchVenueMenu(venueId) {
         isDefault: row.is_default,
         qty: Number(row.qty) || 0,
         unit: row.warehouse_unit || null,
+        sortOrder: Number(row.sort_order) || 0,
       });
     }
     return [...groups.values()].map((group) => {
@@ -67,8 +69,9 @@ export async function fetchVenueMenu(venueId) {
         maxSelect = Math.min(Number(maxSelect), optionCount);
       }
       group.options.sort((a, b) => {
-        if (a.isDefault === b.isDefault) return String(a.name).localeCompare(String(b.name), 'ru');
-        return a.isDefault ? -1 : 1;
+        if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+        return String(a.name).localeCompare(String(b.name), 'ru');
       });
       return { ...group, minSelect, maxSelect };
     });
@@ -79,6 +82,7 @@ export async function fetchVenueMenu(venueId) {
     name: item.name,
     price: Number(item.price),
     imageUrl: item.image_url,
+    serveIn: item.serve_in || null,
     modifierGroups: buildModifierGroups(item.id),
   });
 
