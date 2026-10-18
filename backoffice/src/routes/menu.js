@@ -36,7 +36,7 @@ async function fetchHiddenCategoryIds(venueId) {
 
 async function fetchAllMenuItems() {
   const { rows } = await pool.query(
-    `SELECT mi.id, mi.name, mi.category_id, mi.price, mi.image_url, mi.is_active,
+    `SELECT mi.id, mi.name, mi.category_id, mi.price, mi.image_url, mi.is_active, mi.serve_in,
             (SELECT COUNT(*) FROM menu_item_modifiers WHERE menu_item_id = mi.id) AS recipe_count
      FROM menu_items mi
      ORDER BY mi.created_at DESC`
@@ -46,7 +46,7 @@ async function fetchAllMenuItems() {
 
 async function fetchMenuItemWithCategory(id) {
   const { rows } = await pool.query(
-    `SELECT mi.id, mi.name, mi.category_id, mi.price, mi.image_url, mi.is_active, mc.name AS category_name,
+    `SELECT mi.id, mi.name, mi.category_id, mi.price, mi.image_url, mi.is_active, mi.serve_in, mc.name AS category_name,
             (SELECT COUNT(*) FROM menu_item_modifiers WHERE menu_item_id = mi.id) AS recipe_count
      FROM menu_items mi
      LEFT JOIN menu_categories mc ON mi.category_id = mc.id
@@ -263,6 +263,7 @@ menu.put('/items/:id', async (c) => {
   const name = String(body.name || '').trim();
   const categoryId = body.category_id ? Number(body.category_id) : null;
   const price = Number(body.price);
+  const serveIn = String(body.serve_in || '').trim() || null;
 
   const current = await fetchMenuItemWithCategory(id);
   if (!current) {
@@ -280,12 +281,10 @@ menu.put('/items/:id', async (c) => {
 
   const categoryChanged = (current.category_id || null) !== (categoryId || null);
 
-  await pool.query('UPDATE menu_items SET name = $1, category_id = $2, price = $3 WHERE id = $4', [
-    name,
-    categoryId,
-    price,
-    id,
-  ]);
+  await pool.query(
+    'UPDATE menu_items SET name = $1, category_id = $2, price = $3, serve_in = $4 WHERE id = $5',
+    [name, categoryId, price, serveIn, id]
+  );
 
   const updated = await fetchMenuItemWithCategory(id);
 

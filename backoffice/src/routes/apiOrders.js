@@ -112,7 +112,7 @@ async function fetchOrderDetail(orderId) {
   );
 
   const { rows: itemRows } = await pool.query(
-    'SELECT id, guest_id, menu_item_id, name, price, qty FROM order_items WHERE order_id = $1 ORDER BY id',
+    'SELECT id, guest_id, menu_item_id, name, price, qty, serve_in FROM order_items WHERE order_id = $1 ORDER BY id',
     [orderId]
   );
 
@@ -123,8 +123,9 @@ async function fetchOrderDetail(orderId) {
     // ингредиенты сняты, какие платные добавки включены.
     // eslint-disable-next-line no-await-in-loop
     const { rows: modRows } = await pool.query(
-      `SELECT oim.modifier_id, oim.name, oim.price, oim.qty, wi.unit
+      `SELECT oim.modifier_id, oim.name, oim.price, oim.qty, COALESCE(wi.unit, m.unit) AS unit
        FROM order_item_modifiers oim
+       LEFT JOIN modifiers m ON m.id = oim.modifier_id
        LEFT JOIN warehouse_items wi ON wi.id = oim.warehouse_item_id
        WHERE oim.order_item_id = $1
        ORDER BY oim.id`,
@@ -145,6 +146,7 @@ async function fetchOrderDetail(orderId) {
       price: Number(item.price),
       qty: item.qty,
       lineTotal: Number(item.price) * item.qty,
+      serveIn: item.serve_in || null,
       modifiers,
     });
   }
@@ -1214,7 +1216,7 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
     await assertGuestEditable(client, guestId);
 
     const { rows: menuRows } = await client.query(
-      'SELECT id, name, price FROM menu_items WHERE id = $1 AND is_active = true',
+      'SELECT id, name, price, serve_in FROM menu_items WHERE id = $1 AND is_active = true',
       [menuItemId]
     );
     if (!menuRows[0]) {
@@ -1250,8 +1252,8 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
       await client.query('UPDATE order_items SET qty = qty + 1 WHERE id = $1', [matchedItemId]);
     } else {
       const { rows: inserted } = await client.query(
-        'INSERT INTO order_items (order_id, guest_id, menu_item_id, name, price, qty) VALUES ($1, $2, $3, $4, $5, 1) RETURNING id',
-        [orderId, guestId, menuItemId, menuItem.name, unitPrice]
+        'INSERT INTO order_items (order_id, guest_id, menu_item_id, name, price, qty, serve_in) VALUES ($1, $2, $3, $4, $5, 1, $6) RETURNING id',
+        [orderId, guestId, menuItemId, menuItem.name, unitPrice, menuItem.serve_in || null]
       );
       const newItemId = inserted[0].id;
       await insertOrderItemModifiers(client, newItemId, selectedAttachments);

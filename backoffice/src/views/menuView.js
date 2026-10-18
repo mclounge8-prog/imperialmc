@@ -66,7 +66,10 @@ export function renderMenuItemRow(item, { oob = false, targetId = null } = {}) {
               hx-swap="outerHTML"
             >
           </label>
-          <span>${safeName}</span>
+          <span class="item-name-text">
+            <span>${safeName}</span>
+            ${item.serve_in ? `<span class="item-serve">посуда: ${escapeHtml(item.serve_in)}</span>` : ''}
+          </span>
         </div>
       </td>
       <td>${price} ₽</td>
@@ -86,7 +89,10 @@ export function renderMenuItemEditRow(item, categories, errorMsg = null) {
 
   return `
     <tr id="menu-row-${item.id}">
-      <td><input type="text" name="name" value="${escapeHtml(item.name)}" required></td>
+      <td>
+        <input type="text" name="name" value="${escapeHtml(item.name)}" required>
+        <input type="text" name="serve_in" value="${escapeHtml(item.serve_in || '')}" placeholder="Посуда: Рокс, Хайболл 470" maxlength="80">
+      </td>
       <td><input type="number" step="0.01" min="0" name="price" value="${Number(item.price)}"></td>
       <td><select name="category_id">${categoryOptions(categories, item.category_id)}</select></td>
       <td class="row-actions">

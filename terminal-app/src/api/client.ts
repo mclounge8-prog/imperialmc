@@ -166,6 +166,7 @@ export type ModifierOption = {
   isDefault: boolean;
   qty: number;
   unit: string | null;
+  sortOrder?: number;
 };
 
 // Группа модификаторов позиции меню. id === null — синтетическая группа
@@ -184,6 +185,8 @@ export type MenuItem = {
   name: string;
   price: number;
   imageUrl: string | null;
+  /** Бокал или стакан. Не модификатор: снять галочкой нельзя. */
+  serveIn?: string | null;
   modifierGroups: ModifierGroup[];
 };
 
@@ -218,6 +221,7 @@ export type OrderItem = {
   price: number;
   qty: number;
   lineTotal: number;
+  serveIn?: string | null;
   modifiers: OrderItemModifier[];
 };
 
@@ -1134,6 +1138,7 @@ export type KitchenTicketItem = {
   qty: number;
   ready: boolean;
   readyAt: string | null;
+  serveIn?: string | null;
   modifiers: KitchenModifier[];
 };
 

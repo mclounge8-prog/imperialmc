@@ -25,6 +25,7 @@ import apiPwaReportsRoutes from './routes/apiPwaReports.js';
 import apiKioskRoutes from './routes/apiKiosk.js';
 import apiKitchenRoutes from './routes/apiKitchen.js';
 import { ensureKitchenSchema } from './services/kitchenSchema.js';
+import { ensureDrinkTechCards } from './services/drinkTechCards.js';
 import terminalUpdatesRoutes from './routes/terminalUpdates.js';
 import tobaccoTaresRoutes from './routes/tobaccoTares.js';
 import telegramRoutes from './routes/telegram.js';
@@ -125,6 +126,7 @@ app.use('/*', serveStatic({ root: './public' }));
 const port = Number(process.env.PORT || 3000);
 
 await ensureKitchenSchema();
+await ensureDrinkTechCards();
 
 serve({ fetch: app.fetch, port }, async (info) => {
   console.log(`Бэкофис запущен: http://localhost:${info.port}`);

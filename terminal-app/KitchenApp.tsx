@@ -370,6 +370,9 @@ function KitchenRoot() {
                             </Pressable>
                           )}
                         </View>
+                        {item.serveIn ? (
+                          <Text style={styles.serveIn}>посуда: {item.serveIn}</Text>
+                        ) : null}
                         {item.modifiers.map((mod, index) => (
                           <Text key={`${item.id}-${index}`} style={styles.mod}>
                             {modifierLine(mod)}
@@ -498,6 +501,7 @@ const styles = StyleSheet.create({
   },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   itemName: { color: colors.text, fontSize: 15, flex: 1 },
+  serveIn: { color: colors.accent2, fontSize: 13, fontWeight: '700', marginLeft: 8, marginTop: 2 },
   mod: { color: colors.textMuted, fontSize: 12, marginLeft: 8, marginTop: 2 },
   itemReadyButton: {
     backgroundColor: colors.accent,
