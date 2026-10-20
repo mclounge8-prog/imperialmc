@@ -62,7 +62,7 @@ export function renderDashboardShell({ username, initialKey, initialSectionHtml,
   <title>Бэкофис — панель управления</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=forecast1">
   <script src="/vendor/htmx.min.js"></script>
   <!-- app.js до Alpine: Alpine стартует микротаской в конце своего defer-скрипта,
        и браузер прогоняет микрозадачи до следующего defer. Если Alpine идёт первым,
