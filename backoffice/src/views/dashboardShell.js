@@ -62,10 +62,14 @@ export function renderDashboardShell({ username, initialKey, initialSectionHtml,
   <title>Бэкофис — панель управления</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=forecast1">
   <script src="/vendor/htmx.min.js"></script>
-  <script src="/vendor/alpine.min.js" defer></script>
+  <!-- app.js до Alpine: Alpine стартует микротаской в конце своего defer-скрипта,
+       и браузер прогоняет микрозадачи до следующего defer. Если Alpine идёт первым,
+       window.chartTooltip ещё нет, x-data графиков падает, и наведение молчит,
+       пока День/Неделя не подменят разметку уже после загрузки app.js. -->
   <script src="/js/app.js" defer></script>
+  <script src="/vendor/alpine.min.js" defer></script>
 </head>
 <body>
   <div class="app-shell">

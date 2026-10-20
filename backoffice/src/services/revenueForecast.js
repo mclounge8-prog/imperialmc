@@ -13,8 +13,10 @@
 
 export const forecastConfig = {
   testMode: true,
-  hourlyModel: 'weekdayProfile',
-  seriesModel: 'halfCompare',
+  // «Профиль дня» рисовал вечер отдельной формой и ломал шкалу графика.
+  // По умолчанию — доля уже прошедшего дня и наклон закрытых периодов.
+  hourlyModel: 'weekdayRatio',
+  seriesModel: 'linearSlope',
   /** Сколько таких же дней недели брать в базу (не считая сегодня). */
   weekdayLookback: 4,
   /** Насколько темп утра двигает вечер: 0 — вечер как в базе, 1 — вечер целиком в темпе утра. */

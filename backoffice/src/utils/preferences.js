@@ -30,8 +30,10 @@ export function writeSelectedVenueId(c, venueId) {
   setCookie(c, VENUE_COOKIE, String(venueId), { path: '/', maxAge: COOKIE_MAX_AGE, sameSite: 'Lax' });
 }
 
-const FORECAST_HOURLY_COOKIE = 'imc_forecast_hourly';
-const FORECAST_SERIES_COOKIE = 'imc_forecast_series';
+// v2: прошлые cookie держали «Профиль дня» и «Половины». Новые имена, чтобы
+// смена модели по умолчанию была видна и тем, кто уже нажимал эти кнопки.
+const FORECAST_HOURLY_COOKIE = 'imc_forecast_hourly_v2';
+const FORECAST_SERIES_COOKIE = 'imc_forecast_series_v2';
 
 /** Какая тестовая модель прогноза выбрана на главной. Пустая строка — брать значение по умолчанию. */
 export function readForecastModels(c) {

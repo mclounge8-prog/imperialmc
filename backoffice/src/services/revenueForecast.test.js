@@ -5,6 +5,7 @@ import {
   runHourlyForecast,
   runSeriesForecast,
   resolveHourlyModel,
+  resolveSeriesModel,
   presentHourlyForecast,
   presentSeriesForecast,
 } from './revenueForecast.js';
@@ -160,6 +161,12 @@ test('ratio cap relaxes after noon', () => {
 
 test('unknown hourly model uses the configured default', () => {
   assert.equal(resolveHourlyModel('nope'), forecastConfig.hourlyModel);
+});
+
+test('dashboard opens on share-of-day and slope, not the profile', () => {
+  assert.equal(forecastConfig.hourlyModel, 'weekdayRatio');
+  assert.equal(forecastConfig.seriesModel, 'linearSlope');
+  assert.equal(resolveSeriesModel('nope'), 'linearSlope');
 });
 
 test('half compare ignores the open tail and uses the recent half as the next point', () => {
