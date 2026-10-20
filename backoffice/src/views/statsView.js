@@ -7,7 +7,7 @@ import {
   renderTopItemsList,
   renderDonutChart,
 } from './charts.js';
-import { listHourlyModels, listSeriesModels, weekdayPhrase, trendWords } from '../services/revenueForecast.js';
+import { forecastConfig, listHourlyModels, listSeriesModels, weekdayPhrase, trendWords } from '../services/revenueForecast.js';
 
 const PERIOD_TABS = [
   ['day', 'День'],
@@ -200,7 +200,7 @@ function renderPeriodTotalsFooter(periodTotals) {
 
 /* ---------- Выручка (тренд + график) ---------- */
 
-export function renderRevenueWidgetBody(trend, periodTotals, activePeriod = 'week', forecast = null, venueId = '', seriesModel = 'halfCompare') {
+export function renderRevenueWidgetBody(trend, periodTotals, activePeriod = 'week', forecast = null, venueId = '', seriesModel = forecastConfig.seriesModel) {
   const labels = trend.map((t) => t.label);
   const values = trend.map((t) => t.revenue);
   const total = values.reduce((s, v) => s + v, 0);
@@ -218,7 +218,7 @@ export function renderRevenueWidgetBody(trend, periodTotals, activePeriod = 'wee
   `;
 }
 
-export function renderRevenueCard({ trend, periodTotals, activePeriod = 'week', venueId = '', forecast = null, seriesModel = 'halfCompare' }) {
+export function renderRevenueCard({ trend, periodTotals, activePeriod = 'week', venueId = '', forecast = null, seriesModel = forecastConfig.seriesModel }) {
   const tabs = PERIOD_TABS.map(
     ([key, label]) => `
         <button
@@ -342,7 +342,7 @@ function hourLabel(h) {
   return `${String(h).padStart(2, '0')}`;
 }
 
-export function renderHourlyWidget({ hourly, forecast = null, venueId = '', hourlyModel = 'weekdayProfile' }) {
+export function renderHourlyWidget({ hourly, forecast = null, venueId = '', hourlyModel = forecastConfig.hourlyModel }) {
   const labels = Array.from({ length: 24 }, (_, h) => hourLabel(h));
   const todaySeries = hourly.todayHours.map((value, hour) => (hour <= hourly.currentHour ? value : null));
   const chart = renderDualLineChart({
