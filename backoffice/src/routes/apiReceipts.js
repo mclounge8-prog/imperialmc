@@ -6,6 +6,7 @@ import {
   enqueueReceiptReturnFiscalJob,
   enqueueReceiptCopyFiscalJob,
 } from '../services/fiscalQueue.js';
+import { syncDeferredCloses } from '../services/cashFiscalHold.js';
 import {
   buildReceiptRefundMessage,
   fetchVenueName,
@@ -432,6 +433,7 @@ apiReceipts.post('/:id/refund', async (c) => {
       total: Number(receipt.total),
       operatorName: staff.name,
     });
+    await syncDeferredCloses(client, receipt.venue_id);
 
     await client.query('COMMIT');
     refundNotify = {

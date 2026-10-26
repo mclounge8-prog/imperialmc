@@ -182,6 +182,7 @@ const FISCAL_JOB_STATUS_LABELS = {
   done: 'Готово',
   error: 'Ошибка',
   cancelled: 'Отменено',
+  deferred: 'Z ждёт наличные',
 };
 
 function formatDateTime(value) {
@@ -255,6 +256,17 @@ export function renderVenueAtolPanel(venue, settings, jobs) {
           <input type="checkbox" name="enabled" ${safe.enabled ? 'checked' : ''}>
           <span>Касса АТОЛ включена для этого заведения</span>
         </label>
+        <label class="atol-toggle-row">
+          <input type="checkbox" name="hold_cash_receipts" ${safe.hold_cash_receipts ? 'checked' : ''}>
+          <span>Наличные чеки отправлять вручную</span>
+        </label>
+        <p class="atol-hint">
+          Чек, оплаченный целиком наличными, не уходит в кассу сразу. Продажа на планшете проходит как обычно, без ошибки и без плашки кассы.
+          В отчётах у такого чека есть кнопка «Отправить» — чек попадает в открытую фискальную смену. Смешанная оплата и карта уходят сразу.
+          Z-отчёт не печатается, пока эти наличные чеки не отправлены, даже если смена в программе уже закрыта: так они остаются в той же смене кассы.
+          Касса не держит смену дольше 24 часов. Если следующую смену откроют раньше, чем чеки отправлены, Z уйдёт вместе с ней, а не посреди дня.
+          Через 22 часа отложенный Z снимается сам, чтобы утренняя смена могла открыться.
+        </p>
 
         <div class="atol-fields-grid">
           <label>

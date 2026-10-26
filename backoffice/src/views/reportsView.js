@@ -2,7 +2,39 @@ import { escapeHtml } from './escapeHtml.js';
 import { formatVenueDateTime } from '../utils/timezone.js';
 
 const METHOD_LABELS = { cash: 'Наличные', card: 'Карта', qr: 'QR-код', other: 'Другое' };
-const STATUS_LABELS = { paid: 'Оплачен', cancelled: 'Отменён' };
+const STATUS_LABELS = { paid: 'Оплачен', cancelled: 'Отменён', refunded: 'Возврат' };
+
+export function renderReceiptFiscalBox(receipt, notice) {
+  const id = receipt.id;
+  const status = receipt.fiscal_status;
+  const manual = status === 'held' || receipt.has_fiscal_hold || receipt.fiscal_hold_payload;
+  let body = '—';
+  if (status === 'held') {
+    body = `
+      <span class="badge badge-inactive">Ждёт отправки</span>
+      <button type="button" class="secondary" hx-post="/reports/receipts/${id}/fiscal-send" hx-target="#receipt-fiscal-${id}" hx-swap="outerHTML">Отправить</button>
+    `;
+  } else if (status === 'pending') {
+    body = `<span class="badge">В очереди на кассу</span>`;
+  } else if (status === 'error') {
+    const error = receipt.fiscal_last_error
+      ? `<div class="fiscal-job-error">${escapeHtml(receipt.fiscal_last_error)}</div>`
+      : '';
+    body = `
+      <span class="badge badge-inactive">Ошибка кассы</span>
+      ${error}
+      ${
+        manual
+          ? `<button type="button" class="secondary" hx-post="/reports/receipts/${id}/fiscal-send" hx-target="#receipt-fiscal-${id}" hx-swap="outerHTML">Повторить</button>`
+          : ''
+      }
+    `;
+  } else if (status === 'done') {
+    body = `<span class="badge badge-active">ФД ${escapeHtml(String(receipt.fiscal_doc_number || '—'))}</span>`;
+  }
+  const note = notice ? `<div class="fiscal-job-error">${escapeHtml(notice)}</div>` : '';
+  return `<div id="receipt-fiscal-${id}" class="receipt-fiscal">${body}${note}</div>`;
+}
 
 function formatDateTime(value) {
   return formatVenueDateTime(value);
@@ -124,6 +156,7 @@ export function renderReceiptRow(receipt) {
       <td>${methods}</td>
       <td><span class="badge ${statusClass}">${STATUS_LABELS[receipt.status] || receipt.status}</span>${precheckBadge}</td>
       <td>${Number(receipt.total).toFixed(2)} ₽</td>
+      <td>${renderReceiptFiscalBox(receipt)}</td>
       <td class="row-actions">
         <button hx-get="/reports/receipts/${receipt.id}" hx-target="#main-content" hx-push-url="false">Открыть</button>
       </td>
@@ -188,6 +221,11 @@ export function renderReceiptsSection(venues, selectedVenueId, dateFrom, dateTo,
         },
       ])}
       <p class="hint">По умолчанию — последние 7 дней. CSV выгружает весь выбранный период, не только текущую страницу.</p>
+      ${
+        Number(summary.heldCount) > 0
+          ? `<p class="hint">Наличные чеки ждут ручной отправки в кассу: ${summary.heldCount}. Z-отчёт смены не печатается, пока они не уйдут в открытую фискальную смену. В уже закрытый Z чек не попадает. Смена кассы не длиннее 24 часов.</p>`
+          : ''
+      }
     </div>
 
     <div class="subsection report-summary">
@@ -229,10 +267,11 @@ export function renderReceiptsSection(venues, selectedVenueId, dateFrom, dateTo,
             <th>Оплата</th>
             <th>Статус</th>
             <th>Сумма</th>
+            <th>Касса</th>
             <th>Действия</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="8" class="empty-hint">Чеков за этот период нет</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="9" class="empty-hint">Чеков за этот период нет</td></tr>'}</tbody>
       </table>
       ${paginationHtml}
     </div>
@@ -495,6 +534,13 @@ export function renderReceiptDetail(receipt, items, payments) {
       }
       <p><strong>Открыт:</strong> ${formatDateTime(receipt.opened_at)}</p>
       <p><strong>Закрыт:</strong> ${formatDateTime(receipt.closed_at)}</p>
+      <p><strong>Касса АТОЛ:</strong></p>
+      ${renderReceiptFiscalBox(receipt)}
+      ${
+        receipt.fiscal_status === 'held'
+          ? `<p class="hint">Чек не уходил в кассу автоматически. «Отправить» ставит его в открытую фискальную смену. Если смена кассы уже закрыта Z-отчётом, кнопка объяснит почему: в закрытый отчёт чек добавить нельзя. Смена кассы живёт не дольше 24 часов.</p>`
+          : ''
+      }
       <p><strong>Сумма без скидки:</strong> ${Number(receipt.subtotal).toFixed(2)} ₽</p>
       ${
         Number(receipt.discount) > 0.009 || Number(receipt.discount_percent) > 0

@@ -459,6 +459,8 @@ export function buildShiftCloseMessage({
   cashier,
   when,
   expectedCash,
+  heldCashCount = 0,
+  heldCashTotal = 0,
 }) {
   return [
     header('🔴 Закрытие смены', venueName, when),
@@ -474,6 +476,9 @@ export function buildShiftCloseMessage({
     `Инкассации: ${escapeHtml(formatMoney(withdrawals))}`,
     `Внесения: ${escapeHtml(formatMoney(deposits))}`,
     `Кассир: ${escapeHtml(cashier || '—')}`,
+    Number(heldCashCount) > 0
+      ? `Наличные чеки ждут ручной отправки в кассу: ${escapeHtml(String(heldCashCount))} на ${escapeHtml(formatMoney(heldCashTotal))}. Z-отчёт напечатается после них, пока фискальная смена открыта (не дольше 24 часов).`
+      : null,
   ]
     .filter((x) => x != null)
     .join('\n');

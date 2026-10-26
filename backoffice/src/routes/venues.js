@@ -259,22 +259,24 @@ venues.post('/:id/atol', async (c) => {
 
   const body = await c.req.parseBody();
   const enabled = body.enabled === 'on' || body.enabled === 'true';
+  const holdCashReceipts = body.hold_cash_receipts === 'on' || body.hold_cash_receipts === 'true';
   const kktIp = String(body.kkt_ip || '').trim() || null;
   const kktPort = body.kkt_port ? Number(body.kkt_port) : 5555;
   const kktModel = body.kkt_model ? Number(body.kkt_model) : null;
   const operatorName = String(body.operator_name || '').trim() || null;
 
   await pool.query(
-    `INSERT INTO venue_atol_settings (venue_id, enabled, kkt_ip, kkt_port, kkt_model, operator_name, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, now())
+    `INSERT INTO venue_atol_settings (venue_id, enabled, kkt_ip, kkt_port, kkt_model, operator_name, hold_cash_receipts, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, now())
      ON CONFLICT (venue_id) DO UPDATE SET
        enabled = EXCLUDED.enabled,
        kkt_ip = EXCLUDED.kkt_ip,
        kkt_port = EXCLUDED.kkt_port,
        kkt_model = EXCLUDED.kkt_model,
        operator_name = EXCLUDED.operator_name,
+       hold_cash_receipts = EXCLUDED.hold_cash_receipts,
        updated_at = now()`,
-    [venueId, enabled, kktIp, kktPort, kktModel, operatorName]
+    [venueId, enabled, kktIp, kktPort, kktModel, operatorName, holdCashReceipts]
   );
 
   const settings = await fetchAtolSettings(venueId);

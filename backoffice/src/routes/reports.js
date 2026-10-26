@@ -6,8 +6,10 @@ import {
   renderReceiptDetail,
   renderItemStatsSection,
   renderCashSection,
+  renderReceiptFiscalBox,
 } from '../views/reportsView.js';
 import { formatVenueDateTime, venueDayBounds, venueTodayISO } from '../utils/timezone.js';
+import { sendHeldCashReceipt } from '../services/cashFiscalHold.js';
 
 const reports = new Hono();
 reports.use('*', requireAuthApi);
@@ -102,6 +104,9 @@ export async function fetchReceiptsPage({ venueId, dateFrom, dateTo, page }) {
     `SELECT r.id, r.venue_id, v.name AS venue_name, r.table_name, r.guest_label, r.staff_name,
             r.status, r.total, r.closed_at, r.opened_at,
             r.cancel_comment, r.precheck_was_printed, r.discount, r.discount_percent,
+            r.fiscal_status, r.fiscal_doc_number,
+            (r.fiscal_hold_payload IS NOT NULL) AS has_fiscal_hold,
+            (SELECT j.last_error FROM fiscal_jobs j WHERE j.receipt_id = r.id ORDER BY j.id DESC LIMIT 1) AS fiscal_last_error,
             (SELECT string_agg(DISTINCT rp.method, ',') FROM receipt_payments rp WHERE rp.receipt_id = r.id) AS payment_methods
      FROM receipts r
      LEFT JOIN venues v ON v.id = r.venue_id
@@ -122,7 +127,8 @@ export async function fetchReceiptsSummary({ venueId, dateFrom, dateTo }) {
          COUNT(*) FILTER (WHERE r.status = 'paid')::int AS paid_count,
          COUNT(*) FILTER (WHERE r.status = 'cancelled')::int AS cancelled_count,
          COALESCE(SUM(r.total) FILTER (WHERE r.status = 'paid'), 0) AS paid_total,
-         COALESCE(SUM(r.discount) FILTER (WHERE r.status = 'paid'), 0) AS discount_total
+         COALESCE(SUM(r.discount) FILTER (WHERE r.status = 'paid'), 0) AS discount_total,
+         COUNT(*) FILTER (WHERE r.fiscal_status = 'held')::int AS held_count
        FROM receipts r
        ${where}`,
       params
@@ -148,6 +154,7 @@ export async function fetchReceiptsSummary({ venueId, dateFrom, dateTo }) {
     cashTotal: Number(pay.cash_total || 0),
     cardTotal: Number(pay.card_total || 0),
     qrTotal: Number(pay.qr_total || 0),
+    heldCount: Number(row.held_count || 0),
   };
 }
 
@@ -570,13 +577,49 @@ reports.get('/export/cash', async (c) => {
   );
 });
 
+async function loadReceiptFiscalView(receiptId) {
+  const { rows } = await pool.query(
+    `SELECT r.*, v.name AS venue_name,
+            (SELECT j.last_error FROM fiscal_jobs j WHERE j.receipt_id = r.id ORDER BY j.id DESC LIMIT 1) AS fiscal_last_error
+     FROM receipts r
+     LEFT JOIN venues v ON v.id = r.venue_id
+     WHERE r.id = $1`,
+    [receiptId]
+  );
+  return rows[0] || null;
+}
+
+reports.post('/receipts/:id/fiscal-send', async (c) => {
+  const id = Number(c.req.param('id'));
+  const client = await pool.connect();
+  let failure = null;
+  try {
+    await client.query('BEGIN');
+    const result = await sendHeldCashReceipt(client, id);
+    if (!result.ok) {
+      failure = result.error;
+      await client.query('ROLLBACK');
+    } else {
+      await client.query('COMMIT');
+    }
+  } catch (err) {
+    await client.query('ROLLBACK');
+    failure = err.message || 'Не удалось поставить чек в очередь кассы';
+  } finally {
+    client.release();
+  }
+
+  const receipt = await loadReceiptFiscalView(id);
+  if (!receipt) {
+    c.status(404);
+    return c.text('Чек не найден');
+  }
+  return c.html(renderReceiptFiscalBox(receipt, failure));
+});
+
 reports.get('/receipts/:id', async (c) => {
   const id = c.req.param('id');
-  const { rows: receiptRows } = await pool.query(
-    `SELECT r.*, v.name AS venue_name FROM receipts r LEFT JOIN venues v ON v.id = r.venue_id WHERE r.id = $1`,
-    [id]
-  );
-  const receipt = receiptRows[0];
+  const receipt = await loadReceiptFiscalView(id);
   if (!receipt) {
     c.status(404);
     return c.text('Чек не найден');

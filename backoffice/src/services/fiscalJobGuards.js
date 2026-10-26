@@ -97,15 +97,24 @@ export async function reclaimStuckInProgress(client, venueId = null) {
   await cancelSupersededShiftJobs(client, venueId);
   // Чек, зависший после отправки на ККТ, нельзя возвращать в pending:
   // касса часто уже пробила, а повторный sell даёт второй ФД (Карла 04.10).
-  await client.query(
+  const stuck = await client.query(
     `UPDATE fiscal_jobs
      SET status = 'error', last_error = $1, updated_at = now()
      WHERE status = 'in_progress'
        AND type IN ('receipt', 'receipt_return')
        AND updated_at < now() - ($2::text || ' minutes')::interval
-       AND ($3::int IS NULL OR venue_id = $3)`,
+       AND ($3::int IS NULL OR venue_id = $3)
+     RETURNING receipt_id`,
     [STUCK_RECEIPT_MSG, String(STUCK_MINUTES), venueId]
   );
+  const stuckReceiptIds = stuck.rows.map((row) => row.receipt_id).filter(Boolean);
+  if (stuckReceiptIds.length) {
+    await client.query(
+      `UPDATE receipts SET fiscal_status = 'error'
+       WHERE id = ANY($1::int[]) AND fiscal_status IN ('pending', 'held')`,
+      [stuckReceiptIds]
+    );
+  }
   await client.query(
     `UPDATE fiscal_jobs
      SET status = 'pending', updated_at = now()
