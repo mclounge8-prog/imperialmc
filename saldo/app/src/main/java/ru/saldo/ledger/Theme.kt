@@ -10,20 +10,17 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-val Paper = Color(0xFFF4F3F7)
-val Cream = Color(0xF7F6FA)
-val Ink = Color(0xFF1C1B22)
-val Muted = Color(0xFF8A8696)
-val Line = Color(0xFFE4E0EE)
-val Copper = Color(0xFF5C34FF)
-val CopperDeep = Color(0xFF3D1FD4)
-val CopperSoft = Color(0xFFF3F0FA)
-val Night = Color(0xFF171717)
-val NightText = Color(0xFFFFFFFF)
-val Income = Color(0xFF149A4A)
-val Expense = Color(0xFFFF5A5A)
-val PurpleSoft = Color(0xFF8B6CFF)
-val Lilac = Color(0xFFEBE6FF)
+val Paper = Color(0xFFF3EEE6)
+val Sheet = Color(0xFFFFFCF8)
+val Ink = Color(0xFF1C1916)
+val Muted = Color(0xFF7A7268)
+val Line = Color(0xFFE6DDD1)
+val Pine = Color(0xFF0F6E58)
+val PineDeep = Color(0xFF0B5343)
+val PineWash = Color(0xFFE5F3EE)
+val Sand = Color(0xFFF7F1E8)
+val Stone = Color(0xFFE3DBD0)
+val StoneText = Color(0xFF5E574E)
 
 val Jakarta = FontFamily(
     Font(R.font.jakarta_regular, FontWeight.Normal),
@@ -33,34 +30,31 @@ val Jakarta = FontFamily(
     Font(R.font.jakarta_extrabold, FontWeight.ExtraBold),
 )
 
-val Fraunces = Jakarta
-val Manrope = Jakarta
-
 @Composable
 fun SaldoTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = lightColorScheme(
-            primary = Copper,
+            primary = Pine,
             onPrimary = Color.White,
-            primaryContainer = CopperSoft,
-            onPrimaryContainer = CopperDeep,
-            secondary = Ink,
+            primaryContainer = PineWash,
+            onPrimaryContainer = PineDeep,
+            secondary = Pine,
             onSecondary = Color.White,
             background = Paper,
             onBackground = Ink,
-            surface = Color.White,
+            surface = Sheet,
             onSurface = Ink,
-            surfaceVariant = CopperSoft,
+            surfaceVariant = Sand,
             onSurfaceVariant = Muted,
             outline = Line,
-            error = Expense,
+            error = Color(0xFF9A4032),
             onError = Color.White,
         ),
         typography = MaterialTheme.typography.copy(
             bodyLarge = TextStyle(fontFamily = Jakarta, fontWeight = FontWeight.Normal, fontSize = 16.sp, color = Ink),
             bodyMedium = TextStyle(fontFamily = Jakarta, fontWeight = FontWeight.Normal, fontSize = 14.sp, color = Ink),
-            labelLarge = TextStyle(fontFamily = Jakarta, fontWeight = FontWeight.Bold, fontSize = 14.sp),
-            titleLarge = TextStyle(fontFamily = Jakarta, fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Ink, letterSpacing = (-0.4).sp),
+            labelLarge = TextStyle(fontFamily = Jakarta, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color.White),
+            titleLarge = TextStyle(fontFamily = Jakarta, fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Ink, letterSpacing = (-0.6).sp),
         ),
         content = content,
     )

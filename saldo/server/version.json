@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "2.0.0",
-  "apkUrl": "https://dash.ref2b.com/saldo/saldo-7.apk",
-  "notes": "A quieter ledger. Amounts are one ink, and each list sits in a single glass sheet."
+  "versionCode": 8,
+  "versionName": "2.1.0",
+  "apkUrl": "https://dash.ref2b.com/saldo/saldo-8.apk",
+  "notes": "Warm paper layout. Actions are white on deep green, and the Insights chart sits above the tabs."
 }
