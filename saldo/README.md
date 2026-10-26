@@ -1,16 +1,16 @@
 # FinSolution
 
-Phone ledger with no login and no storefront. The interface is English. Surfaces use Kyant's Liquid Glass (Backdrop) over a colored field, and the Android navigation bar stays hidden until a swipe from the bottom edge.
+Phone ledger with no login and no storefront. The interface is English. Cards and the bottom bar use [Liquid Glass](https://github.com/Kyant0/AndroidLiquidGlass) over a colored field, so the blur is the wallpaper behind them. The Android navigation bar stays hidden until a swipe up from the bottom edge.
 
-- Обзор: остаток, доходы и расходы текущего месяца, последние операции
-- Доходы и расходы по месяцам
-- Анализ: кольцо категорий и столбцы расходов за полгода (Vico)
-- Кредитный калькулятор, аннуитет
-- Записи лежат в файле на телефоне
-- При запуске приложение читает `https://dash.ref2b.com/saldo/version.json`. Если `versionCode` больше установленного, скачивает APK без кэша и открывает установщик Android. Если загрузка срывается, баннер открывает тот же файл в браузере
+- Home: balance, this month's income and expenses, recent entries
+- Income and expenses by month
+- Insights: category ring and six months of expenses (Vico)
+- Credit calculator, annuity
+- Entries stay in a file on the phone
+- On launch the app reads `https://dash.ref2b.com/saldo/version.json`. A higher `versionCode` downloads the APK without cache and opens the Android installer. If that fails, the banner opens the same file in the browser
 
-Первая установка: https://dash.ref2b.com/saldo/
+Install: https://dash.ref2b.com/saldo/
 
-Сборка подписывается ключом из `keystore/`, он не попадает в git. Копия ключа и пароля лежит на сервере в `/root/saldo-signing/`. Новая сборка должна быть подписана тем же ключом, иначе Android не поставит её поверх старой.
+The release is signed with the key in `keystore/`, which is not committed. A copy of the key lives on the server in `/root/saldo-signing/`. A new build must use the same key, or Android will refuse to install it over the previous one.
 
-Шрифты Manrope и Fraunces распространяются по лицензии OFL.
+The typeface is Plus Jakarta Sans, OFL.
