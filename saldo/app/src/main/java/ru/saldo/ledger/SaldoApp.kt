@@ -123,18 +123,24 @@ fun SaldoApp(vm: LedgerViewModel = viewModel()) {
                     onAdd = { editor = EditorRequest(TxType.EXPENSE) },
                     onOpen = { editor = EditorRequest(it.type, it) },
                     onUpdate = update@{
-                        val release = (update as? UpdateState.Available)?.release
-                        if (release == null) return@update
-                        if (!updater.canInstall()) {
-                            updater.openInstallPermission()
-                        } else {
-                            scope.launch {
-                                update = UpdateState.Downloading(release)
-                                update = runCatching { UpdateState.Ready(release, updater.download(release)) }
-                                    .getOrElse { UpdateState.Failed("Не удалось скачать сборку") }
-                            }
+                        val release = (update as? UpdateState.Available)?.release ?: return@update
+                        scope.launch {
+                            update = UpdateState.Downloading(release)
+                            val ready = runCatching { updater.download(release) }
+                            update = ready.fold(
+                                onSuccess = { UpdateState.Ready(release, it) },
+                                onFailure = {
+                                    UpdateState.Failed(
+                                        it.message ?: "Не удалось скачать сборку",
+                                        release.apkUrl,
+                                    )
+                                },
+                            )
+                            val file = ready.getOrNull() ?: return@launch
+                            if (updater.canInstall()) updater.install(file) else updater.openInstallPermission()
                         }
                     },
+                    onOpenLink = updater::openInBrowser,
                     onInstall = { file -> updater.install(file) },
                 )
                 Tab.Income -> OperationsScreen(TxType.INCOME, ledger, { editor = EditorRequest(TxType.INCOME) }) { editor = EditorRequest(it.type, it) }
@@ -170,6 +176,7 @@ private fun OverviewScreen(
     onOpen: (Tx) -> Unit,
     onUpdate: () -> Unit,
     onInstall: (java.io.File) -> Unit,
+    onOpenLink: (String) -> Unit,
 ) {
     val today = YearMonth.now()
     val monthItems = ledger.transactions.filter { YearMonth.from(LocalDate.ofEpochDay(it.epochDay)) == today }
@@ -181,7 +188,7 @@ private fun OverviewScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { BrandLockup() }
-        item { UpdateBanner(update, onUpdate, onInstall) }
+        item { UpdateBanner(update, onUpdate, onInstall, onOpenLink) }
         item { BalanceSlab(formatRub(balance), formatRub(income), formatRub(expense)) }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -597,12 +604,22 @@ private fun EmptyBlock(title: String, body: String, onAdd: () -> Unit) {
 }
 
 @Composable
-private fun UpdateBanner(state: UpdateState, onUpdate: () -> Unit, onInstall: (java.io.File) -> Unit) {
+private fun UpdateBanner(
+    state: UpdateState,
+    onUpdate: () -> Unit,
+    onInstall: (java.io.File) -> Unit,
+    onOpenLink: (String) -> Unit,
+) {
     when (state) {
         is UpdateState.Available -> Banner("Доступна версия ${state.release.versionName}", state.release.notes.ifBlank { "Нажмите, чтобы скачать и установить." }, "Обновить", onUpdate)
-        is UpdateState.Downloading -> Banner("Скачиваем ${state.release.versionName}", "Файл придёт с вашего сервера.", null, {})
-        is UpdateState.Ready -> Banner("Сборка скачана", "Дальше подтверждение установки Android.", "Установить", { onInstall(state.file) })
-        is UpdateState.Failed -> Banner("Обновление", state.message, null, {})
+        is UpdateState.Downloading -> Banner("Скачиваем ${state.release.versionName}", "Загрузка идёт напрямую, без старого кэша.", null, {})
+        is UpdateState.Ready -> Banner("Сборка скачана", "Подтвердите установку. Если окно не открылось, нажмите ещё раз.", "Установить", { onInstall(state.file) })
+        is UpdateState.Failed -> Banner(
+            "Обновление",
+            state.message,
+            if (state.apkUrl != null) "Скачать в браузере" else null,
+            { state.apkUrl?.let(onOpenLink) },
+        )
         else -> Unit
     }
 }

@@ -12,9 +12,10 @@ android {
         applicationId = "ru.saldo.ledger"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.2.0"
         buildConfigField("String", "UPDATE_URL", "\"https://dash.ref2b.com/saldo/version.json\"")
+        buildConfigField("String", "APK_URL", "\"https://dash.ref2b.com/saldo/saldo-4.apk\"")
     }
 
     buildFeatures {
