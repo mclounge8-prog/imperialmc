@@ -1,6 +1,6 @@
 {
-  "versionCode": 6,
-  "versionName": "1.3.1",
-  "apkUrl": "https://dash.ref2b.com/saldo/saldo-6.apk",
-  "notes": "The download resumes if the connection drops."
+  "versionCode": 7,
+  "versionName": "2.0.0",
+  "apkUrl": "https://dash.ref2b.com/saldo/saldo-7.apk",
+  "notes": "A quieter ledger. Amounts are one ink, and each list sits in a single glass sheet."
 }

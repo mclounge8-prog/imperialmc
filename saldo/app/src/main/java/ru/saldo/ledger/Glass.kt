@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -86,7 +88,7 @@ fun AuroraBackground(modifier: Modifier = Modifier) {
     Box(
         modifier
             .fillMaxSize()
-            .background(Color(0xFFE7E2F6))
+            .background(Paper)
             .drawBehind {
                 fun orb(center: Offset, radius: Float, color: Color) {
                     drawCircle(
@@ -99,10 +101,8 @@ fun AuroraBackground(modifier: Modifier = Modifier) {
                         center = center,
                     )
                 }
-                orb(Offset(size.width * 0.02f, size.height * 0.02f), size.width * 0.92f, Color(0xFF7C5CFF).copy(alpha = 0.62f))
-                orb(Offset(size.width * 1.02f, size.height * 0.16f), size.width * 0.68f, Color(0xFF4C9DFF).copy(alpha = 0.48f))
-                orb(Offset(size.width * 0.12f, size.height * 0.78f), size.width * 0.74f, Color(0xFFFF7EC8).copy(alpha = 0.30f))
-                orb(Offset(size.width * 0.88f, size.height * 0.96f), size.width * 0.58f, Color(0xFF5C34FF).copy(alpha = 0.36f))
+                orb(Offset(size.width * 0.92f, -size.height * 0.04f), size.width * 0.85f, Color(0xFF7C5CFF).copy(alpha = 0.28f))
+                orb(Offset(size.width * 0.05f, size.height * 0.92f), size.width * 0.7f, Color(0xFFD7CEFF).copy(alpha = 0.55f))
             },
     )
 }
@@ -161,43 +161,41 @@ fun CoinMark(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun BalanceSlab(balance: String, income: String, expense: String) {
-    Column(Modifier.fillMaxWidth().glass(32.dp, Color.White.copy(alpha = 0.38f)).padding(22.dp)) {
-        Text(
-            "BALANCE",
-            color = Muted,
-            fontFamily = Jakarta,
-            fontWeight = FontWeight.Bold,
-            fontSize = 12.sp,
-            letterSpacing = 1.6.sp,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            balance,
+fun GlassGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .glass(28.dp, Color.White.copy(alpha = 0.62f))
+            .padding(vertical = 4.dp),
+        content = content,
+    )
+}
+
+@Composable
+fun GroupDivider(inset: Dp = 16.dp) {
+    Box(
+        Modifier
+            .padding(start = inset)
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(Line.copy(alpha = 0.85f)),
+    )
+}
+
+@Composable
+fun MoneyText(value: String, size: androidx.compose.ui.unit.TextUnit, modifier: Modifier = Modifier, weight: FontWeight = FontWeight.SemiBold) {
+    Text(
+        value,
+        modifier = modifier,
+        style = TextStyle(
             color = Ink,
             fontFamily = Jakarta,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 40.sp,
-            letterSpacing = (-1).sp,
-        )
-        Text(
-            "Everything recorded on this phone",
-            color = Muted,
-            fontFamily = Jakarta,
-            fontSize = 13.sp,
-        )
-        Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text("Income", color = Muted, fontFamily = Jakarta, fontSize = 12.sp)
-                Text(income, color = Income, fontFamily = Jakarta, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-            Column(Modifier.weight(1f)) {
-                Text("Expenses", color = Muted, fontFamily = Jakarta, fontSize = 12.sp)
-                Text(expense, color = Expense, fontFamily = Jakarta, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-        }
-    }
+            fontWeight = weight,
+            fontSize = size,
+            letterSpacing = (-0.4).sp,
+            fontFeatureSettings = "tnum",
+        ),
+    )
 }
 
 @Composable
@@ -253,12 +251,12 @@ fun GlassNav(
                 Icon(
                     icon,
                     contentDescription = label,
-                    tint = if (selected) CopperDeep else Ink.copy(alpha = 0.55f),
+                    tint = if (selected) Ink else Muted,
                     modifier = Modifier.size(21.dp),
                 )
                 Text(
                     label,
-                    color = if (selected) CopperDeep else Ink.copy(alpha = 0.62f),
+                    color = if (selected) Ink else Muted,
                     fontFamily = Jakarta,
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                     fontSize = 10.sp,

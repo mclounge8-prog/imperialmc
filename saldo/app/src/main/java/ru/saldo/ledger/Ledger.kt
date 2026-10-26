@@ -15,17 +15,17 @@ enum class Category(
     val color: Long,
 ) {
     GROCERIES("Groceries", TxType.EXPENSE, 0xFF5C34FF),
-    TRANSPORT("Transport", TxType.EXPENSE, 0xFF0A7AFF),
-    HOME("Housing", TxType.EXPENSE, 0xFF8B6CFF),
-    BILLS("Bills", TxType.EXPENSE, 0xFF3D1FD4),
-    SHOPPING("Shopping", TxType.EXPENSE, 0xFFB87900),
-    LEISURE("Leisure", TxType.EXPENSE, 0xFF149A4A),
-    HEALTH("Health", TxType.EXPENSE, 0xFF0A7EA4),
-    OTHER_EXPENSE("Other", TxType.EXPENSE, 0xFF6B6B76),
-    SALARY("Salary", TxType.INCOME, 0xFF1E7A4D),
-    SIDE("Side income", TxType.INCOME, 0xFF2F6F4E),
-    GIFT("Gift", TxType.INCOME, 0xFF3E7A6B),
-    OTHER_INCOME("Other", TxType.INCOME, 0xFF5C7A62),
+    TRANSPORT("Transport", TxType.EXPENSE, 0xFF8B74FF),
+    HOME("Housing", TxType.EXPENSE, 0xFF3D2E8A),
+    BILLS("Bills", TxType.EXPENSE, 0xFFB7A6FF),
+    SHOPPING("Shopping", TxType.EXPENSE, 0xFF241B42),
+    LEISURE("Leisure", TxType.EXPENSE, 0xFF6A5A99),
+    HEALTH("Health", TxType.EXPENSE, 0xFF4E4478),
+    OTHER_EXPENSE("Other", TxType.EXPENSE, 0xFFC4BED4),
+    SALARY("Salary", TxType.INCOME, 0xFF5C34FF),
+    SIDE("Side income", TxType.INCOME, 0xFF8B74FF),
+    GIFT("Gift", TxType.INCOME, 0xFF3D2E8A),
+    OTHER_INCOME("Other", TxType.INCOME, 0xFF6A5A99),
 }
 
 @Serializable

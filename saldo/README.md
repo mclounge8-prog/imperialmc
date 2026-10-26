@@ -1,6 +1,6 @@
 # FinSolution
 
-Phone ledger with no login and no storefront. The interface is English. Cards and the bottom bar use [Liquid Glass](https://github.com/Kyant0/AndroidLiquidGlass) over a colored field, so the blur is the wallpaper behind them. The Android navigation bar stays hidden until a swipe up from the bottom edge.
+Phone ledger with no login and no storefront. The interface is English. Amounts are one ink, categories stay in a single violet family, and each list is one liquid-glass sheet. The bottom bar uses [Liquid Glass](https://github.com/Kyant0/AndroidLiquidGlass). The Android navigation bar stays hidden until a swipe up from the bottom edge.
 
 - Home: balance, this month's income and expenses, recent entries
 - Income and expenses by month
