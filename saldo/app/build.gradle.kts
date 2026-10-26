@@ -12,8 +12,8 @@ android {
         applicationId = "ru.saldo.ledger"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         buildConfigField("String", "UPDATE_URL", "\"http://38.244.214.143/saldo/version.json\"")
     }
 

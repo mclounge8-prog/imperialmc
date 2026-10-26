@@ -10,58 +10,57 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-val Paper = Color(0xFFF4F0E8)
-val Cream = Color(0xFFFFFCF7)
-val Ink = Color(0xFF1A1814)
-val Muted = Color(0xFF6F6A62)
-val Line = Color(0xFFE4DDD2)
-val Copper = Color(0xFFB85C38)
-val CopperDeep = Color(0xFF8C3E22)
-val CopperSoft = Color(0xFFF3E2D6)
-val Night = Color(0xFF231C16)
-val NightText = Color(0xFFF6F0E6)
-val Income = Color(0xFF1E7A4D)
-val IncomeSoft = Color(0xFFE5F4EC)
-val Expense = Color(0xFFA33B32)
-val ExpenseSoft = Color(0xFFF8E8E6)
+val Paper = Color(0xFFF3F3F3)
+val Cream = Color(0xF2FFFFFF)
+val Ink = Color(0xFF171717)
+val Muted = Color(0xFF6B6B76)
+val Line = Color(0xFFEBE7F5)
+val Copper = Color(0xFF5C34FF)
+val CopperDeep = Color(0xFF3D1FD4)
+val CopperSoft = Color(0xFFEFE9FF)
+val Night = Color(0xFF171717)
+val NightText = Color(0xFFFFFFFF)
+val Income = Color(0xFF149A4A)
+val Expense = Color(0xFFFF5A5A)
+val PurpleSoft = Color(0xFF8B6CFF)
+val Lilac = Color(0xFFEBE6FF)
 
-val Fraunces = FontFamily(
-    Font(R.font.fraunces_regular, FontWeight.Normal),
-    Font(R.font.fraunces_semibold, FontWeight.SemiBold),
+val Jakarta = FontFamily(
+    Font(R.font.jakarta_regular, FontWeight.Normal),
+    Font(R.font.jakarta_medium, FontWeight.Medium),
+    Font(R.font.jakarta_semibold, FontWeight.SemiBold),
+    Font(R.font.jakarta_bold, FontWeight.Bold),
+    Font(R.font.jakarta_extrabold, FontWeight.ExtraBold),
 )
 
-val Manrope = FontFamily(
-    Font(R.font.manrope_regular, FontWeight.Normal),
-    Font(R.font.manrope_medium, FontWeight.Medium),
-    Font(R.font.manrope_semibold, FontWeight.SemiBold),
-    Font(R.font.manrope_bold, FontWeight.Bold),
-)
+val Fraunces = Jakarta
+val Manrope = Jakarta
 
 @Composable
 fun SaldoTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = Copper,
-            onPrimary = Cream,
+            onPrimary = Color.White,
             primaryContainer = CopperSoft,
             onPrimaryContainer = CopperDeep,
             secondary = Ink,
-            onSecondary = Cream,
+            onSecondary = Color.White,
             background = Paper,
             onBackground = Ink,
-            surface = Cream,
+            surface = Color.White,
             onSurface = Ink,
-            surfaceVariant = Color(0xFFEFEAE2),
+            surfaceVariant = CopperSoft,
             onSurfaceVariant = Muted,
             outline = Line,
             error = Expense,
-            onError = Cream,
+            onError = Color.White,
         ),
         typography = MaterialTheme.typography.copy(
-            bodyLarge = TextStyle(fontFamily = Manrope, fontWeight = FontWeight.Normal, fontSize = 16.sp, color = Ink),
-            bodyMedium = TextStyle(fontFamily = Manrope, fontWeight = FontWeight.Normal, fontSize = 14.sp, color = Ink),
-            labelLarge = TextStyle(fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
-            titleLarge = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, color = Ink),
+            bodyLarge = TextStyle(fontFamily = Jakarta, fontWeight = FontWeight.Normal, fontSize = 16.sp, color = Ink),
+            bodyMedium = TextStyle(fontFamily = Jakarta, fontWeight = FontWeight.Normal, fontSize = 14.sp, color = Ink),
+            labelLarge = TextStyle(fontFamily = Jakarta, fontWeight = FontWeight.Bold, fontSize = 14.sp),
+            titleLarge = TextStyle(fontFamily = Jakarta, fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Ink, letterSpacing = (-0.4).sp),
         ),
         content = content,
     )

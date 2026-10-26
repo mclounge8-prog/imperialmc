@@ -4,6 +4,9 @@ package ru.saldo.ledger
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -102,26 +105,14 @@ fun SaldoApp(vm: LedgerViewModel = viewModel()) {
 
     LaunchedEffect(Unit) { update = updater.check() }
 
+    Box(Modifier.fillMaxSize()) {
+    AuroraBackground()
     Scaffold(
-        containerColor = Paper,
+        containerColor = Color.Transparent,
         bottomBar = {
-            NavigationBar(containerColor = Cream, tonalElevation = 0.dp) {
-                Tab.entries.forEach { item ->
-                    NavigationBarItem(
-                        selected = tab == item,
-                        onClick = { tab = item },
-                        icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label, fontFamily = Manrope, fontSize = 11.sp, maxLines = 1) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = CopperDeep,
-                            selectedTextColor = CopperDeep,
-                            indicatorColor = CopperSoft,
-                            unselectedIconColor = Muted,
-                            unselectedTextColor = Muted,
-                        ),
-                    )
-                }
-            }
+            GlassNav(
+                Tab.entries.map { Triple(it.label, it.icon, tab == it) },
+            ) { index -> tab = Tab.entries[index] }
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -152,6 +143,7 @@ fun SaldoApp(vm: LedgerViewModel = viewModel()) {
                 Tab.Credit -> CreditScreen()
             }
         }
+    }
     }
 
     editor?.let { request ->
@@ -188,23 +180,9 @@ private fun OverviewScreen(
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { Wordmark() }
+        item { BrandLockup() }
         item { UpdateBanner(update, onUpdate, onInstall) }
-        item {
-            Surface(shape = RoundedCornerShape(28.dp), color = Night, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(22.dp)) {
-                    Text("ОСТАТОК", color = Color(0xFFE7C7B2), fontFamily = Manrope, fontWeight = FontWeight.SemiBold, letterSpacing = 1.6.sp, fontSize = 12.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text(formatRub(balance), color = NightText, fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 42.sp)
-                    Text("все операции", color = Color(0xFFB7A89A), fontFamily = Manrope, fontSize = 13.sp)
-                    Spacer(Modifier.height(18.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        MiniStat("Доходы", formatRub(income), Income, Modifier.weight(1f))
-                        MiniStat("Расходы", formatRub(expense), Expense, Modifier.weight(1f))
-                    }
-                }
-            }
-        }
+        item { BalanceSlab(formatRub(balance), formatRub(income), formatRub(expense)) }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("Последние", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, color = Ink)
@@ -251,9 +229,9 @@ private fun OperationsScreen(
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = onAdd,
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Copper, contentColor = Cream),
-            ) { Text(if (type == TxType.INCOME) "Новый доход" else "Новый расход", fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
+                shape = RoundedCornerShape(999.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Copper, contentColor = Color.White),
+            ) { Text(if (type == TxType.INCOME) "Новый доход" else "Новый расход", fontFamily = Manrope, fontWeight = FontWeight.Bold) }
         }
         if (items.isEmpty()) {
             item { EmptyBlock("В этом месяце нет записей", "Смените месяц или добавьте операцию.", onAdd) }
@@ -286,8 +264,8 @@ private fun AnalyticsScreen(ledger: Ledger) {
             MonthSwitcher(month, { month = month.minusMonths(1) }, { if (month < YearMonth.now()) month = month.plusMonths(1) })
         }
         item {
-            Surface(shape = RoundedCornerShape(24.dp), color = Cream, modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.fillMaxWidth().glass(24.dp).padding(18.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Column(Modifier.weight(1f)) {
                         Text("Доходы", color = Muted, fontFamily = Manrope, fontSize = 13.sp)
                         Text(formatRub(income), color = Income, fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 26.sp)
@@ -300,7 +278,7 @@ private fun AnalyticsScreen(ledger: Ledger) {
             }
         }
         item {
-            Surface(shape = RoundedCornerShape(24.dp), color = Cream, modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().glass(24.dp)) {
                 Column(Modifier.padding(18.dp)) {
                     Text("Куда ушли деньги", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
@@ -319,7 +297,7 @@ private fun AnalyticsScreen(ledger: Ledger) {
             }
         }
         item {
-            Surface(shape = RoundedCornerShape(24.dp), color = Cream, modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().glass(24.dp)) {
                 Column(Modifier.padding(18.dp)) {
                     Text("Расходы за полгода", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
@@ -355,26 +333,33 @@ private fun CreditScreen() {
         if (quote == null) {
             Text("Укажите сумму больше нуля, срок от 1 до 360 месяцев и ставку от 0.", color = Expense, fontFamily = Manrope)
         } else {
-            Surface(shape = RoundedCornerShape(28.dp), color = Night, modifier = Modifier.fillMaxWidth()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .shadow(22.dp, RoundedCornerShape(28.dp), ambientColor = Color(0x665C34FF), spotColor = Color(0x595C34FF))
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFF6A45FF), Color(0xFF5C34FF), Color(0xFF3F22D2)))),
+            ) {
                 Column(Modifier.padding(22.dp)) {
-                    Text("ПЛАТЁЖ В МЕСЯЦ", color = Color(0xFFE7C7B2), fontFamily = Manrope, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp, fontSize = 12.sp)
-                    Text(money(quote.payment), color = NightText, fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 40.sp)
+                    Text("ПЛАТЁЖ В МЕСЯЦ", color = Color.White.copy(alpha = 0.78f), fontFamily = Manrope, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, fontSize = 12.sp)
+                    Text(money(quote.payment), color = Color.White, fontFamily = Fraunces, fontWeight = FontWeight.ExtraBold, fontSize = 40.sp)
                     Spacer(Modifier.height(12.dp))
-                    Text("Всего к возврату  ${money(quote.total)}", color = Color(0xFFD9CBBE), fontFamily = Manrope)
-                    Text("Переплата  ${money(quote.overpayment)}", color = Color(0xFFD9CBBE), fontFamily = Manrope)
+                    Text("Всего к возврату  ${money(quote.total)}", color = Color.White.copy(alpha = 0.86f), fontFamily = Manrope)
+                    Text("Переплата  ${money(quote.overpayment)}", color = Color.White.copy(alpha = 0.86f), fontFamily = Manrope)
                 }
             }
             Text("График, первые ${quote.rows.size} мес.", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 22.sp)
             quote.rows.forEach { row ->
-                Surface(shape = RoundedCornerShape(16.dp), color = Cream, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${row.month}", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, modifier = Modifier.width(36.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(money(row.payment), fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
-                            Text("проценты ${money(row.interest)} · тело ${money(row.principalPart)}", color = Muted, fontFamily = Manrope, fontSize = 12.sp)
-                        }
-                        Text(money(row.balance), color = Muted, fontFamily = Manrope, fontSize = 12.sp)
+                Row(
+                    Modifier.fillMaxWidth().glass(16.dp).padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("${row.month}", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, modifier = Modifier.width(36.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(money(row.payment), fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
+                        Text("проценты ${money(row.interest)} · тело ${money(row.principalPart)}", color = Muted, fontFamily = Manrope, fontSize = 12.sp)
                     }
+                    Text(money(row.balance), color = Muted, fontFamily = Manrope, fontSize = 12.sp)
                 }
             }
         }
@@ -477,7 +462,7 @@ private fun TransactionSheet(
                 },
                 enabled = minor != null,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(999.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Copper, contentColor = Cream),
             ) { Text("Сохранить", fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
             if (existing != null) {
@@ -542,12 +527,10 @@ private fun MiniStat(label: String, value: String, color: Color, modifier: Modif
 private fun TxRow(tx: Tx, onOpen: (Tx) -> Unit) {
     val category = categoryOf(tx.category)
     val positive = tx.type == TxType.INCOME
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = Cream,
-        modifier = Modifier.fillMaxWidth().clickable { onOpen(tx) },
+    Row(
+        Modifier.fillMaxWidth().glass(18.dp).clickable { onOpen(tx) }.padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(10.dp).clip(CircleShape).background(Color(category.color)))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -565,7 +548,6 @@ private fun TxRow(tx: Tx, onOpen: (Tx) -> Unit) {
                 fontFamily = Manrope,
                 fontWeight = FontWeight.SemiBold,
             )
-        }
     }
 }
 
@@ -605,14 +587,12 @@ private fun MonthSwitcher(month: YearMonth, onPrev: () -> Unit, onNext: () -> Un
 
 @Composable
 private fun EmptyBlock(title: String, body: String, onAdd: () -> Unit) {
-    Surface(shape = RoundedCornerShape(24.dp), color = Cream, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(18.dp)) {
+    Column(Modifier.fillMaxWidth().glass(24.dp).padding(18.dp)) {
             Text(title, fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 22.sp)
             Spacer(Modifier.height(6.dp))
             Text(body, color = Muted, fontFamily = Manrope)
             Spacer(Modifier.height(12.dp))
             TextButton(onClick = onAdd) { Text("Добавить запись", color = CopperDeep, fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
-        }
     }
 }
 
@@ -642,7 +622,7 @@ private fun Banner(title: String, body: String, action: String?, onClick: () -> 
 
 @Composable
 private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(shape = RoundedCornerShape(999.dp), color = if (selected) Night else Color(0xFFF3EEE6), modifier = Modifier.clickable(onClick = onClick)) {
+    Surface(shape = RoundedCornerShape(999.dp), color = if (selected) Copper else Color.White.copy(alpha = 0.7f), modifier = Modifier.clickable(onClick = onClick)) {
         Text(label, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = if (selected) Cream else Ink, fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
     }
 }
