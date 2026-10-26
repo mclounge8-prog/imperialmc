@@ -10,6 +10,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -59,37 +60,55 @@ class AppUpdater(private val context: Context) {
     }
 
     suspend fun download(release: RemoteRelease): File = withContext(Dispatchers.IO) {
+        val part = File(context.cacheDir, "saldo-update.part")
         val target = File(context.cacheDir, "saldo-update.apk")
-        val urls = listOf(release.apkUrl, cacheBust(release.apkUrl))
+        if (target.exists()) target.delete()
         var last = "Could not download the build"
-        for (url in urls) {
-            if (target.exists()) target.delete()
-            val connection = open(url)
+        repeat(8) {
+            val offset = if (part.exists()) part.length() else 0L
+            val connection = open(release.apkUrl)
+            connection.setRequestProperty("Accept-Encoding", "identity")
+            if (offset > 0L) connection.setRequestProperty("Range", "bytes=$offset-")
             try {
-                val code = connection.responseCode
-                if (code == HttpURLConnection.HTTP_NOT_MODIFIED) {
-                    last = "The server returned an empty cached response"
-                    continue
+                when (val code = connection.responseCode) {
+                    HttpURLConnection.HTTP_NOT_MODIFIED -> {
+                        last = "The server returned an empty cached response"
+                    }
+                    in 200..299 -> {
+                        val partial = code == HttpURLConnection.HTTP_PARTIAL
+                        val range = connection.getHeaderField("Content-Range")
+                        val total = if (partial) totalFrom(range) else connection.contentLengthLong
+                        val start = if (partial) startFrom(range) else 0L
+                        if (!partial || (start != null && start != part.length())) {
+                            if (part.exists()) part.delete()
+                        }
+                        val append = partial && part.exists() && start == part.length()
+                        connection.inputStream.use { input ->
+                            FileOutputStream(part, append).use { output -> input.copyTo(output) }
+                        }
+                        if (total > 0L && part.length() < total) {
+                            last = "The connection dropped during download"
+                        } else {
+                            validateApk(part, total)
+                            if (target.exists()) target.delete()
+                            if (!part.renameTo(target)) {
+                                part.copyTo(target, overwrite = true)
+                                part.delete()
+                            }
+                            return@withContext target
+                        }
+                    }
+                    else -> last = "The server responded with code $code"
                 }
-                if (code !in 200..299) {
-                    last = "The server responded with code $code"
-                    continue
-                }
-                val expected = connection.contentLengthLong
-                connection.inputStream.use { input ->
-                    target.outputStream().use { output -> input.copyTo(output) }
-                }
-                validateApk(target, expected)
-                return@withContext target
             } catch (error: IllegalStateException) {
                 last = error.message ?: last
+                if (part.exists()) part.delete()
             } catch (_: Exception) {
                 last = "The connection dropped during download"
             } finally {
                 connection.disconnect()
             }
         }
-        if (target.exists()) target.delete()
         throw IllegalStateException(last)
     }
 
@@ -123,16 +142,18 @@ class AppUpdater(private val context: Context) {
             readTimeout = 180_000
             instanceFollowRedirects = true
             useCaches = false
-            setRequestProperty("Cache-Control", "no-cache, no-store")
-            setRequestProperty("Pragma", "no-cache")
             setRequestProperty("Accept", "*/*")
+            setRequestProperty("Accept-Encoding", "identity")
             setRequestProperty("User-Agent", "FinSolution/${BuildConfig.VERSION_NAME} Android")
         }
     }
 
-    private fun cacheBust(url: String): String {
-        val join = if (url.contains("?")) "&" else "?"
-        return "$url${join}fresh=${System.currentTimeMillis()}"
+    private fun totalFrom(header: String?): Long =
+        header?.substringAfter('/', "")?.substringBefore(' ')?.toLongOrNull() ?: -1L
+
+    private fun startFrom(header: String?): Long? {
+        val bytes = header?.substringAfter("bytes ", "")?.substringBefore('-') ?: return null
+        return bytes.toLongOrNull()
     }
 
     private fun validateApk(file: File, expected: Long) {
