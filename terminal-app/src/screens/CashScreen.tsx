@@ -126,11 +126,15 @@ export default function CashScreen() {
       {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
 
       <View style={styles.hero}>
-        <Text style={styles.heroLabel}>Сейчас в кассе (расчёт)</Text>
+        <Text style={styles.heroLabel}>Сейчас в кассе</Text>
         <Text style={styles.heroValue}>{formatMoney(shift.cash.expectedCash)}</Text>
+        <View style={styles.openingBlock}>
+          <Text style={styles.openingLabel}>На открытии смены</Text>
+          <Text style={styles.openingValue}>{formatMoney(shift.cash.openingCash)}</Text>
+        </View>
         <Text style={styles.heroMeta}>
-          Открытие {formatMoney(shift.cash.openingCash)} · продажи {formatMoney(shift.cash.cashSales)} ·
-          внесения {formatMoney(shift.cash.deposits)} · инкассации {formatMoney(shift.cash.withdrawals)}
+          продажи {formatMoney(shift.cash.cashSales)} · внесения {formatMoney(shift.cash.deposits)} ·
+          инкассации {formatMoney(shift.cash.withdrawals)}
         </Text>
       </View>
 
@@ -229,6 +233,14 @@ const styles = StyleSheet.create({
   },
   heroLabel: { color: colors.textMuted, fontSize: 12 },
   heroValue: { color: colors.accent2, fontSize: 32, fontWeight: '800', marginTop: 4 },
+  openingBlock: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  openingLabel: { color: colors.textMuted, fontSize: 12 },
+  openingValue: { color: colors.text, fontSize: 22, fontWeight: '700', marginTop: 2 },
   heroMeta: { color: colors.textMuted, fontSize: 12, marginTop: 8, lineHeight: 18 },
   actions: { flexDirection: 'row', gap: 10 },
   actionBtn: {

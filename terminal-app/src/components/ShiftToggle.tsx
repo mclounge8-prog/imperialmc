@@ -12,7 +12,6 @@ import {
 import { colors } from '../theme/colors';
 import { useCurrentShift } from '../hooks/useCurrentShift';
 import { openShift, closeShift, ApiRequestError } from '../api/client';
-import { formatDrawerMoney } from '../utils/drawerCash';
 import { useSession } from '../context/SessionContext';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
 import AmountPromptModal from './AmountPromptModal';
@@ -330,14 +329,9 @@ export default function ShiftToggle() {
       </View>
 
       {isOpen && shift?.cash ? (
-        <View>
-          <Text style={styles.cashHint}>
-            Сейчас в кассе: {formatDrawerMoney(shift.cash.expectedCash)}
-          </Text>
-          <Text style={[styles.cashHint, styles.cashHintNext]}>
-            На открытии смены: {formatDrawerMoney(shift.cash.openingCash)}
-          </Text>
-        </View>
+        <Text style={styles.cashHint}>
+          Наличных в кассе (расчёт): {Math.round(shift.cash.expectedCash).toLocaleString('ru-RU')} ₽
+        </Text>
       ) : null}
 
       {actionError && (
@@ -475,8 +469,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 12,
     textAlign: 'center',
-  },
-  cashHintNext: {
-    marginTop: 2,
   },
 });
