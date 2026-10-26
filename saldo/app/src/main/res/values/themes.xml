@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#0F6E58</color>
+    <color name="ic_launcher_background">#5C34FF</color>
     <style name="Theme.Saldo" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:forceDarkAllowed">false</item>
-        <item name="android:windowBackground">#F3EEE6</item>
+        <item name="android:windowBackground">#F5F4F8</item>
     </style>
 </resources>

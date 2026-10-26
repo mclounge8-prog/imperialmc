@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material.icons.automirrored.outlined.TrendingDown
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
@@ -42,7 +43,6 @@ import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -61,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -68,6 +69,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -91,6 +93,7 @@ private enum class Tab(val label: String, val icon: ImageVector) {
 private val en = Locale.US
 private val dayFormat = DateTimeFormatter.ofPattern("d MMMM", en)
 private val screenPadding = PaddingValues(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 28.dp)
+private val heroBrush = Brush.linearGradient(listOf(Color(0xFF9A7BFF), Brand, BrandDeep))
 
 @Composable
 fun SaldoApp(vm: LedgerViewModel = viewModel()) {
@@ -144,8 +147,11 @@ fun SaldoApp(vm: LedgerViewModel = viewModel()) {
                         Tab.Overview -> OverviewScreen(
                             ledger = ledger,
                             update = update,
-                            onAdd = { editor = EditorRequest(TxType.EXPENSE) },
+                            onAddIncome = { editor = EditorRequest(TxType.INCOME) },
+                            onAddExpense = { editor = EditorRequest(TxType.EXPENSE) },
                             onOpen = { editor = EditorRequest(it.type, it) },
+                            onInsights = { tab = Tab.Analytics },
+                            onCredit = { tab = Tab.Credit },
                             onUpdate = update@{
                                 val release = (update as? UpdateState.Available)?.release ?: return@update
                                 scope.launch {
@@ -197,8 +203,11 @@ fun SaldoApp(vm: LedgerViewModel = viewModel()) {
 private fun OverviewScreen(
     ledger: Ledger,
     update: UpdateState,
-    onAdd: () -> Unit,
+    onAddIncome: () -> Unit,
+    onAddExpense: () -> Unit,
     onOpen: (Tx) -> Unit,
+    onInsights: () -> Unit,
+    onCredit: () -> Unit,
     onUpdate: () -> Unit,
     onInstall: (java.io.File) -> Unit,
     onOpenLink: (String) -> Unit,
@@ -208,45 +217,50 @@ private fun OverviewScreen(
     val income = monthItems.filter { it.type == TxType.INCOME }.sumOf { it.amountMinor }
     val expense = monthItems.filter { it.type == TxType.EXPENSE }.sumOf { it.amountMinor }
     val balance = ledger.transactions.sumOf { if (it.type == TxType.INCOME) it.amountMinor else -it.amountMinor }
-    val recent = ledger.transactions.take(12)
-    LazyColumn(
-        contentPadding = screenPadding,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+    val recent = ledger.transactions.take(8)
+    LazyColumn(contentPadding = screenPadding, verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { Wordmark() }
         if (update is UpdateState.Available || update is UpdateState.Downloading || update is UpdateState.Ready || update is UpdateState.Failed) {
             item { UpdateBanner(update, onUpdate, onInstall, onOpenLink) }
         }
         item {
-            Column(Modifier.padding(start = 2.dp, top = 4.dp)) {
-                Text("Balance", color = Muted, fontFamily = Jakarta, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                MoneyText(formatRub(balance), 52.sp, weight = FontWeight.ExtraBold)
-                Text("Everything kept on this phone", color = Muted, fontFamily = Jakarta, fontSize = 14.sp)
-            }
-        }
-        item {
-            SheetGroup {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(heroBrush)
+                    .padding(22.dp),
+            ) {
                 Text(
-                    "This month",
-                    color = Muted,
+                    today.month.getDisplayName(MonthStyle.FULL, en) + " " + today.year,
+                    color = Color.White.copy(alpha = 0.78f),
                     fontFamily = Jakarta,
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp,
-                    modifier = Modifier.padding(start = 18.dp, top = 16.dp, end = 18.dp),
                 )
-                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    StatCell("Income", formatRub(income), Modifier.weight(1f))
-                    Box(Modifier.width(1.dp).height(42.dp).background(Line))
-                    StatCell("Spent", formatRub(expense), Modifier.weight(1f))
+                Spacer(Modifier.height(8.dp))
+                Text("Balance", color = Color.White.copy(alpha = 0.78f), fontFamily = Jakarta, fontSize = 14.sp)
+                MoneyText(formatRub(balance), 46.sp, weight = FontWeight.ExtraBold, color = Color.White)
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth()) {
+                    HeroStat("Income", formatRub(income), Modifier.weight(1f))
+                    HeroStat("Spent", formatRub(expense), Modifier.weight(1f))
                 }
+                Spacer(Modifier.height(18.dp))
+                LightButton("Add entry", onAddExpense)
             }
         }
         item {
-            PrimaryButton("Add entry", onAdd, Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                ActionOrb(Icons.AutoMirrored.Outlined.TrendingUp, "Income", onAddIncome, Modifier.weight(1f))
+                ActionOrb(Icons.AutoMirrored.Outlined.TrendingDown, "Expense", onAddExpense, Modifier.weight(1f))
+                ActionOrb(Icons.Outlined.PieChart, "Insights", onInsights, Modifier.weight(1f))
+                ActionOrb(Icons.Outlined.Calculate, "Credit", onCredit, Modifier.weight(1f))
+            }
         }
         item { SectionHeading("Recent") }
         if (recent.isEmpty()) {
-            item { EmptyBlock("Nothing here yet", "Add the first income or expense. The numbers stay on this phone.", onAdd) }
+            item { EmptyBlock("Nothing here yet", "Add the first income or expense. The numbers stay on this phone.", onAddExpense) }
         } else {
             item {
                 SheetGroup {
@@ -260,18 +274,18 @@ private fun OverviewScreen(
                 color = Muted,
                 fontFamily = Jakarta,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+                modifier = Modifier.padding(start = 4.dp),
             )
         }
     }
 }
 
 @Composable
-private fun StatCell(label: String, value: String, modifier: Modifier) {
-    Column(modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
-        Text(label, color = Muted, fontFamily = Jakarta, fontSize = 13.sp)
-        Spacer(Modifier.height(4.dp))
-        MoneyText(value, 18.sp, weight = FontWeight.Bold)
+private fun HeroStat(label: String, value: String, modifier: Modifier) {
+    Column(modifier) {
+        Text(label, color = Color.White.copy(alpha = 0.72f), fontFamily = Jakarta, fontSize = 12.sp)
+        Spacer(Modifier.height(2.dp))
+        MoneyText(value, 16.sp, weight = FontWeight.Bold, color = Color.White)
     }
 }
 
@@ -291,7 +305,7 @@ private fun OperationsScreen(
         item {
             ScreenTitle(if (type == TxType.INCOME) "Income" else "Expenses")
             MonthSwitcher(month, { month = month.minusMonths(1) }, { if (month < YearMonth.now()) month = month.plusMonths(1) })
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
             MoneyText(formatRub(total), 44.sp, weight = FontWeight.ExtraBold)
             Spacer(Modifier.height(14.dp))
             PrimaryButton(
@@ -329,23 +343,38 @@ private fun AnalyticsScreen(ledger: Ledger) {
         }.sumOf { it.amountMinor } / 100.0
     }
     val labels = months.map { it.month.getDisplayName(MonthStyle.SHORT, en).replace(".", "") }
+    val peakMinor = columnValues.maxOrNull()?.let { Math.round(it * 100.0) } ?: 0L
     LazyColumn(contentPadding = screenPadding, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             ScreenTitle("Insights")
             MonthSwitcher(month, { month = month.minusMonths(1) }, { if (month < YearMonth.now()) month = month.plusMonths(1) })
         }
         item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MiniStat("Income", formatRub(income), Modifier.weight(1f))
+                MiniStat("Spent", formatRub(expense), Modifier.weight(1f))
+            }
+        }
+        item {
             SheetGroup {
-                QuietLine("Income", formatRub(income), false)
-                QuietLine("Expenses", formatRub(expense), true)
+                Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+                    Text("Six months of spending", fontFamily = Jakarta, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = Ink)
+                    Text("Spending across the last six months.", color = Muted, fontFamily = Jakarta, fontSize = 13.sp)
+                    Spacer(Modifier.height(8.dp))
+                    if (columnValues.all { it == 0.0 }) {
+                        Text("Not enough to draw a chart.", color = Muted, fontFamily = Jakarta)
+                    } else {
+                        SpendingCurve(columnValues, labels, formatRub(peakMinor))
+                    }
+                }
             }
         }
         item {
             SheetGroup {
                 Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
                     Text("Where the money went", fontFamily = Jakarta, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = Ink)
-                    Spacer(Modifier.height(4.dp))
                     if (slices.isEmpty()) {
+                        Spacer(Modifier.height(8.dp))
                         Text("No expenses this month.", color = Muted, fontFamily = Jakarta)
                     } else {
                         ExpenseDonut(
@@ -360,19 +389,20 @@ private fun AnalyticsScreen(ledger: Ledger) {
                 }
             }
         }
-        item {
-            SheetGroup {
-                Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-                    Text("Six months of spending", fontFamily = Jakarta, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = Ink)
-                    Spacer(Modifier.height(12.dp))
-                    if (columnValues.all { it == 0.0 }) {
-                        Text("Not enough to draw a chart.", color = Muted, fontFamily = Jakarta)
-                    } else {
-                        MonthColumns(columnValues, labels)
-                    }
-                }
-            }
-        }
+    }
+}
+
+@Composable
+private fun MiniStat(label: String, value: String, modifier: Modifier) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(Sheet)
+            .padding(16.dp),
+    ) {
+        Text(label, color = Muted, fontFamily = Jakarta, fontSize = 13.sp)
+        Spacer(Modifier.height(6.dp))
+        MoneyText(value, 18.sp, weight = FontWeight.Bold)
     }
 }
 
@@ -402,9 +432,15 @@ private fun CreditScreen() {
         if (quote == null) {
             Text("Enter an amount above zero, a term from 1 to 360 months, and a rate from 0.", color = Muted, fontFamily = Jakarta)
         } else {
-            Column(Modifier.padding(start = 2.dp, top = 8.dp)) {
-                Text("Monthly payment", color = Muted, fontFamily = Jakarta, fontSize = 14.sp)
-                MoneyText(money(quote.payment), 48.sp, weight = FontWeight.ExtraBold)
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(heroBrush)
+                    .padding(22.dp),
+            ) {
+                Text("Monthly payment", color = Color.White.copy(alpha = 0.78f), fontFamily = Jakarta, fontSize = 14.sp)
+                MoneyText(money(quote.payment), 44.sp, weight = FontWeight.ExtraBold, color = Color.White)
             }
             SheetGroup {
                 QuietLine("Total to repay", money(quote.total), false)
@@ -419,10 +455,10 @@ private fun CreditScreen() {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(
-                            Modifier.size(28.dp).clip(CircleShape).background(PineWash),
+                            Modifier.size(28.dp).clip(CircleShape).background(BrandWash),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("${row.month}", fontFamily = Jakarta, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = PineDeep)
+                            Text("${row.month}", fontFamily = Jakarta, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = BrandDeep)
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
@@ -485,23 +521,18 @@ private fun TransactionSheet(
                     if (category.type != TxType.EXPENSE) category = Category.GROCERIES
                 })
             }
-            OutlinedTextField(
-                value = amount,
-                onValueChange = { amount = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Amount") },
-                suffix = { Text("₽", color = Muted) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                textStyle = TextStyle(
-                    fontFamily = Jakarta,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Ink,
-                    fontFeatureSettings = "tnum",
-                ),
-                colors = fieldColors(),
-            )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Sheet)
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Amount", color = Muted, fontFamily = Jakarta, fontSize = 13.sp)
+                MoneyText(if (amount.isBlank()) "0 ₽" else "${amount.trim()} ₽", 40.sp, weight = FontWeight.ExtraBold)
+            }
+            AmountKeypad(onKey = { amount = pushAmountKey(amount, it) })
             Text("Category", color = Muted, fontFamily = Jakarta, fontSize = 13.sp)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 categoriesFor(type).forEach { item ->
@@ -531,6 +562,7 @@ private fun TransactionSheet(
                 label = { Text("Note") },
                 singleLine = true,
                 colors = fieldColors(),
+                shape = RoundedCornerShape(16.dp),
             )
             PrimaryButton(
                 "Save",
@@ -561,9 +593,9 @@ private fun TransactionSheet(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Outlined.Delete, contentDescription = null, tint = StoneText)
+                    Icon(Icons.Outlined.Delete, contentDescription = null, tint = Muted)
                     Spacer(Modifier.width(6.dp))
-                    Text("Delete", color = StoneText, fontFamily = Jakarta, fontWeight = FontWeight.SemiBold)
+                    Text("Delete", color = Muted, fontFamily = Jakarta, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -578,7 +610,7 @@ private fun TransactionSheet(
                         day = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
                     }
                     pickDate = false
-                }) { Text("Done", color = Pine, fontFamily = Jakarta, fontWeight = FontWeight.SemiBold) }
+                }) { Text("Done", color = Brand, fontFamily = Jakarta, fontWeight = FontWeight.SemiBold) }
             },
             dismissButton = {
                 TextButton(onClick = { pickDate = false }) {
@@ -587,6 +619,48 @@ private fun TransactionSheet(
             },
         ) { DatePicker(state = state) }
     }
+}
+
+@Composable
+private fun AmountKeypad(onKey: (String) -> Unit) {
+    val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf(".", "0", "⌫"))
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        rows.forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { key ->
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Sheet)
+                            .clickable(role = Role.Button) { onKey(key) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (key == "⌫") {
+                            Icon(Icons.AutoMirrored.Outlined.Backspace, contentDescription = "Delete digit", tint = Ink)
+                        } else {
+                            Text(key, color = Ink, fontFamily = Jakarta, fontWeight = FontWeight.SemiBold, fontSize = 22.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun pushAmountKey(current: String, key: String): String {
+    val raw = current.trim()
+    if (key == "⌫") return raw.dropLast(1)
+    if (key == ".") {
+        if (raw.contains('.')) return raw
+        return if (raw.isEmpty()) "0." else "$raw."
+    }
+    val next = if (raw == "0") key else raw + key
+    val fraction = next.substringAfter('.', "")
+    if (next.contains('.') && fraction.length > 2) return raw
+    if (next.substringBefore('.').length > 9) return raw
+    return next
 }
 
 @Composable
@@ -600,7 +674,7 @@ private fun SectionHeading(title: String) {
         title,
         fontFamily = Jakarta,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 15.sp,
+        fontSize = 16.sp,
         color = Ink,
         modifier = Modifier.padding(start = 2.dp),
     )
@@ -625,16 +699,16 @@ private fun QuietLine(label: String, value: String, divider: Boolean) {
 private fun LedgerRow(tx: Tx, onOpen: (Tx) -> Unit, showDivider: Boolean) {
     val category = categoryOf(tx.category)
     val positive = tx.type == TxType.INCOME
-    if (showDivider) GroupDivider(64.dp)
+    if (showDivider) GroupDivider(68.dp)
     Row(
         Modifier.fillMaxWidth().clickable(role = Role.Button) { onOpen(tx) }.padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(40.dp).clip(RoundedCornerShape(14.dp)).background(Color(category.color).copy(alpha = 0.16f)),
+            Modifier.size(42.dp).clip(CircleShape).background(Color(category.color).copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.size(9.dp).clip(CircleShape).background(Color(category.color)))
+            Box(Modifier.size(10.dp).clip(CircleShape).background(Color(category.color)))
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
@@ -653,7 +727,7 @@ private fun LedgerRow(tx: Tx, onOpen: (Tx) -> Unit, showDivider: Boolean) {
 @Composable
 private fun ShareRow(category: Category, amount: Long, total: Long) {
     val fraction = if (total == 0L) 0f else amount.toFloat() / total.toFloat()
-    Column(Modifier.padding(top = 12.dp)) {
+    Column(Modifier.padding(top = 14.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(Color(category.color)))
@@ -662,27 +736,29 @@ private fun ShareRow(category: Category, amount: Long, total: Long) {
             }
             MoneyText(formatRub(amount), 14.sp, weight = FontWeight.Medium)
         }
-        Spacer(Modifier.height(6.dp))
-        LinearProgressIndicator(
-            progress = { fraction },
-            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(99.dp)),
-            color = Color(category.color),
-            trackColor = Line,
-            drawStopIndicator = {},
-        )
+        Spacer(Modifier.height(8.dp))
+        ShareTrack(fraction, Color(category.color))
     }
 }
 
 @Composable
 private fun MonthSwitcher(month: YearMonth, onPrev: () -> Unit, onNext: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(Sheet)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+    ) {
         Stepper(Icons.Outlined.ChevronLeft, "Previous month", true, onPrev)
         Text(
             month.month.getDisplayName(MonthStyle.FULL, en) + " " + month.year,
             fontFamily = Jakarta,
             fontWeight = FontWeight.SemiBold,
             color = Ink,
-            fontSize = 16.sp,
+            fontSize = 15.sp,
+            textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 8.dp),
         )
         Stepper(Icons.Outlined.ChevronRight, "Next month", month < YearMonth.now(), onNext)
@@ -695,11 +771,10 @@ private fun Stepper(icon: ImageVector, description: String, enabled: Boolean, on
         Modifier
             .size(36.dp)
             .clip(CircleShape)
-            .background(if (enabled) Sand else Color.Transparent)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = description, tint = if (enabled) Ink else Line)
+        Icon(icon, contentDescription = description, tint = if (enabled) Brand else Line)
     }
 }
 
@@ -708,9 +783,8 @@ private fun EmptyBlock(title: String, body: String, onAdd: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(26.dp))
+            .clip(RoundedCornerShape(28.dp))
             .background(Sheet)
-            .border(1.dp, Line, RoundedCornerShape(26.dp))
             .padding(18.dp),
     ) {
         Text(title, fontFamily = Jakarta, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, color = Ink)
@@ -747,11 +821,11 @@ private fun Banner(title: String, body: String, action: String?, onClick: () -> 
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(PineWash)
+            .clip(RoundedCornerShape(24.dp))
+            .background(BrandWash)
             .padding(16.dp),
     ) {
-        Text(title, fontFamily = Jakarta, fontWeight = FontWeight.SemiBold, color = PineDeep)
+        Text(title, fontFamily = Jakarta, fontWeight = FontWeight.SemiBold, color = BrandDeep)
         Text(body, fontFamily = Jakarta, color = Ink, fontSize = 13.sp)
         if (action != null) {
             Spacer(Modifier.height(12.dp))
@@ -762,17 +836,15 @@ private fun Banner(title: String, body: String, action: String?, onClick: () -> 
 
 @Composable
 private fun fieldColors() = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = Pine,
+    focusedBorderColor = Brand,
     unfocusedBorderColor = Line,
-    focusedLabelColor = PineDeep,
+    focusedLabelColor = BrandDeep,
     unfocusedLabelColor = Muted,
-    cursorColor = Pine,
+    cursorColor = Brand,
     focusedTextColor = Ink,
     unfocusedTextColor = Ink,
     focusedContainerColor = Sheet,
     unfocusedContainerColor = Sheet,
-    disabledContainerColor = Sand,
-    disabledTextColor = StoneText,
 )
 
 @Composable
@@ -786,7 +858,7 @@ private fun NumberField(label: String, value: String, onChange: (String) -> Unit
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         textStyle = TextStyle(fontFamily = Jakarta, fontSize = 18.sp, color = Ink, fontFeatureSettings = "tnum"),
         colors = fieldColors(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
     )
 }
 

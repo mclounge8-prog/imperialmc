@@ -10,17 +10,16 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-val Paper = Color(0xFFF3EEE6)
-val Sheet = Color(0xFFFFFCF8)
-val Ink = Color(0xFF1C1916)
-val Muted = Color(0xFF7A7268)
-val Line = Color(0xFFE6DDD1)
-val Pine = Color(0xFF0F6E58)
-val PineDeep = Color(0xFF0B5343)
-val PineWash = Color(0xFFE5F3EE)
-val Sand = Color(0xFFF7F1E8)
-val Stone = Color(0xFFE3DBD0)
-val StoneText = Color(0xFF5E574E)
+val Paper = Color(0xFFF5F4F8)
+val Sheet = Color(0xFFFFFFFF)
+val Ink = Color(0xFF17161C)
+val Muted = Color(0xFF8B8794)
+val Line = Color(0xFFE8E6EE)
+val Brand = Color(0xFF5C34FF)
+val BrandDeep = Color(0xFF3D1FD4)
+val BrandSoft = Color(0xFF8B6CFF)
+val BrandWash = Color(0xFFF3F0FF)
+val Field = Color(0xFFF6F5F8)
 
 val Jakarta = FontFamily(
     Font(R.font.jakarta_regular, FontWeight.Normal),
@@ -34,17 +33,17 @@ val Jakarta = FontFamily(
 fun SaldoTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = lightColorScheme(
-            primary = Pine,
+            primary = Brand,
             onPrimary = Color.White,
-            primaryContainer = PineWash,
-            onPrimaryContainer = PineDeep,
-            secondary = Pine,
+            primaryContainer = BrandWash,
+            onPrimaryContainer = BrandDeep,
+            secondary = Brand,
             onSecondary = Color.White,
             background = Paper,
             onBackground = Ink,
             surface = Sheet,
             onSurface = Ink,
-            surfaceVariant = Sand,
+            surfaceVariant = BrandWash,
             onSurfaceVariant = Muted,
             outline = Line,
             error = Color(0xFF9A4032),
