@@ -37,7 +37,22 @@ export function renderVenueCard(venue, assignedNames) {
               >
               <span>Киоск самообслуживания${kioskOn ? ' · включён' : ''}</span>
             </label>
+            <label class="venue-precheck-toggle">
+              <input
+                type="checkbox"
+                ${venue.hold_cash_receipts ? 'checked' : ''}
+                hx-post="/venues/${venue.id}/cash-hold-toggle"
+                hx-target="#venue-card-${venue.id}"
+                hx-swap="outerHTML"
+              >
+              <span>Ручная отправка наличных${venue.hold_cash_receipts ? ' · включена' : ''}</span>
+            </label>
           </div>
+          ${
+            venue.hold_cash_receipts
+              ? `<div class="venue-flag-hint">Наличные чеки копятся в бэкофисе. Смена и Z на планшете закрываются как обычно.</div>`
+              : ''
+          }
           ${
             tobaccoOn
               ? `<div class="venue-flag-hint">Учёт табака · вкл · погрешность ${Number(venue.tobacco_tolerance_g ?? 100)} г</div>`
@@ -256,16 +271,12 @@ export function renderVenueAtolPanel(venue, settings, jobs) {
           <input type="checkbox" name="enabled" ${safe.enabled ? 'checked' : ''}>
           <span>Касса АТОЛ включена для этого заведения</span>
         </label>
-        <label class="atol-toggle-row">
-          <input type="checkbox" name="hold_cash_receipts" ${safe.hold_cash_receipts ? 'checked' : ''}>
-          <span>Наличные чеки отправлять вручную</span>
-        </label>
         <p class="atol-hint">
-          Чек, оплаченный целиком наличными, не уходит в кассу сразу. Продажа на планшете проходит как обычно, без ошибки и без плашки кассы.
-          В отчётах у такого чека есть кнопка «Отправить» — чек попадает в открытую фискальную смену. Смешанная оплата и карта уходят сразу.
-          Z-отчёт не печатается, пока эти наличные чеки не отправлены, даже если смена в программе уже закрыта: так они остаются в той же смене кассы.
-          Касса не держит смену дольше 24 часов. Если следующую смену откроют раньше, чем чеки отправлены, Z уйдёт вместе с ней, а не посреди дня.
-          Через 22 часа отложенный Z снимается сам, чтобы утренняя смена могла открыться.
+          Ручная отправка наличных включается отдельной ручкой на карточке заведения выше, рядом с пречеком и киоском.
+          Пока она выключена, чеки и Z уходят как раньше.
+          Когда включена, целиком наличный чек не уходит в кассу сразу: в «Отчётах» у него кнопка «Отправить», планшет ошибку не показывает.
+          Смену персонал закрывает как обычно, Z печатается по чекам, которые касса уже приняла.
+          Неотправленные наличные в Telegram и в отчёте кассы помечены отдельно и при этом входят в обычную сумму наличных.
         </p>
 
         <div class="atol-fields-grid">

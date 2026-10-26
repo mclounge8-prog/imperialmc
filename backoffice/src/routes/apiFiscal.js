@@ -13,8 +13,6 @@ import {
   cancelSupersededShiftJobs,
   reclaimStuckInProgress,
 } from '../services/fiscalJobGuards.js';
-import { syncDeferredCloses } from '../services/cashFiscalHold.js';
-
 const apiFiscal = new Hono();
 apiFiscal.use('*', requireStaffToken);
 
@@ -351,9 +349,6 @@ apiFiscal.post('/jobs/:id/result', async (c) => {
            WHERE id = $2`,
           [body.fiscalDocNumber || null, job.receipt_id]
         );
-      }
-      if (job.type === 'close_shift' || isReceiptJob) {
-        await syncDeferredCloses(client, job.venue_id);
       }
     } else {
       await client.query(

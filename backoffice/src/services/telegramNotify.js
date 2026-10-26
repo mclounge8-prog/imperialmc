@@ -1,4 +1,5 @@
 import { pool } from '../db.js';
+import { unsentCashNote } from './cashFiscalHold.js';
 
 const SETTINGS_ID = 1;
 const DEFAULT_CHANNEL_KEY = 'mc_lounge';
@@ -462,6 +463,7 @@ export function buildShiftCloseMessage({
   heldCashCount = 0,
   heldCashTotal = 0,
 }) {
+  const unsentNote = unsentCashNote(heldCashCount, heldCashTotal);
   return [
     header('🔴 Закрытие смены', venueName, when),
     '',
@@ -476,9 +478,7 @@ export function buildShiftCloseMessage({
     `Инкассации: ${escapeHtml(formatMoney(withdrawals))}`,
     `Внесения: ${escapeHtml(formatMoney(deposits))}`,
     `Кассир: ${escapeHtml(cashier || '—')}`,
-    Number(heldCashCount) > 0
-      ? `Наличные чеки ждут ручной отправки в кассу: ${escapeHtml(String(heldCashCount))} на ${escapeHtml(formatMoney(heldCashTotal))}. Z-отчёт напечатается после них, пока фискальная смена открыта (не дольше 24 часов).`
-      : null,
+    unsentNote ? escapeHtml(unsentNote) : null,
   ]
     .filter((x) => x != null)
     .join('\n');

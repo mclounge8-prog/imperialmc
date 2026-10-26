@@ -18,18 +18,21 @@ import { cancelIfSuperseded } from '../services/fiscalJobGuards.js';
 const venues = new Hono();
 venues.use('*', requireAuthApi);
 
+const VENUE_CARD_SQL = `
+  SELECT v.id, v.name, v.address,
+         COALESCE(v.precheck_enabled, false) AS precheck_enabled,
+         COALESCE(v.tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
+         COALESCE(v.tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
+         COALESCE(v.kiosk_enabled, false) AS kiosk_enabled,
+         COALESCE(v.kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
+         v.kiosk_qr_image_url,
+         COALESCE(a.hold_cash_receipts, false) AS hold_cash_receipts
+  FROM venues v
+  LEFT JOIN venue_atol_settings a ON a.venue_id = v.id
+`;
+
 async function fetchVenue(id) {
-  const { rows } = await pool.query(
-    `SELECT id, name, address,
-            COALESCE(precheck_enabled, false) AS precheck_enabled,
-            COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
-            COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
-            COALESCE(kiosk_enabled, false) AS kiosk_enabled,
-            COALESCE(kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
-            kiosk_qr_image_url
-     FROM venues WHERE id = $1`,
-    [id]
-  );
+  const { rows } = await pool.query(`${VENUE_CARD_SQL} WHERE v.id = $1`, [id]);
   return rows[0] || null;
 }
 
@@ -46,14 +49,7 @@ async function fetchAssignedStaffNames(venueId) {
 
 async function fetchAllVenueCards() {
   const { rows: venueRows } = await pool.query(
-    `SELECT id, name, address,
-            COALESCE(precheck_enabled, false) AS precheck_enabled,
-            COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
-            COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
-            COALESCE(kiosk_enabled, false) AS kiosk_enabled,
-            COALESCE(kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
-            kiosk_qr_image_url
-     FROM venues ORDER BY name`
+    `${VENUE_CARD_SQL} ORDER BY v.name`
   );
   const cards = [];
   for (const venue of venueRows) {
@@ -133,6 +129,28 @@ venues.post('/:id/precheck-toggle', async (c) => {
 
   await pool.query(
     'UPDATE venues SET precheck_enabled = NOT COALESCE(precheck_enabled, false) WHERE id = $1',
+    [id]
+  );
+
+  const updated = await fetchVenue(id);
+  const assignedNames = await fetchAssignedStaffNames(id);
+  return c.html(renderVenueCard(updated, assignedNames));
+});
+
+venues.post('/:id/cash-hold-toggle', async (c) => {
+  const id = c.req.param('id');
+  const current = await fetchVenue(id);
+  if (!current) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+
+  await pool.query(
+    `INSERT INTO venue_atol_settings (venue_id, hold_cash_receipts, updated_at)
+     VALUES ($1, true, now())
+     ON CONFLICT (venue_id) DO UPDATE
+       SET hold_cash_receipts = NOT COALESCE(venue_atol_settings.hold_cash_receipts, false),
+           updated_at = now()`,
     [id]
   );
 
@@ -259,24 +277,22 @@ venues.post('/:id/atol', async (c) => {
 
   const body = await c.req.parseBody();
   const enabled = body.enabled === 'on' || body.enabled === 'true';
-  const holdCashReceipts = body.hold_cash_receipts === 'on' || body.hold_cash_receipts === 'true';
   const kktIp = String(body.kkt_ip || '').trim() || null;
   const kktPort = body.kkt_port ? Number(body.kkt_port) : 5555;
   const kktModel = body.kkt_model ? Number(body.kkt_model) : null;
   const operatorName = String(body.operator_name || '').trim() || null;
 
   await pool.query(
-    `INSERT INTO venue_atol_settings (venue_id, enabled, kkt_ip, kkt_port, kkt_model, operator_name, hold_cash_receipts, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+    `INSERT INTO venue_atol_settings (venue_id, enabled, kkt_ip, kkt_port, kkt_model, operator_name, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, now())
      ON CONFLICT (venue_id) DO UPDATE SET
        enabled = EXCLUDED.enabled,
        kkt_ip = EXCLUDED.kkt_ip,
        kkt_port = EXCLUDED.kkt_port,
        kkt_model = EXCLUDED.kkt_model,
        operator_name = EXCLUDED.operator_name,
-       hold_cash_receipts = EXCLUDED.hold_cash_receipts,
        updated_at = now()`,
-    [venueId, enabled, kktIp, kktPort, kktModel, operatorName, holdCashReceipts]
+    [venueId, enabled, kktIp, kktPort, kktModel, operatorName]
   );
 
   const settings = await fetchAtolSettings(venueId);

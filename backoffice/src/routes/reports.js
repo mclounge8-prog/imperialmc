@@ -7,9 +7,12 @@ import {
   renderItemStatsSection,
   renderCashSection,
   renderReceiptFiscalBox,
+  renderShiftFiscalPanel,
 } from '../views/reportsView.js';
 import { formatVenueDateTime, venueDayBounds, venueTodayISO } from '../utils/timezone.js';
-import { sendHeldCashReceipt } from '../services/cashFiscalHold.js';
+import { sendHeldCashReceipt, zButtonDecision } from '../services/cashFiscalHold.js';
+import { enqueueShiftFiscalJob } from '../services/fiscalQueue.js';
+import { hasNewerOpenShiftDone } from '../services/fiscalJobGuards.js';
 
 const reports = new Hono();
 reports.use('*', requireAuthApi);
@@ -218,11 +221,16 @@ function roundMoney(value) {
 }
 
 /** Смены за период с разбивкой кассы — основа вкладки «Касса» и CSV. */
-async function fetchCashShifts({ venueId, dateFrom, dateTo }) {
+async function fetchCashShifts({ venueId, dateFrom, dateTo, shiftId }) {
   const conditions = [];
   const params = [];
   let idx = 1;
 
+  if (shiftId) {
+    conditions.push(`s.id = $${idx}`);
+    params.push(shiftId);
+    idx += 1;
+  }
   if (venueId) {
     conditions.push(`s.venue_id = $${idx}`);
     params.push(venueId);
@@ -245,7 +253,16 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo }) {
   const { rows } = await pool.query(
     `SELECT s.id, s.venue_id, v.name AS venue_name, s.status,
             s.opened_at, s.closed_at, s.opened_by_name, s.closed_by_name,
-            s.opening_cash, s.closing_cash, s.closing_cash_expected,
+            s.opening_cash, s.closing_cash, s.closing_cash_expected, s.fiscal_reconcile,
+            COALESCE(atolset.hold_cash_receipts, false) AS hold_cash_receipts,
+            COALESCE(held.held_cash, 0) AS held_cash,
+            COALESCE(held.held_count, 0) AS held_count,
+            COALESCE(atolpay.atol_cash, 0) AS atol_cash,
+            COALESCE(atolpay.atol_noncash, 0) AS atol_noncash,
+            z.status AS z_status,
+            z.fiscal_doc_number AS z_doc,
+            z.last_error AS z_error,
+            z.id AS z_job_id,
             COALESCE(pay.cash_sales, 0) AS cash_sales,
             COALESCE(pay.card_sales, 0) AS card_sales,
             COALESCE(pay.qr_sales, 0) AS qr_sales,
@@ -256,6 +273,7 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo }) {
             COALESCE(mov.withdrawals, 0) AS withdrawals
      FROM shifts s
      JOIN venues v ON v.id = s.venue_id
+     LEFT JOIN venue_atol_settings atolset ON atolset.venue_id = s.venue_id
      LEFT JOIN LATERAL (
        SELECT
          COUNT(*) FILTER (WHERE r.status = 'paid')::int AS receipts_count,
@@ -280,6 +298,28 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo }) {
        FROM cash_movements
        WHERE shift_id = s.id
      ) mov ON true
+     LEFT JOIN LATERAL (
+       SELECT
+         COALESCE(SUM(r.total) FILTER (WHERE r.status = 'paid' AND r.fiscal_status = 'held'), 0) AS held_cash,
+         COUNT(*) FILTER (WHERE r.status = 'paid' AND r.fiscal_status = 'held')::int AS held_count
+       FROM receipts r
+       WHERE r.shift_id = s.id
+     ) held ON true
+     LEFT JOIN LATERAL (
+       SELECT
+         COALESCE(SUM(rp.amount) FILTER (WHERE rp.method = 'cash'), 0) AS atol_cash,
+         COALESCE(SUM(rp.amount) FILTER (WHERE rp.method <> 'cash'), 0) AS atol_noncash
+       FROM receipt_payments rp
+       JOIN receipts r ON r.id = rp.receipt_id
+       WHERE r.shift_id = s.id AND r.fiscal_status = 'done' AND r.status IN ('paid', 'refunded')
+     ) atolpay ON true
+     LEFT JOIN LATERAL (
+       SELECT id, status, fiscal_doc_number, last_error
+       FROM fiscal_jobs
+       WHERE shift_id = s.id AND type = 'close_shift'
+       ORDER BY id DESC
+       LIMIT 1
+     ) z ON true
      ${where}
      ORDER BY s.opened_at DESC`,
     params
@@ -320,6 +360,16 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo }) {
       difference,
       receiptsCount: Number(row.receipts_count || 0),
       revenueTotal: Number(row.revenue_total || 0),
+      holdCashReceipts: !!row.hold_cash_receipts,
+      heldCash: Number(row.held_cash || 0),
+      heldCount: Number(row.held_count || 0),
+      atolCash: Number(row.atol_cash || 0),
+      atolNoncash: Number(row.atol_noncash || 0),
+      zStatus: row.z_status || null,
+      zDoc: row.z_doc || null,
+      zError: row.z_error || null,
+      zJobId: row.z_job_id || null,
+      fiscalReconcile: row.fiscal_reconcile || null,
     };
   });
 }
@@ -348,6 +398,7 @@ function aggregateCashByDay(shifts) {
         countedCash: 0,
         countedShifts: 0,
         difference: 0,
+        heldCash: 0,
       });
     }
     const row = map.get(key);
@@ -355,6 +406,7 @@ function aggregateCashByDay(shifts) {
     row.receiptsCount += s.receiptsCount;
     row.revenueTotal = roundMoney(row.revenueTotal + s.revenueTotal);
     row.cashSales = roundMoney(row.cashSales + s.cashSales);
+    row.heldCash = roundMoney((row.heldCash || 0) + (s.heldCash || 0));
     row.cardSales = roundMoney(row.cardSales + s.cardSales);
     row.qrSales = roundMoney(row.qrSales + s.qrSales);
     row.otherSales = roundMoney(row.otherSales + s.otherSales);
@@ -404,6 +456,105 @@ reports.get('/cash', async (c) => {
   const shifts = await fetchCashShifts({ venueId, dateFrom, dateTo });
   const byDay = aggregateCashByDay(shifts);
   return c.html(renderCashSection(venues, venueId, dateFrom, dateTo, byDay, shifts));
+});
+
+function parseReconcileMoney(value) {
+  const n = Number(String(value ?? '').replace(',', '.').replace(/\s/g, ''));
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n * 100) / 100;
+}
+
+async function renderCashShiftFiscal(shiftId, notice) {
+  const shifts = await fetchCashShifts({ shiftId });
+  const shift = shifts[0];
+  if (!shift) return null;
+  return renderShiftFiscalPanel(shift, notice);
+}
+
+reports.get('/cash/shifts/:id/fiscal', async (c) => {
+  const html = await renderCashShiftFiscal(c.req.param('id'));
+  if (!html) {
+    c.status(404);
+    return c.text('Смена не найдена');
+  }
+  return c.html(html);
+});
+
+reports.post('/cash/shifts/:id/reconcile', async (c) => {
+  const id = c.req.param('id');
+  const shifts = await fetchCashShifts({ shiftId: id });
+  const shift = shifts[0];
+  if (!shift) {
+    c.status(404);
+    return c.text('Смена не найдена');
+  }
+  if (!shift.holdCashReceipts) {
+    return c.html(renderShiftFiscalPanel(shift, 'Ручная отправка наличных на этой точке выключена.'));
+  }
+  const body = await c.req.parseBody();
+  const cash = parseReconcileMoney(body.cash);
+  const noncash = parseReconcileMoney(body.noncash);
+  if (cash == null || noncash == null) {
+    return c.html(renderShiftFiscalPanel(shift, 'Нужны суммы наличных и безнала, ноль или больше.'));
+  }
+  const note = String(body.note || '').trim().slice(0, 500);
+  await pool.query(
+    `UPDATE shifts
+     SET fiscal_reconcile = $2::jsonb
+     WHERE id = $1`,
+    [id, JSON.stringify({ cash, noncash, note })]
+  );
+  const html = await renderCashShiftFiscal(id, 'Сверка сохранена. На кассу эти цифры не уходили.');
+  return c.html(html);
+});
+
+reports.post('/cash/shifts/:id/z', async (c) => {
+  const id = c.req.param('id');
+  const shifts = await fetchCashShifts({ shiftId: id });
+  const shift = shifts[0];
+  if (!shift) {
+    c.status(404);
+    return c.text('Смена не найдена');
+  }
+  if (!shift.holdCashReceipts) {
+    return c.html(renderShiftFiscalPanel(shift, 'Ручная отправка наличных на этой точке выключена.'));
+  }
+  const newerOpenDone = await hasNewerOpenShiftDone(pool, shift.venueId, shift.id);
+  const decision = zButtonDecision({
+    shiftStatus: shift.status,
+    closeStatus: shift.zStatus,
+    newerOpenDone,
+  });
+  if (!decision.ok) {
+    return c.html(renderShiftFiscalPanel(shift, decision.error));
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (decision.action === 'retry' && shift.zJobId) {
+      await client.query(
+        `UPDATE fiscal_jobs
+         SET status = 'pending', last_error = NULL, updated_at = now()
+         WHERE id = $1 AND status IN ('error', 'cancelled', 'deferred')`,
+        [shift.zJobId]
+      );
+    } else {
+      await enqueueShiftFiscalJob(client, {
+        venueId: shift.venueId,
+        shiftId: shift.id,
+        type: 'close_shift',
+        operatorName: shift.closedByName || shift.openedByName || '',
+      });
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    return c.html(renderShiftFiscalPanel(shift, err.message || 'Не удалось поставить Z в очередь'));
+  } finally {
+    client.release();
+  }
+  const html = await renderCashShiftFiscal(id, 'Z поставлен в очередь кассы. Суммы сверки на кассу не передаются.');
+  return c.html(html);
 });
 
 reports.get('/export/receipts', async (c) => {

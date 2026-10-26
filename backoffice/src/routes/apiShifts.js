@@ -3,14 +3,6 @@ import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { enqueueCashFiscalJob, enqueueShiftFiscalJob } from '../services/fiscalQueue.js';
 import {
-  cancelDeferredCloses,
-  countUnsentHeldReceipts,
-  DEFERRED_CLOSE_EXPIRED,
-  inspectDeferredFiscalClose,
-  shouldKeepFiscalShiftForHeldCash,
-  syncDeferredCloses,
-} from '../services/cashFiscalHold.js';
-import {
   buildCashMovementMessage,
   buildShiftCloseMessage,
   buildShiftOpenMessage,
@@ -215,28 +207,22 @@ apiShifts.post('/open', async (c) => {
     );
     const shift = rows[0];
 
-    const deferredClose = await inspectDeferredFiscalClose(client, venueId);
-    // Фискальная смена ещё открыта из‑за неотправленных наличных: повторное
-    // openShift касса не примет, а cashIn удвоил бы деньги, которые уже в ящике.
-    if (!shouldKeepFiscalShiftForHeldCash(deferredClose)) {
-      if (deferredClose.hasDeferred) {
-        await cancelDeferredCloses(client, venueId, DEFERRED_CLOSE_EXPIRED);
-      }
-      await enqueueShiftFiscalJob(client, {
+    await enqueueShiftFiscalJob(client, {
+      venueId,
+      shiftId: shift.id,
+      type: 'open_shift',
+      operatorName: staff.name,
+    });
+
+    // Остаток на открытии = внесение в денежный ящик ККТ (учётный чек cashIn).
+    if (openingCash > 0) {
+      await enqueueCashFiscalJob(client, {
         venueId,
         shiftId: shift.id,
-        type: 'open_shift',
+        type: 'cash_in',
+        amount: openingCash,
         operatorName: staff.name,
       });
-      if (openingCash > 0) {
-        await enqueueCashFiscalJob(client, {
-          venueId,
-          shiftId: shift.id,
-          type: 'cash_in',
-          amount: openingCash,
-          operatorName: staff.name,
-        });
-      }
     }
 
     await client.query('COMMIT');
@@ -363,15 +349,12 @@ apiShifts.post('/close', async (c) => {
       ]
     );
 
-    const unsentHeld = await countUnsentHeldReceipts(client, venueId);
     await enqueueShiftFiscalJob(client, {
       venueId,
       shiftId: shift.id,
       type: 'close_shift',
       operatorName: staff.name,
-      status: unsentHeld > 0 ? 'deferred' : 'pending',
     });
-    await syncDeferredCloses(client, venueId);
     const { rows: heldRows } = await client.query(
       `SELECT COUNT(*)::int AS count, COALESCE(SUM(total), 0) AS total
        FROM receipts

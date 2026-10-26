@@ -1,8 +1,7 @@
 // Ручная отправка наличных чеков в АТОЛ.
-// Чек не прячется от фискализации: задание просто не попадает в очередь,
-// пока его не отправят из бэкофиса. Планшет задание не видит и продажу не стопорит.
-// Z (close_shift) держится в статусе deferred, чтобы касса не закрыла смену
-// раньше этих чеков. В уже напечатанный Z чек добавить нельзя.
+// Весь режим включается только галочкой venue_atol_settings.hold_cash_receipts.
+// Пока она снята, чеки и Z уходят как раньше, персонал ничего не замечает.
+// В уже напечатанный Z чек добавить нельзя: касса собирает Z сама из принятых документов.
 
 export async function ensureAtolCashHoldSchema() {
   const { pool } = await import('../db.js');
@@ -11,12 +10,11 @@ export async function ensureAtolCashHoldSchema() {
      ADD COLUMN IF NOT EXISTS hold_cash_receipts BOOLEAN NOT NULL DEFAULT false`
   );
   await pool.query(`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS fiscal_hold_payload JSONB`);
+  await pool.query(`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS fiscal_reconcile JSONB`);
 }
 
-export const FISCAL_SHIFT_HOLD_HOURS = 22;
-
 export const FISCAL_SEND_CLOSED =
-  'Фискальная смена уже закрыта Z-отчётом. В закрытый отчёт чек добавить нельзя. Когда на точке откроют следующую смену, кнопка отправит чек уже в неё — он попадёт в следующий Z, не в прошлый.';
+  'Фискальная смена этого чека уже закрыта Z-отчётом. В закрытый Z чек добавить нельзя. Когда на точке откроют следующую смену, кнопка отправит его в неё.';
 
 export const FISCAL_SEND_CLOSING =
   'Касса уже печатает Z-отчёт. Этот чек в него не успеет. Дождитесь открытия следующей смены и отправьте чек туда.';
@@ -24,11 +22,36 @@ export const FISCAL_SEND_CLOSING =
 export const FISCAL_SEND_NO_SHIFT =
   'Фискальная смена на кассе не открыта. Чек можно отправить, когда планшет откроет смену на кассе. В уже закрытый Z он не попадает.';
 
-export const DEFERRED_CLOSE_EXPIRED =
-  'Фискальная смена открыта больше 22 часов. Отложенный Z снят: касса не держит смену дольше 24 часов. Неотправленные наличные чеки попадут в следующую фискальную смену, не в этот Z.';
+export function unsentCashNote(count, total) {
+  const n = Number(count) || 0;
+  if (n <= 0) return null;
+  const money = (Number(total) || 0).toFixed(2);
+  return `Из них не отправлено в АТОЛ: ${n} на ${money} ₽. В строке «Наличные оплаты» эта сумма уже учтена. Z печатается как обычно, эти чеки в него не входят.`;
+}
 
-export const DEFERRED_CLOSE_REPLACED =
-  'Отложенный Z заменён: наличные чеки уже в очереди кассы, отчёт уйдёт следом.';
+/** Кнопка Z в бэкофисе не подменяет закрытие смены персоналом и не принимает суммы. */
+export function zButtonDecision({ shiftStatus, closeStatus, newerOpenDone }) {
+  if (shiftStatus !== 'closed') {
+    return {
+      ok: false,
+      error: 'Смена в программе ещё открыта. Её закрывают на планшете, Z уходит вместе с закрытием.',
+    };
+  }
+  if (newerOpenDone) {
+    return {
+      ok: false,
+      error: 'Следующая смена уже открыта на кассе. Этот Z отправить нельзя: касса закрыла бы текущую смену.',
+    };
+  }
+  if (closeStatus === 'done') return { ok: false, done: true, error: 'Z уже напечатан.' };
+  if (closeStatus === 'pending' || closeStatus === 'in_progress') {
+    return { ok: false, error: 'Z уже в очереди кассы.' };
+  }
+  if (closeStatus === 'error' || closeStatus === 'cancelled' || closeStatus === 'deferred') {
+    return { ok: true, action: 'retry' };
+  }
+  return { ok: true, action: 'enqueue' };
+}
 
 export function isPureCashSale(payments) {
   return Array.isArray(payments) && payments.length > 0 && payments.every((p) => p.method === 'cash');
@@ -55,80 +78,6 @@ export function decideFiscalSend({ opens, closes }) {
   return { ok: true };
 }
 
-/**
- * Пока есть отложенный Z и кассовая смена моложе 22 часов, новую фискальную
- * смену не открываем: иначе Z вчерашнего дня закроет уже сегодняшнюю смену
- * или касса ответит «смена уже открыта». После 22 часов отложенный Z снимаем,
- * чтобы утренняя смена не встала из‑за лимита ККТ в 24 часа.
- */
-export function shouldKeepFiscalShiftForHeldCash({ hasDeferredClose, fiscalOpenAgeHours }) {
-  if (!hasDeferredClose) return false;
-  if (fiscalOpenAgeHours == null || !Number.isFinite(fiscalOpenAgeHours)) return false;
-  return fiscalOpenAgeHours < FISCAL_SHIFT_HOLD_HOURS;
-}
-
-/**
- * deferredCloses: { id, shiftId }
- * shifts: { id, status } — смена и все более новые смены этой точки
- * blockingHeld: сколько наличных чеков ещё не проведены кассой
- */
-export function planDeferredCloses({ deferredCloses, shifts, blockingHeld }) {
-  const actions = { cancel: [], release: null };
-  const sorted = [...(deferredCloses || [])].sort(
-    (a, b) => a.shiftId - b.shiftId || a.id - b.id
-  );
-  for (const job of sorted) {
-    const newer = (shifts || []).filter((shift) => shift.id > job.shiftId);
-    if (newer.some((shift) => shift.status === 'open')) continue;
-    if (newer.length > 0) {
-      actions.cancel.push(job.id);
-      continue;
-    }
-    const shift = (shifts || []).find((row) => row.id === job.shiftId);
-    if (!shift || shift.status !== 'closed') continue;
-    if (blockingHeld > 0) continue;
-    actions.release = job.id;
-  }
-  return actions;
-}
-
-export async function countUnsentHeldReceipts(client, venueId) {
-  const { rows } = await client.query(
-    `SELECT COUNT(*)::int AS count
-     FROM receipts r
-     WHERE r.venue_id = $1
-       AND r.fiscal_hold_payload IS NOT NULL
-       AND r.fiscal_status IN ('held', 'pending', 'error')
-       AND NOT EXISTS (
-         SELECT 1 FROM fiscal_jobs c
-         WHERE c.shift_id = r.shift_id
-           AND c.type = 'close_shift'
-           AND c.status = 'done'
-       )`,
-    [venueId]
-  );
-  return Number(rows[0]?.count || 0);
-}
-
-export async function inspectDeferredFiscalClose(client, venueId) {
-  const { rows: deferred } = await client.query(
-    `SELECT 1 FROM fiscal_jobs
-     WHERE venue_id = $1 AND type = 'close_shift' AND status = 'deferred'
-     LIMIT 1`,
-    [venueId]
-  );
-  const { rows: opens } = await client.query(
-    `SELECT updated_at FROM fiscal_jobs
-     WHERE venue_id = $1 AND type = 'open_shift' AND status = 'done'
-     ORDER BY id DESC
-     LIMIT 1`,
-    [venueId]
-  );
-  const openAt = opens[0]?.updated_at ? new Date(opens[0].updated_at).getTime() : null;
-  const fiscalOpenAgeHours = openAt == null ? null : (Date.now() - openAt) / 36e5;
-  return { hasDeferred: Boolean(deferred[0]), fiscalOpenAgeHours };
-}
-
 export async function loadFiscalShiftJobs(client, venueId) {
   const { rows } = await client.query(
     `SELECT id, type, status
@@ -147,68 +96,8 @@ export async function loadFiscalShiftJobs(client, venueId) {
   };
 }
 
-export async function cancelDeferredCloses(client, venueId, message) {
-  await client.query(
-    `UPDATE fiscal_jobs
-     SET status = 'cancelled', last_error = $2, updated_at = now()
-     WHERE venue_id = $1 AND type = 'close_shift' AND status = 'deferred'`,
-    [venueId, message]
-  );
-}
-
 function payloadJson(payload) {
   return typeof payload === 'string' ? payload : JSON.stringify(payload);
-}
-
-export async function syncDeferredCloses(client, venueId) {
-  const { rows: deferred } = await client.query(
-    `SELECT id, shift_id, payload
-     FROM fiscal_jobs
-     WHERE venue_id = $1 AND type = 'close_shift' AND status = 'deferred'
-     ORDER BY id ASC
-     FOR UPDATE`,
-    [venueId]
-  );
-  if (!deferred.length) return { cancelled: 0, released: false };
-
-  const minShift = Math.min(...deferred.map((row) => Number(row.shift_id)));
-  const { rows: shiftRows } = await client.query(
-    `SELECT id, status FROM shifts WHERE venue_id = $1 AND id >= $2 ORDER BY id`,
-    [venueId, minShift]
-  );
-  const blockingHeld = await countUnsentHeldReceipts(client, venueId);
-  const plan = planDeferredCloses({
-    deferredCloses: deferred.map((row) => ({ id: Number(row.id), shiftId: Number(row.shift_id) })),
-    shifts: shiftRows.map((row) => ({ id: Number(row.id), status: row.status })),
-    blockingHeld,
-  });
-
-  if (plan.cancel.length) {
-    await client.query(
-      `UPDATE fiscal_jobs
-       SET status = 'cancelled',
-           last_error = 'Z этой смены перешёл к более поздней: фискальная смена кассы оставалась открытой.',
-           updated_at = now()
-       WHERE id = ANY($1::int[]) AND status = 'deferred'`,
-      [plan.cancel]
-    );
-  }
-
-  if (!plan.release) return { cancelled: plan.cancel.length, released: false };
-
-  const job = deferred.find((row) => Number(row.id) === plan.release);
-  await client.query(
-    `UPDATE fiscal_jobs
-     SET status = 'cancelled', last_error = $2, updated_at = now()
-     WHERE id = $1 AND status = 'deferred'`,
-    [plan.release, DEFERRED_CLOSE_REPLACED]
-  );
-  await client.query(
-    `INSERT INTO fiscal_jobs (venue_id, type, shift_id, payload, status)
-     VALUES ($1, 'close_shift', $2, $3::jsonb, 'pending')`,
-    [venueId, job.shift_id, payloadJson(job.payload)]
-  );
-  return { cancelled: plan.cancel.length, released: true };
 }
 
 export async function sendHeldCashReceipt(client, receiptId) {

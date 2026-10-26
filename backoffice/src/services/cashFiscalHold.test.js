@@ -6,9 +6,9 @@ import {
   FISCAL_SEND_CLOSING,
   FISCAL_SEND_NO_SHIFT,
   isPureCashSale,
-  planDeferredCloses,
   shouldHoldCashReceipt,
-  shouldKeepFiscalShiftForHeldCash,
+  unsentCashNote,
+  zButtonDecision,
 } from './cashFiscalHold.js';
 
 test('only a fully cash sale is held, and only when the switch is on', () => {
@@ -73,53 +73,29 @@ test('a held receipt can be sent only into a fiscal shift that is still open', (
   );
 });
 
-test('the next fiscal open is skipped only while the held shift is still inside 22 hours', () => {
+test('unsent cash is named separately and does not replace the cash total', () => {
+  assert.equal(unsentCashNote(0, 0), null);
+  const note = unsentCashNote(2, 1500);
+  assert.match(note, /1500\.00/);
+  assert.match(note, /уже учтена/);
+});
+
+test('the backoffice Z button does not fire while the shift is open or the next fiscal shift is already open', () => {
+  assert.equal(zButtonDecision({ shiftStatus: 'open', closeStatus: null, newerOpenDone: false }).ok, false);
   assert.equal(
-    shouldKeepFiscalShiftForHeldCash({ hasDeferredClose: true, fiscalOpenAgeHours: 12 }),
+    zButtonDecision({ shiftStatus: 'closed', closeStatus: 'error', newerOpenDone: true }).ok,
+    false
+  );
+  assert.equal(
+    zButtonDecision({ shiftStatus: 'closed', closeStatus: 'done', newerOpenDone: false }).done,
     true
   );
   assert.equal(
-    shouldKeepFiscalShiftForHeldCash({ hasDeferredClose: true, fiscalOpenAgeHours: 22 }),
-    false
+    zButtonDecision({ shiftStatus: 'closed', closeStatus: 'error', newerOpenDone: false }).action,
+    'retry'
   );
   assert.equal(
-    shouldKeepFiscalShiftForHeldCash({ hasDeferredClose: false, fiscalOpenAgeHours: 1 }),
-    false
+    zButtonDecision({ shiftStatus: 'closed', closeStatus: null, newerOpenDone: false }).action,
+    'enqueue'
   );
-  assert.equal(
-    shouldKeepFiscalShiftForHeldCash({ hasDeferredClose: true, fiscalOpenAgeHours: null }),
-    false
-  );
-});
-
-test('deferred Z stays while a later shift is open and prints only after the cash queue is empty', () => {
-  const waiting = planDeferredCloses({
-    deferredCloses: [{ id: 10, shiftId: 1 }],
-    shifts: [
-      { id: 1, status: 'closed' },
-      { id: 2, status: 'open' },
-    ],
-    blockingHeld: 2,
-  });
-  assert.deepEqual(waiting, { cancel: [], release: null });
-
-  const ready = planDeferredCloses({
-    deferredCloses: [{ id: 10, shiftId: 1 }],
-    shifts: [{ id: 1, status: 'closed' }],
-    blockingHeld: 0,
-  });
-  assert.deepEqual(ready, { cancel: [], release: 10 });
-
-  const continued = planDeferredCloses({
-    deferredCloses: [
-      { id: 10, shiftId: 1 },
-      { id: 20, shiftId: 2 },
-    ],
-    shifts: [
-      { id: 1, status: 'closed' },
-      { id: 2, status: 'closed' },
-    ],
-    blockingHeld: 0,
-  });
-  assert.deepEqual(continued, { cancel: [10], release: 20 });
 });
