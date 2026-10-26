@@ -1,6 +1,6 @@
 # FinSolution
 
-Телефонный учёт денег без входа и без витрины. Визуальный язык — фиолетовый бренд FinSolution и стеклянные панели.
+Phone ledger with no login and no storefront. The interface is English. Surfaces use Kyant's Liquid Glass (Backdrop) over a colored field, and the Android navigation bar stays hidden until a swipe from the bottom edge.
 
 - Обзор: остаток, доходы и расходы текущего месяца, последние операции
 - Доходы и расходы по месяцам

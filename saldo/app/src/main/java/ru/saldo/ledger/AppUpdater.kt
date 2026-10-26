@@ -39,7 +39,7 @@ class AppUpdater(private val context: Context) {
             val connection = open(BuildConfig.UPDATE_URL)
             try {
                 val code = connection.responseCode
-                if (code !in 200..299) error("код $code")
+                if (code !in 200..299) error("code $code")
                 val body = connection.inputStream.bufferedReader().use { it.readText() }
                 val release = json.decodeFromString<RemoteRelease>(body)
                 if (release.versionCode > BuildConfig.VERSION_CODE) {
@@ -52,7 +52,7 @@ class AppUpdater(private val context: Context) {
             }
         }.getOrElse {
             UpdateState.Failed(
-                "Сервер обновлений не ответил. Файл можно открыть в браузере.",
+                "The update server did not respond. Open the file in the browser.",
                 BuildConfig.APK_URL,
             )
         }
@@ -61,18 +61,18 @@ class AppUpdater(private val context: Context) {
     suspend fun download(release: RemoteRelease): File = withContext(Dispatchers.IO) {
         val target = File(context.cacheDir, "saldo-update.apk")
         val urls = listOf(release.apkUrl, cacheBust(release.apkUrl))
-        var last = "Не удалось скачать сборку"
+        var last = "Could not download the build"
         for (url in urls) {
             if (target.exists()) target.delete()
             val connection = open(url)
             try {
                 val code = connection.responseCode
                 if (code == HttpURLConnection.HTTP_NOT_MODIFIED) {
-                    last = "Сервер отдал пустой кэш вместо файла"
+                    last = "The server returned an empty cached response"
                     continue
                 }
                 if (code !in 200..299) {
-                    last = "Сервер ответил кодом $code"
+                    last = "The server responded with code $code"
                     continue
                 }
                 val expected = connection.contentLengthLong
@@ -84,7 +84,7 @@ class AppUpdater(private val context: Context) {
             } catch (error: IllegalStateException) {
                 last = error.message ?: last
             } catch (_: Exception) {
-                last = "Связь оборвалась во время загрузки"
+                last = "The connection dropped during download"
             } finally {
                 connection.disconnect()
             }
@@ -138,18 +138,18 @@ class AppUpdater(private val context: Context) {
     private fun validateApk(file: File, expected: Long) {
         if (expected > 0 && file.length() != expected) {
             file.delete()
-            throw IllegalStateException("Файл скачался не целиком")
+            throw IllegalStateException("The file did not download completely")
         }
         if (file.length() < 1_000_000L) {
             file.delete()
-            throw IllegalStateException("Скачанный файл слишком маленький")
+            throw IllegalStateException("The downloaded file is too small")
         }
         val magic = ByteArray(2)
         val read = file.inputStream().use { it.read(magic) }
         val zip = read == 2 && magic[0] == 0x50.toByte() && magic[1] == 0x4B.toByte()
         if (!zip) {
             file.delete()
-            throw IllegalStateException("Скачанный файл не является установщиком")
+            throw IllegalStateException("The downloaded file is not an installer")
         }
     }
 }

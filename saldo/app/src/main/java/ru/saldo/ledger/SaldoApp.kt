@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -45,16 +47,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -73,6 +72,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -83,15 +84,16 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 private enum class Tab(val label: String, val icon: ImageVector) {
-    Overview("Обзор", Icons.Outlined.AccountBalanceWallet),
-    Income("Доходы", Icons.Outlined.TrendingUp),
-    Expense("Расходы", Icons.Outlined.TrendingDown),
-    Analytics("Анализ", Icons.Outlined.PieChart),
-    Credit("Кредит", Icons.Outlined.Calculate),
+    Overview("Home", Icons.Outlined.AccountBalanceWallet),
+    Income("Income", Icons.Outlined.TrendingUp),
+    Expense("Expenses", Icons.Outlined.TrendingDown),
+    Analytics("Insights", Icons.Outlined.PieChart),
+    Credit("Credit", Icons.Outlined.Calculate),
 }
 
-private val ru = Locale("ru", "RU")
-private val dayFormat = DateTimeFormatter.ofPattern("d MMMM", ru)
+private val en = Locale.US
+private val dayFormat = DateTimeFormatter.ofPattern("d MMMM", en)
+private val screenPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 124.dp)
 
 @Composable
 fun SaldoApp(vm: LedgerViewModel = viewModel()) {
@@ -105,17 +107,16 @@ fun SaldoApp(vm: LedgerViewModel = viewModel()) {
 
     LaunchedEffect(Unit) { update = updater.check() }
 
+    val wallpaper = rememberLayerBackdrop()
+    val page = rememberLayerBackdrop()
+
     Box(Modifier.fillMaxSize()) {
-    AuroraBackground()
-    Scaffold(
-        containerColor = Color.Transparent,
-        bottomBar = {
-            GlassNav(
-                Tab.entries.map { Triple(it.label, it.icon, tab == it) },
-            ) { index -> tab = Tab.entries[index] }
-        },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        Box(Modifier.fillMaxSize().layerBackdrop(page)) {
+            Box(Modifier.fillMaxSize().layerBackdrop(wallpaper)) {
+                AuroraBackground()
+            }
+            CompositionLocalProvider(LocalBackdrop provides wallpaper) {
+                Box(Modifier.fillMaxSize().statusBarsPadding()) {
             when (tab) {
                 Tab.Overview -> OverviewScreen(
                     ledger = ledger,
@@ -131,7 +132,7 @@ fun SaldoApp(vm: LedgerViewModel = viewModel()) {
                                 onSuccess = { UpdateState.Ready(release, it) },
                                 onFailure = {
                                     UpdateState.Failed(
-                                        it.message ?: "Не удалось скачать сборку",
+                                        it.message ?: "Could not download the build",
                                         release.apkUrl,
                                     )
                                 },
@@ -148,8 +149,18 @@ fun SaldoApp(vm: LedgerViewModel = viewModel()) {
                 Tab.Analytics -> AnalyticsScreen(ledger)
                 Tab.Credit -> CreditScreen()
             }
+                }
+            }
         }
-    }
+        GlassNav(
+            tabs = Tab.entries.map { Triple(it.label, it.icon, tab == it) },
+            backdrop = page,
+            onSelect = { index -> tab = Tab.entries[index] },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
+        )
     }
 
     editor?.let { request ->
@@ -184,7 +195,7 @@ private fun OverviewScreen(
     val expense = monthItems.filter { it.type == TxType.EXPENSE }.sumOf { it.amountMinor }
     val balance = ledger.transactions.sumOf { if (it.type == TxType.INCOME) it.amountMinor else -it.amountMinor }
     LazyColumn(
-        contentPadding = PaddingValues(20.dp),
+        contentPadding = screenPadding,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { BrandLockup() }
@@ -192,12 +203,12 @@ private fun OverviewScreen(
         item { BalanceSlab(formatRub(balance), formatRub(income), formatRub(expense)) }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Последние", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, color = Ink)
-                TextButton(onClick = onAdd) { Text("Добавить", color = CopperDeep, fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
+                Text("Recent", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 26.sp, color = Ink)
+                TextButton(onClick = onAdd) { Text("Add", color = CopperDeep, fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
             }
         }
         if (ledger.transactions.isEmpty()) {
-            item { EmptyBlock("Пока пусто", "Запишите первый доход или расход. Цифры останутся только на этом телефоне.", onAdd) }
+            item { EmptyBlock("Nothing here yet", "Add the first income or expense. The numbers stay on this phone.", onAdd) }
         } else {
             items(ledger.transactions.take(12), key = { it.id }) { tx ->
                 TxRow(tx, onOpen)
@@ -205,7 +216,7 @@ private fun OverviewScreen(
         }
         item {
             Text(
-                "Версия ${BuildConfig.VERSION_NAME}. При запуске приложение само спрашивает сервер о новой сборке.",
+                "Version ${BuildConfig.VERSION_NAME}. On launch, the app asks the server for a newer build.",
                 color = Muted,
                 fontFamily = Manrope,
                 fontSize = 12.sp,
@@ -227,9 +238,9 @@ private fun OperationsScreen(
         it.type == type && YearMonth.from(LocalDate.ofEpochDay(it.epochDay)) == month
     }
     val total = items.sumOf { it.amountMinor }
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(contentPadding = screenPadding, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            ScreenTitle(if (type == TxType.INCOME) "Доходы" else "Расходы")
+            ScreenTitle(if (type == TxType.INCOME) "Income" else "Expenses")
             MonthSwitcher(month, { month = month.minusMonths(1) }, { if (month < YearMonth.now()) month = month.plusMonths(1) })
             Spacer(Modifier.height(8.dp))
             Text(formatRub(total), fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 36.sp, color = if (type == TxType.INCOME) Income else Expense)
@@ -238,10 +249,10 @@ private fun OperationsScreen(
                 onClick = onAdd,
                 shape = RoundedCornerShape(999.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Copper, contentColor = Color.White),
-            ) { Text(if (type == TxType.INCOME) "Новый доход" else "Новый расход", fontFamily = Manrope, fontWeight = FontWeight.Bold) }
+            ) { Text(if (type == TxType.INCOME) "New income" else "New expense", fontFamily = Manrope, fontWeight = FontWeight.Bold) }
         }
         if (items.isEmpty()) {
-            item { EmptyBlock("В этом месяце нет записей", "Смените месяц или добавьте операцию.", onAdd) }
+            item { EmptyBlock("No entries this month", "Change the month or add one.", onAdd) }
         } else {
             items(items, key = { it.id }) { TxRow(it, onOpen) }
         }
@@ -264,21 +275,21 @@ private fun AnalyticsScreen(ledger: Ledger) {
             it.type == TxType.EXPENSE && YearMonth.from(LocalDate.ofEpochDay(it.epochDay)) == ym
         }.sumOf { it.amountMinor } / 100.0
     }
-    val labels = months.map { it.month.getDisplayName(TextStyle.SHORT_STANDALONE, ru).replace(".", "") }
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    val labels = months.map { it.month.getDisplayName(TextStyle.SHORT, en).replace(".", "") }
+    LazyColumn(contentPadding = screenPadding, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            ScreenTitle("Анализ")
+            ScreenTitle("Insights")
             MonthSwitcher(month, { month = month.minusMonths(1) }, { if (month < YearMonth.now()) month = month.plusMonths(1) })
         }
         item {
             Column(Modifier.fillMaxWidth().glass(24.dp).padding(18.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Text("Доходы", color = Muted, fontFamily = Manrope, fontSize = 13.sp)
+                        Text("Income", color = Muted, fontFamily = Manrope, fontSize = 13.sp)
                         Text(formatRub(income), color = Income, fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 26.sp)
                     }
                     Column(Modifier.weight(1f)) {
-                        Text("Расходы", color = Muted, fontFamily = Manrope, fontSize = 13.sp)
+                        Text("Expenses", color = Muted, fontFamily = Manrope, fontSize = 13.sp)
                         Text(formatRub(expense), color = Expense, fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 26.sp)
                     }
                 }
@@ -287,10 +298,10 @@ private fun AnalyticsScreen(ledger: Ledger) {
         item {
             Column(Modifier.fillMaxWidth().glass(24.dp)) {
                 Column(Modifier.padding(18.dp)) {
-                    Text("Куда ушли деньги", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Text("Where the money went", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
                     if (slices.isEmpty()) {
-                        Text("За этот месяц расходов нет.", color = Muted, fontFamily = Manrope)
+                        Text("No expenses this month.", color = Muted, fontFamily = Manrope)
                     } else {
                         ExpenseDonut(
                             values = slices.map { it.second.toFloat() },
@@ -306,10 +317,10 @@ private fun AnalyticsScreen(ledger: Ledger) {
         item {
             Column(Modifier.fillMaxWidth().glass(24.dp)) {
                 Column(Modifier.padding(18.dp)) {
-                    Text("Расходы за полгода", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Text("Expenses, last six months", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
                     if (columnValues.all { it == 0.0 }) {
-                        Text("Недостаточно данных для графика.", color = Muted, fontFamily = Manrope)
+                        Text("Not enough data for a chart.", color = Muted, fontFamily = Manrope)
                     } else {
                         MonthColumns(columnValues, labels)
                     }
@@ -329,16 +340,16 @@ private fun CreditScreen() {
     val annual = rate.replace(',', '.').toDoubleOrNull()
     val quote = if (principal != null && term != null && annual != null) CreditMath.quote(principal, annual, term) else null
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(screenPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ScreenTitle("Кредитный калькулятор")
-        Text("Аннуитет: одинаковый платёж каждый месяц. Это расчёт, не заявка и не витрина займов.", color = Muted, fontFamily = Manrope, fontSize = 14.sp)
-        NumberField("Сумма, ₽", amount) { amount = it }
-        NumberField("Срок, месяцев", months) { months = it.filter { ch -> ch.isDigit() }.take(3) }
-        NumberField("Ставка, % годовых", rate) { rate = it }
+        ScreenTitle("Credit calculator")
+        Text("Annuity: the same payment every month. This is a calculation, not an application.", color = Muted, fontFamily = Manrope, fontSize = 14.sp)
+        NumberField("Amount, ₽", amount) { amount = it }
+        NumberField("Term, months", months) { months = it.filter { ch -> ch.isDigit() }.take(3) }
+        NumberField("Rate, % per year", rate) { rate = it }
         if (quote == null) {
-            Text("Укажите сумму больше нуля, срок от 1 до 360 месяцев и ставку от 0.", color = Expense, fontFamily = Manrope)
+            Text("Enter an amount above zero, a term from 1 to 360 months, and a rate from 0.", color = Expense, fontFamily = Manrope)
         } else {
             Box(
                 Modifier
@@ -348,23 +359,23 @@ private fun CreditScreen() {
                     .background(Brush.linearGradient(listOf(Color(0xFF6A45FF), Color(0xFF5C34FF), Color(0xFF3F22D2)))),
             ) {
                 Column(Modifier.padding(22.dp)) {
-                    Text("ПЛАТЁЖ В МЕСЯЦ", color = Color.White.copy(alpha = 0.78f), fontFamily = Manrope, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, fontSize = 12.sp)
+                    Text("MONTHLY PAYMENT", color = Color.White.copy(alpha = 0.78f), fontFamily = Manrope, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, fontSize = 12.sp)
                     Text(money(quote.payment), color = Color.White, fontFamily = Fraunces, fontWeight = FontWeight.ExtraBold, fontSize = 40.sp)
                     Spacer(Modifier.height(12.dp))
-                    Text("Всего к возврату  ${money(quote.total)}", color = Color.White.copy(alpha = 0.86f), fontFamily = Manrope)
-                    Text("Переплата  ${money(quote.overpayment)}", color = Color.White.copy(alpha = 0.86f), fontFamily = Manrope)
+                    Text("Total to repay  ${money(quote.total)}", color = Color.White.copy(alpha = 0.86f), fontFamily = Manrope)
+                    Text("Interest  ${money(quote.overpayment)}", color = Color.White.copy(alpha = 0.86f), fontFamily = Manrope)
                 }
             }
-            Text("График, первые ${quote.rows.size} мес.", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 22.sp)
+            Text("Schedule, first ${quote.rows.size} months", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 22.sp)
             quote.rows.forEach { row ->
                 Row(
-                    Modifier.fillMaxWidth().glass(16.dp).padding(horizontal = 14.dp, vertical = 12.dp),
+                    Modifier.fillMaxWidth().glass(16.dp, lens = false).padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text("${row.month}", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, modifier = Modifier.width(36.dp))
                     Column(Modifier.weight(1f)) {
                         Text(money(row.payment), fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
-                        Text("проценты ${money(row.interest)} · тело ${money(row.principalPart)}", color = Muted, fontFamily = Manrope, fontSize = 12.sp)
+                        Text("interest ${money(row.interest)} · principal ${money(row.principalPart)}", color = Muted, fontFamily = Manrope, fontSize = 12.sp)
                     }
                     Text(money(row.balance), color = Muted, fontFamily = Manrope, fontSize = 12.sp)
                 }
@@ -395,13 +406,13 @@ private fun TransactionSheet(
             Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(if (existing == null) "Новая операция" else "Операция", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 28.sp)
+            Text(if (existing == null) "New entry" else "Entry", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 28.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TypeChip("Доход", type == TxType.INCOME) {
+                TypeChip("Income", type == TxType.INCOME) {
                     type = TxType.INCOME
                     if (category.type != TxType.INCOME) category = Category.SALARY
                 }
-                TypeChip("Расход", type == TxType.EXPENSE) {
+                TypeChip("Expense", type == TxType.EXPENSE) {
                     type = TxType.EXPENSE
                     if (category.type != TxType.EXPENSE) category = Category.GROCERIES
                 }
@@ -410,13 +421,13 @@ private fun TransactionSheet(
                 value = amount,
                 onValueChange = { amount = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Сумма") },
+                label = { Text("Amount") },
                 suffix = { Text("₽") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Fraunces, fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
             )
-            Text("Категория", color = Muted, fontFamily = Manrope, fontSize = 13.sp)
+            Text("Category", color = Muted, fontFamily = Manrope, fontSize = 13.sp)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 categoriesFor(type).forEach { item ->
                     val selected = item == category
@@ -441,7 +452,7 @@ private fun TransactionSheet(
                 modifier = Modifier.fillMaxWidth().clickable { pickDate = true },
             ) {
                 Column(Modifier.padding(14.dp)) {
-                    Text("Дата", color = Muted, fontFamily = Manrope, fontSize = 12.sp)
+                    Text("Date", color = Muted, fontFamily = Manrope, fontSize = 12.sp)
                     Text(day.format(dayFormat), fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 }
             }
@@ -449,7 +460,7 @@ private fun TransactionSheet(
                 value = note,
                 onValueChange = { note = it.take(80) },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Заметка") },
+                label = { Text("Note") },
                 singleLine = true,
             )
             Button(
@@ -471,12 +482,12 @@ private fun TransactionSheet(
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(999.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Copper, contentColor = Cream),
-            ) { Text("Сохранить", fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
+            ) { Text("Save", fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
             if (existing != null) {
                 TextButton(onClick = { onDelete(existing.id) }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.Delete, contentDescription = null, tint = Expense)
                     Spacer(Modifier.width(6.dp))
-                    Text("Удалить", color = Expense, fontFamily = Manrope)
+                    Text("Delete", color = Expense, fontFamily = Manrope)
                 }
             }
         }
@@ -491,27 +502,10 @@ private fun TransactionSheet(
                         day = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
                     }
                     pickDate = false
-                }) { Text("Готово") }
+                }) { Text("Done") }
             },
-            dismissButton = { TextButton(onClick = { pickDate = false }) { Text("Отмена") } },
+            dismissButton = { TextButton(onClick = { pickDate = false }) { Text("Cancel") } },
         ) { DatePicker(state = state) }
-    }
-}
-
-@Composable
-private fun Wordmark() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(CopperDeep),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("С", color = Cream, fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-        }
-        Spacer(Modifier.width(10.dp))
-        Column {
-            Text("Сальдо", fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, color = Ink)
-            Text("деньги на этом телефоне", fontFamily = Manrope, fontSize = 12.sp, color = Muted)
-        }
     }
 }
 
@@ -521,21 +515,11 @@ private fun ScreenTitle(text: String) {
 }
 
 @Composable
-private fun MiniStat(label: String, value: String, color: Color, modifier: Modifier) {
-    Surface(modifier, shape = RoundedCornerShape(16.dp), color = Color(0xFF342920)) {
-        Column(Modifier.padding(12.dp)) {
-            Text(label, color = Color(0xFFB7A89A), fontFamily = Manrope, fontSize = 12.sp)
-            Text(value, color = color, fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-        }
-    }
-}
-
-@Composable
 private fun TxRow(tx: Tx, onOpen: (Tx) -> Unit) {
     val category = categoryOf(tx.category)
     val positive = tx.type == TxType.INCOME
     Row(
-        Modifier.fillMaxWidth().glass(18.dp).clickable { onOpen(tx) }.padding(14.dp),
+        Modifier.fillMaxWidth().glass(18.dp, lens = false).clickable { onOpen(tx) }.padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
             Box(Modifier.size(10.dp).clip(CircleShape).background(Color(category.color)))
@@ -579,15 +563,15 @@ private fun ShareRow(category: Category, amount: Long, total: Long) {
 @Composable
 private fun MonthSwitcher(month: YearMonth, onPrev: () -> Unit, onNext: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onPrev) { Icon(Icons.Outlined.ChevronLeft, contentDescription = "Предыдущий месяц") }
+        IconButton(onClick = onPrev) { Icon(Icons.Outlined.ChevronLeft, contentDescription = "Previous month") }
         Text(
-            month.month.getDisplayName(TextStyle.FULL_STANDALONE, ru).replaceFirstChar { it.titlecase(ru) } + " " + month.year,
+            month.month.getDisplayName(TextStyle.FULL, en) + " " + month.year,
             fontFamily = Manrope,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
         IconButton(onClick = onNext, enabled = month < YearMonth.now()) {
-            Icon(Icons.Outlined.ChevronRight, contentDescription = "Следующий месяц")
+            Icon(Icons.Outlined.ChevronRight, contentDescription = "Next month")
         }
     }
 }
@@ -599,7 +583,7 @@ private fun EmptyBlock(title: String, body: String, onAdd: () -> Unit) {
             Spacer(Modifier.height(6.dp))
             Text(body, color = Muted, fontFamily = Manrope)
             Spacer(Modifier.height(12.dp))
-            TextButton(onClick = onAdd) { Text("Добавить запись", color = CopperDeep, fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
+            TextButton(onClick = onAdd) { Text("Add entry", color = CopperDeep, fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
     }
 }
 
@@ -611,13 +595,13 @@ private fun UpdateBanner(
     onOpenLink: (String) -> Unit,
 ) {
     when (state) {
-        is UpdateState.Available -> Banner("Доступна версия ${state.release.versionName}", state.release.notes.ifBlank { "Нажмите, чтобы скачать и установить." }, "Обновить", onUpdate)
-        is UpdateState.Downloading -> Banner("Скачиваем ${state.release.versionName}", "Загрузка идёт напрямую, без старого кэша.", null, {})
-        is UpdateState.Ready -> Banner("Сборка скачана", "Подтвердите установку. Если окно не открылось, нажмите ещё раз.", "Установить", { onInstall(state.file) })
+        is UpdateState.Available -> Banner("Version ${state.release.versionName} is ready", state.release.notes.ifBlank { "Tap to download and install." }, "Update", onUpdate)
+        is UpdateState.Downloading -> Banner("Downloading ${state.release.versionName}", "The file is coming straight from the server.", null, {})
+        is UpdateState.Ready -> Banner("Build downloaded", "Confirm the Android install. If the prompt did not open, tap again.", "Install", { onInstall(state.file) })
         is UpdateState.Failed -> Banner(
-            "Обновление",
+            "Update",
             state.message,
-            if (state.apkUrl != null) "Скачать в браузере" else null,
+            if (state.apkUrl != null) "Open in browser" else null,
             { state.apkUrl?.let(onOpenLink) },
         )
         else -> Unit

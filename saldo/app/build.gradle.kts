@@ -12,10 +12,10 @@ android {
         applicationId = "ru.saldo.ledger"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "1.3.0"
         buildConfigField("String", "UPDATE_URL", "\"https://dash.ref2b.com/saldo/version.json\"")
-        buildConfigField("String", "APK_URL", "\"https://dash.ref2b.com/saldo/saldo-4.apk\"")
+        buildConfigField("String", "APK_URL", "\"https://dash.ref2b.com/saldo/saldo-5.apk\"")
     }
 
     buildFeatures {
@@ -65,6 +65,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.patrykandpatrick.vico:compose-m3:3.3.1")
+    implementation("io.github.kyant0:backdrop:2.0.1")
 
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")

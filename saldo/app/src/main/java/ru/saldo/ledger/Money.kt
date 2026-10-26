@@ -19,8 +19,8 @@ fun formatRub(minor: Long, withSign: Boolean = false): String {
     val absolute = abs(minor)
     val rubles = absolute / 100
     val kopecks = (absolute % 100).toInt()
-    val grouped = String.format(Locale("ru", "RU"), "%,d", rubles).replace('\u00A0', ' ')
-    val body = if (kopecks == 0) "$grouped ₽" else "$grouped,%02d ₽".format(kopecks)
+    val grouped = String.format(Locale.US, "%,d", rubles)
+    val body = if (kopecks == 0) "$grouped ₽" else String.format(Locale.US, "%s.%02d ₽", grouped, kopecks)
     return when {
         negative -> "−$body"
         withSign && minor > 0 -> "+$body"

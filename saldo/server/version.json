@@ -1,6 +1,6 @@
 {
-  "versionCode": 4,
-  "versionName": "1.2.0",
-  "apkUrl": "https://dash.ref2b.com/saldo/saldo-4.apk",
-  "notes": "Загрузка обновления больше не обрывается на кэше. Если кнопка ошибётся, откройте файл в браузере."
+  "versionCode": 5,
+  "versionName": "1.3.0",
+  "apkUrl": "https://dash.ref2b.com/saldo/saldo-5.apk",
+  "notes": "English interface, Apple liquid glass, and the Android navigation bar stays hidden until you swipe up."
 }
