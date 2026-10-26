@@ -136,13 +136,15 @@ fun SaldoApp(vm: LedgerViewModel = viewModel()) {
                     .statusBarsPadding()
                     .clipToBounds(),
             ) {
-                Box(
+                Column(
                     Modifier
                         .align(Alignment.TopCenter)
                         .widthIn(max = 680.dp)
                         .fillMaxWidth()
                         .fillMaxHeight(),
                 ) {
+                    BrandLockup(Modifier.padding(start = 20.dp, top = 6.dp, end = 20.dp, bottom = 2.dp))
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (tab) {
                         Tab.Overview -> OverviewScreen(
                             ledger = ledger,
@@ -177,6 +179,7 @@ fun SaldoApp(vm: LedgerViewModel = viewModel()) {
                         Tab.Expense -> OperationsScreen(TxType.EXPENSE, ledger, { editor = EditorRequest(TxType.EXPENSE) }) { editor = EditorRequest(it.type, it) }
                         Tab.Analytics -> AnalyticsScreen(ledger)
                         Tab.Credit -> CreditScreen()
+                    }
                     }
                 }
             }
@@ -219,7 +222,6 @@ private fun OverviewScreen(
     val balance = ledger.transactions.sumOf { if (it.type == TxType.INCOME) it.amountMinor else -it.amountMinor }
     val recent = ledger.transactions.take(8)
     LazyColumn(contentPadding = screenPadding, verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        item { Wordmark() }
         if (update is UpdateState.Available || update is UpdateState.Downloading || update is UpdateState.Ready || update is UpdateState.Failed) {
             item { UpdateBanner(update, onUpdate, onInstall, onOpenLink) }
         }

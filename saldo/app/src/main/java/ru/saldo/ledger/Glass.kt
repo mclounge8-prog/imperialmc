@@ -1,5 +1,6 @@
 package ru.saldo.ledger
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -61,15 +63,33 @@ fun AppCanvas(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun Wordmark() {
-    Text(
-        "FIN SOLUTION",
-        color = Brand,
-        fontFamily = Jakarta,
-        fontWeight = FontWeight.Bold,
-        fontSize = 12.sp,
-        letterSpacing = 2.4.sp,
-    )
+fun BrandLockup(modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Image(
+            painterResource(R.drawable.ic_logo),
+            contentDescription = "FinSolution",
+            modifier = Modifier.size(46.dp),
+        )
+        Spacer(Modifier.size(12.dp))
+        Column {
+            Text(
+                "Finance",
+                color = Ink,
+                fontFamily = Jakarta,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 18.sp,
+                letterSpacing = (-0.4).sp,
+            )
+            Text(
+                "Solutions",
+                color = Brand,
+                fontFamily = Jakarta,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                letterSpacing = 0.2.sp,
+            )
+        }
+    }
 }
 
 @Composable

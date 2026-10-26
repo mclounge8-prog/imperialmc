@@ -7,7 +7,11 @@
   <style>
     body { margin: 0; background: #F5F4F8; color: #17161C; font-family: "Segoe UI", sans-serif; }
     main { max-width: 520px; margin: 0 auto; padding: 64px 22px; }
-    .mark { width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(145deg, #9A7BFF, #5C34FF 55%, #3D1FD4); }
+    .mark { position: relative; width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(145deg, #9A7BFF, #5C34FF 55%, #3D1FD4); }
+    .mark i { position: absolute; left: 11px; width: 30px; height: 10px; border-radius: 999px; }
+    .mark i:nth-child(1) { top: 28px; background: #B7A6FF; }
+    .mark i:nth-child(2) { top: 21px; background: #E4DBFF; }
+    .mark i:nth-child(3) { top: 14px; background: #fff; }
     h1 { font-weight: 750; letter-spacing: -0.04em; font-size: 42px; margin: 18px 0 8px; }
     p { line-height: 1.5; color: #8B8794; }
     a.button { display: inline-block; margin-top: 18px; background: #5C34FF; color: #ffffff; text-decoration: none; padding: 14px 24px; border-radius: 999px; font-weight: 700; }
@@ -16,10 +20,10 @@
 </head>
 <body>
   <main>
-    <div class="mark"></div>
+    <div class="mark"><i></i><i></i><i></i></div>
     <h1>FinSolution</h1>
-    <p>Income, expenses, balance, insights, and a credit calculator. Version 2.2.0.</p>
-    <a class="button" href="saldo-9.apk">Download APK</a>
+    <p>Income, expenses, balance, insights, and a credit calculator. Version 2.2.1.</p>
+    <a class="button" href="saldo-10.apk">Download APK</a>
     <small>Android 8 and newer. If the app is already installed, open it and the update is offered on launch.</small>
   </main>
 </body>
