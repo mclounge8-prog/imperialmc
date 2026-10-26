@@ -16,22 +16,32 @@ export function useCurrentShift() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!session || !venue) return;
-    setLoading(true);
-    setError(null);
+    const silent = Boolean(opts?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const data = await fetchCurrentShift(venue.id, session.token);
       setShift(data);
+      if (silent) setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось загрузить данные смены');
+      if (!silent) {
+        setError(e instanceof Error ? e.message : 'Не удалось загрузить данные смены');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [session, venue]);
 
   useEffect(() => {
     load();
+    const timer = setInterval(() => {
+      load({ silent: true });
+    }, 10000);
+    return () => clearInterval(timer);
   }, [load]);
 
   return { session, venue, shift, setShift, loading, error, reload: load };

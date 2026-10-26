@@ -7,6 +7,8 @@ import { ICON_BUTTON_SIZE } from '../theme/sizes';
 import { useSession } from '../context/SessionContext';
 import { useDevice } from '../context/DeviceContext';
 import { useFiscalAlerts } from '../context/FiscalAlertsContext';
+import { useDrawerCash } from '../hooks/useDrawerCash';
+import { formatDrawerMoney } from '../utils/drawerCash';
 import type { RootStackParamList } from '../../App';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -21,6 +23,7 @@ export default function TerminalHeaderRight() {
   const venue = status?.venue ?? null;
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute();
+  const drawerCash = useDrawerCash();
 
   if (!session) return null;
 
@@ -62,6 +65,21 @@ export default function TerminalHeaderRight() {
 
   return (
     <View style={styles.container}>
+      {drawerCash ? (
+        <Pressable
+          style={styles.cashChip}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => navigation.navigate('Cash')}
+        >
+          <Text style={styles.cashLine} numberOfLines={1}>
+            Сейчас {formatDrawerMoney(drawerCash.expectedCash)}
+          </Text>
+          <Text style={styles.cashLineMuted} numberOfLines={1}>
+            Открытие {formatDrawerMoney(drawerCash.openingCash)}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {!onStatusScreen ? (
         <Pressable
           style={[styles.statusChip, serverOk ? styles.chipOk : styles.chipError]}
@@ -146,7 +164,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginRight: 8,
-    maxWidth: 720,
+    maxWidth: 920,
+  },
+  cashChip: {
+    borderWidth: 1,
+    borderColor: colors.accent2,
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    minHeight: ICON_BUTTON_SIZE,
+    justifyContent: 'center',
+    maxWidth: 176,
+  },
+  cashLine: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cashLineMuted: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
   },
   statusChip: {
     maxWidth: 150,
