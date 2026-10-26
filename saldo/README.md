@@ -11,6 +11,8 @@ Phone ledger with no login and no storefront. The interface is English. Cards an
 
 Install: https://dash.ref2b.com/saldo/
 
+The APK response must keep an ETag, `Accept-Ranges`, and `Cache-Control: public`. `no-store` and `Pragma: no-cache` make Android Chrome and the in-app downloader abort a file that nginx has already finished sending. `version.json` stays uncached. A dropped download is continued with a `Range` request.
+
 The release is signed with the key in `keystore/`, which is not committed. A copy of the key lives on the server in `/root/saldo-signing/`. A new build must use the same key, or Android will refuse to install it over the previous one.
 
 The typeface is Plus Jakarta Sans, OFL.
