@@ -6,6 +6,9 @@ import {
   FISCAL_SEND_CLOSING,
   FISCAL_SEND_NO_SHIFT,
   isPureCashSale,
+  fiscalShiftIsOpen,
+  shouldEnqueueFiscalClose,
+  shouldEnqueueFiscalOpen,
   shouldHoldCashReceipt,
   unsentCashNote,
   zButtonDecision,
@@ -73,11 +76,23 @@ test('a held receipt can be sent only into a fiscal shift that is still open', (
   );
 });
 
-test('unsent cash is named separately and does not replace the cash total', () => {
+test('unsent cash is named separately and a skipped Z is said outright', () => {
   assert.equal(unsentCashNote(0, 0), null);
   const note = unsentCashNote(2, 1500);
   assert.match(note, /1500\.00/);
   assert.match(note, /уже учтена/);
+  const skipped = unsentCashNote(0, 0, { zSkipped: true });
+  assert.match(skipped, /не отправлялся/);
+  assert.equal(shouldEnqueueFiscalClose(false), true);
+  assert.equal(shouldEnqueueFiscalClose(true), false);
+  assert.equal(fiscalShiftIsOpen([{ id: 1, status: 'done' }], []), true);
+  assert.equal(
+    fiscalShiftIsOpen([{ id: 1, status: 'done' }], [{ id: 2, status: 'done' }]),
+    false
+  );
+  assert.equal(shouldEnqueueFiscalOpen({ holdCash: false, fiscalShiftOpen: true }), true);
+  assert.equal(shouldEnqueueFiscalOpen({ holdCash: true, fiscalShiftOpen: true }), false);
+  assert.equal(shouldEnqueueFiscalOpen({ holdCash: true, fiscalShiftOpen: false }), true);
 });
 
 test('the backoffice Z button does not fire while the shift is open or the next fiscal shift is already open', () => {

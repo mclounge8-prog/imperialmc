@@ -3,6 +3,12 @@ import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { enqueueCashFiscalJob, enqueueShiftFiscalJob } from '../services/fiscalQueue.js';
 import {
+  fiscalShiftIsOpen,
+  loadFiscalShiftJobs,
+  shouldEnqueueFiscalClose,
+  shouldEnqueueFiscalOpen,
+} from '../services/cashFiscalHold.js';
+import {
   buildCashMovementMessage,
   buildShiftCloseMessage,
   buildShiftOpenMessage,
@@ -207,22 +213,36 @@ apiShifts.post('/open', async (c) => {
     );
     const shift = rows[0];
 
-    await enqueueShiftFiscalJob(client, {
-      venueId,
-      shiftId: shift.id,
-      type: 'open_shift',
-      operatorName: staff.name,
+    const { rows: holdRows } = await client.query(
+      `SELECT COALESCE(hold_cash_receipts, false) AS hold
+       FROM venue_atol_settings WHERE venue_id = $1`,
+      [venueId]
+    );
+    const holdCash = !!holdRows[0]?.hold;
+    const shiftJobs = await loadFiscalShiftJobs(client, venueId);
+    const enqueueFiscalOpen = shouldEnqueueFiscalOpen({
+      holdCash,
+      fiscalShiftOpen: fiscalShiftIsOpen(shiftJobs.opens, shiftJobs.closes),
     });
 
-    // Остаток на открытии = внесение в денежный ящик ККТ (учётный чек cashIn).
-    if (openingCash > 0) {
-      await enqueueCashFiscalJob(client, {
+    if (enqueueFiscalOpen) {
+      await enqueueShiftFiscalJob(client, {
         venueId,
         shiftId: shift.id,
-        type: 'cash_in',
-        amount: openingCash,
+        type: 'open_shift',
         operatorName: staff.name,
       });
+
+      // Остаток на открытии = внесение в денежный ящик ККТ (учётный чек cashIn).
+      if (openingCash > 0) {
+        await enqueueCashFiscalJob(client, {
+          venueId,
+          shiftId: shift.id,
+          type: 'cash_in',
+          amount: openingCash,
+          operatorName: staff.name,
+        });
+      }
     }
 
     await client.query('COMMIT');
@@ -349,12 +369,20 @@ apiShifts.post('/close', async (c) => {
       ]
     );
 
-    await enqueueShiftFiscalJob(client, {
-      venueId,
-      shiftId: shift.id,
-      type: 'close_shift',
-      operatorName: staff.name,
-    });
+    const { rows: holdRows } = await client.query(
+      `SELECT COALESCE(hold_cash_receipts, false) AS hold
+       FROM venue_atol_settings WHERE venue_id = $1`,
+      [venueId]
+    );
+    const skipFiscalZ = !shouldEnqueueFiscalClose(!!holdRows[0]?.hold);
+    if (!skipFiscalZ) {
+      await enqueueShiftFiscalJob(client, {
+        venueId,
+        shiftId: shift.id,
+        type: 'close_shift',
+        operatorName: staff.name,
+      });
+    }
     const { rows: heldRows } = await client.query(
       `SELECT COUNT(*)::int AS count, COALESCE(SUM(total), 0) AS total
        FROM receipts
@@ -400,6 +428,7 @@ apiShifts.post('/close', async (c) => {
           cashier: staff.name,
           heldCashCount,
           heldCashTotal,
+          zSkipped: skipFiscalZ,
         }),
         { venueId }
       );

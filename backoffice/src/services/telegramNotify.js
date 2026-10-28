@@ -462,8 +462,9 @@ export function buildShiftCloseMessage({
   expectedCash,
   heldCashCount = 0,
   heldCashTotal = 0,
+  zSkipped = false,
 }) {
-  const unsentNote = unsentCashNote(heldCashCount, heldCashTotal);
+  const unsentNote = unsentCashNote(heldCashCount, heldCashTotal, { zSkipped });
   return [
     header('🔴 Закрытие смены', venueName, when),
     '',

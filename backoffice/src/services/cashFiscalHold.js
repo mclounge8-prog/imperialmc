@@ -22,11 +22,40 @@ export const FISCAL_SEND_CLOSING =
 export const FISCAL_SEND_NO_SHIFT =
   'Фискальная смена на кассе не открыта. Чек можно отправить, когда планшет откроет смену на кассе. В уже закрытый Z он не попадает.';
 
-export function unsentCashNote(count, total) {
+export function unsentCashNote(count, total, { zSkipped = false } = {}) {
   const n = Number(count) || 0;
-  if (n <= 0) return null;
-  const money = (Number(total) || 0).toFixed(2);
-  return `Из них не отправлено в АТОЛ: ${n} на ${money} ₽. В строке «Наличные оплаты» эта сумма уже учтена. Z печатается как обычно, эти чеки в него не входят.`;
+  const parts = [];
+  if (n > 0) {
+    const money = (Number(total) || 0).toFixed(2);
+    parts.push(
+      `Из них не отправлено в АТОЛ: ${n} на ${money} ₽. В строке «Наличные оплаты» эта сумма уже учтена.`
+    );
+  }
+  if (zSkipped) {
+    parts.push('Z на кассу не отправлялся. Смена в программе закрыта, Z печатается кнопкой в бэкофисе.');
+  }
+  return parts.length ? parts.join(' ') : null;
+}
+
+/** Пока ручная отправка включена, закрытие смены в программе не ставит Z в очередь кассы. */
+export function shouldEnqueueFiscalClose(holdCash) {
+  return !holdCash;
+}
+
+/** Фискальная смена ещё открыта: был успешный open_shift и после него Z не напечатан и не в очереди. */
+export function fiscalShiftIsOpen(opens, closes) {
+  const lastOpen = [...(opens || [])]
+    .filter((job) => job.status === 'done')
+    .sort((a, b) => b.id - a.id)[0];
+  if (!lastOpen) return false;
+  const later = (closes || []).filter((job) => job.id > lastOpen.id);
+  return !later.some((job) => job.status === 'done' || job.status === 'pending' || job.status === 'in_progress');
+}
+
+/** Не открывать вторую фискальную смену, если предыдущий Z ещё не отправлен. */
+export function shouldEnqueueFiscalOpen({ holdCash, fiscalShiftOpen }) {
+  if (holdCash && fiscalShiftOpen) return false;
+  return true;
 }
 
 /** Кнопка Z в бэкофисе не подменяет закрытие смены персоналом и не принимает суммы. */
@@ -34,7 +63,7 @@ export function zButtonDecision({ shiftStatus, closeStatus, newerOpenDone }) {
   if (shiftStatus !== 'closed') {
     return {
       ok: false,
-      error: 'Смена в программе ещё открыта. Её закрывают на планшете, Z уходит вместе с закрытием.',
+      error: 'Смена в программе ещё открыта. Её закрывают на планшете. Z отсюда уходит только после закрытия.',
     };
   }
   if (newerOpenDone) {
