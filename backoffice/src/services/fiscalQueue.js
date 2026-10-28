@@ -4,7 +4,7 @@
 // (fiscal_jobs), а выполняет их сам terminal-app.
 import { pool } from '../db.js';
 import { formatVenueDateTime } from '../utils/timezone.js';
-import { shouldHoldCashReceipt } from './cashFiscalHold.js';
+import { queueProgressiveCash, shouldHoldCashReceipt } from './cashFiscalHold.js';
 
 export async function fetchAtolSettings(venueId) {
   const { rows } = await pool.query('SELECT * FROM venue_atol_settings WHERE venue_id = $1', [
@@ -309,6 +309,7 @@ export async function enqueueReceiptFiscalJob(
     Array.isArray(payments) && payments.length > 0 && payments.every((p) => p.method === 'qr');
   if (onlyQr) {
     await client.query('UPDATE receipts SET fiscal_status = NULL WHERE id = $1', [receiptId]);
+    await queueProgressiveCash(client, receiptId);
     return;
   }
   const flags = await fetchAtolFlags(client, venueId);
@@ -322,6 +323,7 @@ export async function enqueueReceiptFiscalJob(
        WHERE id = $1`,
       [receiptId, JSON.stringify(payload)]
     );
+    await queueProgressiveCash(client, receiptId);
     return;
   }
   await client.query(
@@ -329,6 +331,7 @@ export async function enqueueReceiptFiscalJob(
     [venueId, receiptId, JSON.stringify(payload)]
   );
   await client.query("UPDATE receipts SET fiscal_status = 'pending' WHERE id = $1", [receiptId]);
+  await queueProgressiveCash(client, receiptId);
 }
 
 /** Фискальный чек возврата (sellReturn) — нал и безнал по исходным оплатам. */

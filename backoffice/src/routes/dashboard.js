@@ -46,7 +46,8 @@ export async function renderFragmentHtml(key, c) {
               COALESCE(v.kiosk_enabled, false) AS kiosk_enabled,
               COALESCE(v.kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
               v.kiosk_qr_image_url,
-              COALESCE(a.hold_cash_receipts, false) AS hold_cash_receipts
+              COALESCE(a.hold_cash_receipts, false) AS hold_cash_receipts,
+              COALESCE(a.cash_auto_quota, 1) AS cash_auto_quota
        FROM venues v
        LEFT JOIN venue_atol_settings a ON a.venue_id = v.id
        ORDER BY v.name`

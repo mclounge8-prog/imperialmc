@@ -106,12 +106,14 @@ test('unsent cash is marked, and the Z goes out on every close', () => {
 
 test('auto cash quota sends the smallest held receipts and only after 10 checks and 3 cash ones', () => {
   assert.equal(autoCashSendQuota({ totalReceipts: 9, cashReceipts: 5 }), 0);
-  assert.equal(autoCashSendQuota({ totalReceipts: 80, cashReceipts: 2 }), 0);
+  assert.equal(autoCashSendQuota({ totalReceipts: 60, cashReceipts: 2 }), 0);
   assert.equal(autoCashSendQuota({ totalReceipts: 10, cashReceipts: 3 }), 1);
-  assert.equal(autoCashSendQuota({ totalReceipts: 39, cashReceipts: 10 }), 1);
-  assert.equal(autoCashSendQuota({ totalReceipts: 80, cashReceipts: 10 }), 2);
-  assert.equal(autoCashSendQuota({ totalReceipts: 120, cashReceipts: 10 }), 3);
-  assert.equal(autoCashSendQuota({ totalReceipts: 80, cashReceipts: 1 }), 0);
+  assert.equal(autoCashSendQuota({ totalReceipts: 29, cashReceipts: 8 }), 1);
+  assert.equal(autoCashSendQuota({ totalReceipts: 30, cashReceipts: 7 }), 2);
+  assert.equal(autoCashSendQuota({ totalReceipts: 60, cashReceipts: 8 }), 3);
+  assert.equal(autoCashSendQuota({ totalReceipts: 100, cashReceipts: 20 }), 5);
+  assert.equal(autoCashSendQuota({ totalReceipts: 100, cashReceipts: 20, maxQuota: 3 }), 3);
+  assert.equal(autoCashSendQuota({ totalReceipts: 60, cashReceipts: 8, maxQuota: 0 }), 0);
 
   const receipts = [
     { id: 5, total: 500, fiscalStatus: 'held' },

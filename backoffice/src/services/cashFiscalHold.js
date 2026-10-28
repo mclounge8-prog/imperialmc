@@ -1,8 +1,9 @@
 // Ручная отправка части наличных чеков в АТОЛ.
 // Весь режим включается только галочкой venue_atol_settings.hold_cash_receipts.
 // Пока она снята, чеки и Z уходят как раньше.
-// При включённой ручке в Z сами попадают только мелкие наличные чеки по квоте.
-// Остальные помечаются и отправляются кнопкой в любую следующую открытую фискальную смену.
+// При включённой ручке мелкие наличные чеки уходят в кассу по ходу смены, не при закрытии.
+// Сколько их можно отправить за смену, задаёт квота точки. Остальные помечаются
+// и отправляются кнопкой в любую следующую открытую фискальную смену.
 // Z при закрытии смены уходит всегда. В уже напечатанный Z чек добавить нельзя.
 
 export async function ensureAtolCashHoldSchema() {
@@ -10,6 +11,10 @@ export async function ensureAtolCashHoldSchema() {
   await pool.query(
     `ALTER TABLE venue_atol_settings
      ADD COLUMN IF NOT EXISTS hold_cash_receipts BOOLEAN NOT NULL DEFAULT false`
+  );
+  await pool.query(
+    `ALTER TABLE venue_atol_settings
+     ADD COLUMN IF NOT EXISTS cash_auto_quota INTEGER NOT NULL DEFAULT 1`
   );
   await pool.query(`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS fiscal_hold_payload JSONB`);
   await pool.query(`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS fiscal_reconcile JSONB`);
@@ -39,17 +44,28 @@ export function ofdSplitNote({ cashCount, sentCount, unsentCount, unsentTotal })
   return `Наличных чеков: ${Number(cashCount) || 0}. В ОФД: ${Number(sentCount) || 0}. Не в ОФД: ${unsent} на ${money} ₽. В «Наличные оплаты» входят все. В Z только отправленные.`;
 }
 
+/** Квота точки: 0–30 самых мелких наличных за смену. Пустое значение не сохраняем. */
+export function clampCashAutoQuota(value) {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n)) return null;
+  return Math.min(30, Math.max(0, n));
+}
+
 /**
- * Квота автоотправки наличных.
- * Меньше 10 чеков за смену или меньше 3 наличных — сами не отправляем.
- * Дальше один самый мелкий на каждые 40 чеков смены, но не меньше одного:
- * 10 чеков → 1, 80 чеков → 2.
+ * Сколько наличных уже пора отправить само.
+ * Меньше 10 чеков или меньше 3 наличных — ноль.
+ * С 10 чеков один, дальше ещё один каждые 20 чеков: 30 → 2, 50 → 3, 70 → 4.
+ * maxQuota — потолок точки. Выше него шкала не поднимается.
  */
-export function autoCashSendQuota({ totalReceipts, cashReceipts }) {
+export function autoCashSendQuota({ totalReceipts, cashReceipts, maxQuota = null }) {
   const total = Number(totalReceipts) || 0;
   const cash = Number(cashReceipts) || 0;
   if (total < 10 || cash < 3) return 0;
-  return Math.min(cash, Math.max(1, Math.floor(total / 40)));
+  const scale = Math.min(cash, 1 + Math.floor((total - 10) / 20));
+  if (maxQuota == null || maxQuota === '') return scale;
+  const cap = clampCashAutoQuota(maxQuota);
+  if (cap == null) return scale;
+  return Math.min(scale, cap);
 }
 
 /** Самые мелкие ещё не отправленные наличные, чтобы добрать квоту. Уже ушедшие в кассу квоту занимают. */
@@ -114,12 +130,28 @@ export async function loadCashOfdSplit(client, shiftId) {
   };
 }
 
-/** Перед Z ставит в очередь самые мелкие наличные чеки в пределах квоты. */
-export async function queueAutoCashBeforeZ(client, shiftId) {
-  const before = await loadCashOfdSplit(client, shiftId);
+/**
+ * По ходу смены добирает квоту самых мелких наличных.
+ * Вызывается после каждого оплаченного чека. Закрытие смены сюда не входит.
+ */
+export async function queueProgressiveCash(client, receiptId) {
+  const { rows } = await client.query(
+    `SELECT r.shift_id,
+            COALESCE(a.hold_cash_receipts, false) AS hold,
+            COALESCE(a.cash_auto_quota, 1) AS quota,
+            COALESCE(a.enabled, false) AS enabled
+     FROM receipts r
+     LEFT JOIN venue_atol_settings a ON a.venue_id = r.venue_id
+     WHERE r.id = $1`,
+    [receiptId]
+  );
+  const row = rows[0];
+  if (!row?.hold || !row.enabled || !row.shift_id) return { quota: 0, queuedIds: [] };
+  const before = await loadCashOfdSplit(client, row.shift_id);
   const quota = autoCashSendQuota({
     totalReceipts: before.totalReceipts,
     cashReceipts: before.cashCount,
+    maxQuota: row.quota,
   });
   const ids = pickHeldCashToSend(before.receipts, quota);
   const queuedIds = [];
@@ -127,8 +159,7 @@ export async function queueAutoCashBeforeZ(client, shiftId) {
     const sent = await sendHeldCashReceipt(client, id);
     if (sent.ok) queuedIds.push(id);
   }
-  const after = await loadCashOfdSplit(client, shiftId);
-  return { ...after, quota, queuedIds };
+  return { quota, queuedIds };
 }
 
 function moneyRub(value) {

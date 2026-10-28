@@ -3,9 +3,10 @@ import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { enqueueCashFiscalJob, enqueueShiftFiscalJob } from '../services/fiscalQueue.js';
 import {
+  autoCashSendQuota,
   fiscalShiftIsOpen,
+  loadCashOfdSplit,
   loadFiscalShiftJobs,
-  queueAutoCashBeforeZ,
   shouldEnqueueFiscalOpen,
 } from '../services/cashFiscalHold.js';
 import {
@@ -369,12 +370,21 @@ apiShifts.post('/close', async (c) => {
     );
 
     const { rows: holdRows } = await client.query(
-      `SELECT COALESCE(hold_cash_receipts, false) AS hold
+      `SELECT COALESCE(hold_cash_receipts, false) AS hold,
+              COALESCE(cash_auto_quota, 1) AS quota
        FROM venue_atol_settings WHERE venue_id = $1`,
       [venueId]
     );
     if (holdRows[0]?.hold) {
-      cashOfd = await queueAutoCashBeforeZ(client, shift.id);
+      const split = await loadCashOfdSplit(client, shift.id);
+      cashOfd = {
+        ...split,
+        quota: autoCashSendQuota({
+          totalReceipts: split.totalReceipts,
+          cashReceipts: split.cashCount,
+          maxQuota: holdRows[0].quota,
+        }),
+      };
     }
     await enqueueShiftFiscalJob(client, {
       venueId,

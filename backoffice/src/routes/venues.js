@@ -26,7 +26,8 @@ const VENUE_CARD_SQL = `
          COALESCE(v.kiosk_enabled, false) AS kiosk_enabled,
          COALESCE(v.kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
          v.kiosk_qr_image_url,
-         COALESCE(a.hold_cash_receipts, false) AS hold_cash_receipts
+         COALESCE(a.hold_cash_receipts, false) AS hold_cash_receipts,
+         COALESCE(a.cash_auto_quota, 1) AS cash_auto_quota
   FROM venues v
   LEFT JOIN venue_atol_settings a ON a.venue_id = v.id
 `;
@@ -154,6 +155,32 @@ venues.post('/:id/cash-hold-toggle', async (c) => {
     [id]
   );
 
+  const updated = await fetchVenue(id);
+  const assignedNames = await fetchAssignedStaffNames(id);
+  return c.html(renderVenueCard(updated, assignedNames));
+});
+
+venues.post('/:id/cash-quota', async (c) => {
+  const id = c.req.param('id');
+  const current = await fetchVenue(id);
+  if (!current) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+  const body = await c.req.parseBody();
+  const { clampCashAutoQuota } = await import('../services/cashFiscalHold.js');
+  const quota = clampCashAutoQuota(body.cash_auto_quota);
+  if (quota == null) {
+    const assignedNames = await fetchAssignedStaffNames(id);
+    return c.html(renderVenueCard(current, assignedNames));
+  }
+  await pool.query(
+    `INSERT INTO venue_atol_settings (venue_id, cash_auto_quota, updated_at)
+     VALUES ($1, $2, now())
+     ON CONFLICT (venue_id) DO UPDATE
+       SET cash_auto_quota = $2, updated_at = now()`,
+    [id, quota]
+  );
   const updated = await fetchVenue(id);
   const assignedNames = await fetchAssignedStaffNames(id);
   return c.html(renderVenueCard(updated, assignedNames));
