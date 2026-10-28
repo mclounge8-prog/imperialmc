@@ -115,7 +115,7 @@ export function renderTelegramSection(settings, flash = null, channels = []) {
     <section class="card" style="margin-top:1.25rem;">
       <h2 style="margin:0 0 .75rem;font-size:1.05rem;">Что приходит (в группу своей точки)</h2>
       <ul style="margin:0;padding-left:1.1rem;line-height:1.55;font-size:.92rem;">
-        <li>Оплата наличными / чеки со скидкой</li>
+        <li>Оплата наличными (с меткой, ушёл чек в ОФД или нет), оплата QR, чеки со скидкой</li>
         <li>Открытие / закрытие смены (выручка + касса)</li>
         <li>Внесение и инкассация</li>
         <li>Отмена пречека, удаление позиций, чек на 0 ₽</li>

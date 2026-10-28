@@ -8,6 +8,7 @@ import {
   isPureCashSale,
   fiscalShiftIsOpen,
   autoCashSendQuota,
+  cashPaymentOfdLabel,
   cashOfdReportLines,
   ofdSplitNote,
   pickHeldCashToSend,
@@ -102,6 +103,14 @@ test('unsent cash is marked, and the Z goes out on every close', () => {
   assert.equal(shouldEnqueueFiscalOpen({ holdCash: false, fiscalShiftOpen: true }), true);
   assert.equal(shouldEnqueueFiscalOpen({ holdCash: true, fiscalShiftOpen: true }), false);
   assert.equal(shouldEnqueueFiscalOpen({ holdCash: true, fiscalShiftOpen: false }), true);
+});
+
+test('a cash payment is marked as in OFD or still outside it', () => {
+  assert.equal(cashPaymentOfdLabel('done'), 'В ОФД');
+  assert.equal(cashPaymentOfdLabel('pending'), 'В очереди в ОФД');
+  assert.equal(cashPaymentOfdLabel('held'), 'Не в ОФД');
+  assert.equal(cashPaymentOfdLabel(null), 'Не в ОФД');
+  assert.match(cashPaymentOfdLabel('error'), /не в ОФД/);
 });
 
 test('auto cash quota sends the smallest held receipts and only after 10 checks and 3 cash ones', () => {

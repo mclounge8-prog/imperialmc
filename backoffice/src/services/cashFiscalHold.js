@@ -29,6 +29,14 @@ export const FISCAL_SEND_CLOSING =
 export const FISCAL_SEND_NO_SHIFT =
   'Фискальная смена на кассе не открыта. Чек можно отправить, когда планшет откроет смену на кассе. В уже закрытый Z он не попадает.';
 
+/** Метка наличного чека в Telegram в момент оплаты. */
+export function cashPaymentOfdLabel(status) {
+  if (status === 'done') return 'В ОФД';
+  if (status === 'pending') return 'В очереди в ОФД';
+  if (status === 'error') return 'Касса не приняла, не в ОФД';
+  return 'Не в ОФД';
+}
+
 export function unsentCashNote(count, total) {
   const n = Number(count) || 0;
   if (n <= 0) return null;

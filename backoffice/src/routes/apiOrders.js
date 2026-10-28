@@ -8,6 +8,7 @@ import {
   buildDiscountPaymentMessage,
   buildItemDeleteMessage,
   buildPrecheckCancelMessage,
+  buildQrPaymentMessage,
   buildZeroCloseMessage,
   fetchVenueName,
   notifyTelegramSafe,
@@ -648,6 +649,7 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
 
     await client.query('COMMIT');
     paidNotify = {
+      receiptId: receiptMeta.receiptId,
       venueName: guest.venue_name,
       venueId: guest.venue_id,
       tableName: guest.table_name,
@@ -655,6 +657,9 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
       cashier: staff.name,
       cashAmount: normalizedPayments
         .filter((p) => p.method === 'cash')
+        .reduce((sum, p) => sum + Number(p.amount), 0),
+      qrAmount: normalizedPayments
+        .filter((p) => p.method === 'qr')
         .reduce((sum, p) => sum + Number(p.amount), 0),
       discountPercent: receiptMeta.discountPercent,
       subtotal: receiptMeta.subtotal,
@@ -675,6 +680,11 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
 
   if (paidNotify) {
     const venueName = paidNotify.venueName || (await fetchVenueName(paidNotify.venueId));
+    const place = {
+      cashier: paidNotify.cashier,
+      tableName: paidNotify.tableName,
+      guestLabel: paidNotify.guestLabel,
+    };
     if (paidNotify.discountPercent > 0) {
       notifyTelegramSafe(
         buildDiscountPaymentMessage({
@@ -684,20 +694,32 @@ apiOrders.post('/orders/:orderId/guests/:guestId/pay', requireStaffToken, async 
           discountAmount: paidNotify.discount,
           total: paidNotify.total,
           payments: paidNotify.payments,
-          cashier: paidNotify.cashier,
-          tableName: paidNotify.tableName,
-          guestLabel: paidNotify.guestLabel,
+          ...place,
         }),
         { venueId: paidNotify.venueId }
       );
-    } else if (paidNotify.cashAmount > 0.009) {
+    }
+    if (paidNotify.qrAmount > 0.009) {
+      notifyTelegramSafe(
+        buildQrPaymentMessage({
+          venueName,
+          amount: paidNotify.qrAmount,
+          ...place,
+        }),
+        { venueId: paidNotify.venueId }
+      );
+    }
+    if (paidNotify.cashAmount > 0.009) {
+      const { rows: fiscalRows } = await pool.query(
+        `SELECT fiscal_status FROM receipts WHERE id = $1`,
+        [paidNotify.receiptId]
+      );
       notifyTelegramSafe(
         buildCashPaymentMessage({
           venueName,
           amount: paidNotify.cashAmount,
-          cashier: paidNotify.cashier,
-          tableName: paidNotify.tableName,
-          guestLabel: paidNotify.guestLabel,
+          fiscalStatus: fiscalRows[0]?.fiscal_status,
+          ...place,
         }),
         { venueId: paidNotify.venueId }
       );

@@ -1,5 +1,5 @@
 import { pool } from '../db.js';
-import { cashOfdReportLines } from './cashFiscalHold.js';
+import { cashOfdReportLines, cashPaymentOfdLabel } from './cashFiscalHold.js';
 
 const SETTINGS_ID = 1;
 const DEFAULT_CHANNEL_KEY = 'mc_lounge';
@@ -339,14 +339,37 @@ function header(title, venueName, when = new Date()) {
   ].join('\n');
 }
 
-export function buildCashPaymentMessage({ venueName, amount, cashier, tableName, guestLabel, when }) {
+export function buildCashPaymentMessage({
+  venueName,
+  amount,
+  cashier,
+  tableName,
+  guestLabel,
+  when,
+  fiscalStatus = null,
+}) {
   const where = [tableName ? `стол ${tableName}` : 'быстрый заказ', guestLabel].filter(Boolean).join(' · ');
   return [
     header('💵 Оплата наличными', venueName, when),
     '',
     `Сумма: <b>${escapeHtml(formatMoney(amount))}</b>`,
+    `ОФД: <b>${escapeHtml(cashPaymentOfdLabel(fiscalStatus))}</b>`,
     `Кассир: ${escapeHtml(cashier || '—')}`,
     where ? `Чек: ${escapeHtml(where)}` : null,
+  ]
+    .filter((x) => x != null)
+    .join('\n');
+}
+
+export function buildQrPaymentMessage({ venueName, amount, cashier, tableName, guestLabel, when }) {
+  const where = [tableName ? `стол ${tableName}` : 'быстрый заказ', guestLabel].filter(Boolean).join(' · ');
+  return [
+    header('📲 Оплата QR', venueName, when),
+    '',
+    `Сумма: <b>${escapeHtml(formatMoney(amount))}</b>`,
+    `Кассир: ${escapeHtml(cashier || '—')}`,
+    where ? `Чек: ${escapeHtml(where)}` : null,
+    'В выручку входит отдельно от наличных и карты. В кассу АТОЛ не отправляется.',
   ]
     .filter((x) => x != null)
     .join('\n');
