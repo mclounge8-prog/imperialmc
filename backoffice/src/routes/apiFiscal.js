@@ -13,7 +13,6 @@ import {
   cancelSupersededShiftJobs,
   reclaimStuckInProgress,
 } from '../services/fiscalJobGuards.js';
-
 const apiFiscal = new Hono();
 apiFiscal.use('*', requireStaffToken);
 
@@ -140,7 +139,7 @@ apiFiscal.get('/jobs', async (c) => {
     `SELECT id, type, status, receipt_id, shift_id, attempts, last_error,
             fiscal_doc_number, fiscal_sign, fiscal_datetime, created_at, updated_at
      FROM fiscal_jobs
-     WHERE venue_id = $1
+     WHERE venue_id = $1 AND status <> 'deferred'
      ORDER BY id DESC
      LIMIT $2`,
     [venueId, limit]
@@ -321,38 +320,54 @@ apiFiscal.post('/jobs/:id/result', async (c) => {
     return c.json({ error: 'Некорректное тело запроса' });
   }
 
-  const { rows: jobRows } = await pool.query('SELECT * FROM fiscal_jobs WHERE id = $1', [jobId]);
-  const job = jobRows[0];
-  if (!job) {
-    c.status(404);
-    return c.json({ error: 'Задание не найдено' });
-  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: jobRows } = await client.query('SELECT * FROM fiscal_jobs WHERE id = $1 FOR UPDATE', [
+      jobId,
+    ]);
+    const job = jobRows[0];
+    if (!job) {
+      await client.query('ROLLBACK');
+      c.status(404);
+      return c.json({ error: 'Задание не найдено' });
+    }
 
-  if (body.success) {
-    await pool.query(
-      `UPDATE fiscal_jobs
-       SET status = 'done', last_error = NULL, fiscal_doc_number = $1, fiscal_sign = $2,
-           fiscal_datetime = $3, updated_at = now()
-       WHERE id = $4`,
-      [body.fiscalDocNumber || null, body.fiscalSign || null, body.fiscalDatetime || null, jobId]
-    );
-    if (job.type === 'receipt' && job.receipt_id) {
-      await pool.query(
-        "UPDATE receipts SET fiscal_status = 'done', fiscal_doc_number = $1 WHERE id = $2",
-        [body.fiscalDocNumber || null, job.receipt_id]
+    const isReceiptJob = job.type === 'receipt' || job.type === 'receipt_return';
+    if (body.success) {
+      await client.query(
+        `UPDATE fiscal_jobs
+         SET status = 'done', last_error = NULL, fiscal_doc_number = $1, fiscal_sign = $2,
+             fiscal_datetime = $3, updated_at = now()
+         WHERE id = $4`,
+        [body.fiscalDocNumber || null, body.fiscalSign || null, body.fiscalDatetime || null, jobId]
       );
+      if (isReceiptJob && job.receipt_id) {
+        await client.query(
+          `UPDATE receipts
+           SET fiscal_status = 'done', fiscal_doc_number = $1, fiscal_hold_payload = NULL
+           WHERE id = $2`,
+          [body.fiscalDocNumber || null, job.receipt_id]
+        );
+      }
+    } else {
+      await client.query(
+        "UPDATE fiscal_jobs SET status = 'error', last_error = $1, updated_at = now() WHERE id = $2",
+        [body.error || 'Неизвестная ошибка терминала', jobId]
+      );
+      if (isReceiptJob && job.receipt_id) {
+        await client.query("UPDATE receipts SET fiscal_status = 'error' WHERE id = $1", [job.receipt_id]);
+      }
     }
-  } else {
-    await pool.query(
-      "UPDATE fiscal_jobs SET status = 'error', last_error = $1, updated_at = now() WHERE id = $2",
-      [body.error || 'Неизвестная ошибка терминала', jobId]
-    );
-    if (job.type === 'receipt' && job.receipt_id) {
-      await pool.query("UPDATE receipts SET fiscal_status = 'error' WHERE id = $1", [job.receipt_id]);
-    }
-  }
 
-  return c.json({ ok: true });
+    await client.query('COMMIT');
+    return c.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 });
 
 export default apiFiscal;

@@ -37,7 +37,28 @@ export function renderVenueCard(venue, assignedNames) {
               >
               <span>Киоск самообслуживания${kioskOn ? ' · включён' : ''}</span>
             </label>
+            <label class="venue-precheck-toggle">
+              <input
+                type="checkbox"
+                ${venue.hold_cash_receipts ? 'checked' : ''}
+                hx-post="/venues/${venue.id}/cash-hold-toggle"
+                hx-target="#venue-card-${venue.id}"
+                hx-swap="outerHTML"
+              >
+              <span>Ручная отправка наличных${venue.hold_cash_receipts ? ' · включена' : ''}</span>
+            </label>
           </div>
+          ${
+            venue.hold_cash_receipts
+              ? `<form class="venue-flag-hint" hx-post="/venues/${venue.id}/cash-quota" hx-target="#venue-card-${venue.id}" hx-swap="outerHTML">
+                  Квота на смену
+                  <input type="number" name="cash_auto_quota" min="0" max="30" value="${Number(venue.cash_auto_quota ?? 1)}" style="width:4.5rem;margin:0 6px">
+                  самых мелких наличных
+                  <button type="submit">Сохранить</button>
+                  <div>С 10 чеков и 3 наличных уходит первый, дальше ещё один каждые 20 чеков, прямо во время смены. Это число — потолок. При закрытии печатается только Z.</div>
+                </form>`
+              : ''
+          }
           ${
             tobaccoOn
               ? `<div class="venue-flag-hint">Учёт табака · вкл · погрешность ${Number(venue.tobacco_tolerance_g ?? 100)} г</div>`
@@ -182,6 +203,7 @@ const FISCAL_JOB_STATUS_LABELS = {
   done: 'Готово',
   error: 'Ошибка',
   cancelled: 'Отменено',
+  deferred: 'Z ждёт наличные',
 };
 
 function formatDateTime(value) {
@@ -255,6 +277,14 @@ export function renderVenueAtolPanel(venue, settings, jobs) {
           <input type="checkbox" name="enabled" ${safe.enabled ? 'checked' : ''}>
           <span>Касса АТОЛ включена для этого заведения</span>
         </label>
+        <p class="atol-hint">
+          Ручная отправка наличных включается отдельной ручкой на карточке заведения выше, рядом с пречеком и киоском.
+          Пока она выключена, чеки и Z уходят как раньше.
+          Когда включена, целиком наличный чек не печатается сразу, планшет ошибку не показывает.
+          По ходу смены, если чеков от 10 и наличных от 3, в кассу сами уходят самые мелкие: первый с 10-го чека, дальше ещё один каждые 20 чеков.
+          Число на карточке заведения — потолок этой шкалы. При закрытии смены новые наличные не печатаются, уходит только Z.
+          Остальные помечаются «Не в ОФД». Их можно отправить кнопкой в любую следующую открытую смену. В уже напечатанный Z чек не добавляется.
+        </p>
 
         <div class="atol-fields-grid">
           <label>

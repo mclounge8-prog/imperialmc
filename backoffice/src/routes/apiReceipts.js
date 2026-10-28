@@ -432,7 +432,6 @@ apiReceipts.post('/:id/refund', async (c) => {
       total: Number(receipt.total),
       operatorName: staff.name,
     });
-
     await client.query('COMMIT');
     refundNotify = {
       venueId: receipt.venue_id,

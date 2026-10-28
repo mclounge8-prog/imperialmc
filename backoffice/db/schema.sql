@@ -491,6 +491,7 @@ CREATE TABLE IF NOT EXISTS venue_atol_settings (
   kkt_port      INT NOT NULL DEFAULT 5555, -- порт канала обмена (TCP/IP) драйвера ДТО10
   kkt_model     INT,                       -- числовой код модели в драйвере (см. "Тест драйвера ККТ" на месте)
   operator_name VARCHAR(100),              -- ФИО оператора по умолчанию для чека/смены (тег 1021), если не переопределяется сотрудником
+  hold_cash_receipts BOOLEAN NOT NULL DEFAULT false, -- наличные чеки не уходят в кассу сами: кнопка в отчётах
   agent_token   VARCHAR(64) UNIQUE,        -- токен фискального агента для авторизации на backend
   last_seen_at  TIMESTAMPTZ,               -- когда агент последний раз опрашивал backend — для индикации "агент онлайн"
   created_at    TIMESTAMPTZ DEFAULT now(),
@@ -508,7 +509,7 @@ CREATE TABLE IF NOT EXISTS fiscal_jobs (
   receipt_id        INT REFERENCES receipts(id) ON DELETE SET NULL,
   shift_id          INT REFERENCES shifts(id) ON DELETE SET NULL,
   payload           JSONB NOT NULL,       -- готовое JSON-задание для драйвера (processJson)
-  status            VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, in_progress, done, error, cancelled
+  status            VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, in_progress, done, error, cancelled, deferred (Z ждёт наличные)
   attempts          INT NOT NULL DEFAULT 0,
   last_error        TEXT,
   fiscal_doc_number INT,       -- номер фискального документа из ответа кассы
@@ -523,7 +524,8 @@ CREATE INDEX IF NOT EXISTS idx_fiscal_jobs_receipt ON fiscal_jobs(receipt_id);
 
 -- Быстрый статус фискализации прямо на чеке — чтобы не делать join с
 -- fiscal_jobs для отображения бейджа в списке чеков терминала/бэкофиса.
-ALTER TABLE receipts ADD COLUMN IF NOT EXISTS fiscal_status VARCHAR(20); -- NULL (не требуется), pending, done, error
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS fiscal_status VARCHAR(20); -- NULL (не требуется), pending, held (ждёт ручной отправки), done, error
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS fiscal_hold_payload JSONB; -- задание sell/sellReturn, пока чек не отправлен вручную
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS fiscal_doc_number INT;
 
 -- Учёт наличности в смене: остаток на открытии, фактический пересчёт на закрытии,
@@ -532,6 +534,7 @@ ALTER TABLE receipts ADD COLUMN IF NOT EXISTS fiscal_doc_number INT;
 ALTER TABLE shifts ADD COLUMN IF NOT EXISTS opening_cash NUMERIC(12,2) NOT NULL DEFAULT 0;
 ALTER TABLE shifts ADD COLUMN IF NOT EXISTS closing_cash NUMERIC(12,2);
 ALTER TABLE shifts ADD COLUMN IF NOT EXISTS closing_cash_expected NUMERIC(12,2);
+ALTER TABLE shifts ADD COLUMN IF NOT EXISTS fiscal_reconcile JSONB;
 
 CREATE TABLE IF NOT EXISTS cash_movements (
   id          SERIAL PRIMARY KEY,

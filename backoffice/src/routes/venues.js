@@ -18,18 +18,22 @@ import { cancelIfSuperseded } from '../services/fiscalJobGuards.js';
 const venues = new Hono();
 venues.use('*', requireAuthApi);
 
+const VENUE_CARD_SQL = `
+  SELECT v.id, v.name, v.address,
+         COALESCE(v.precheck_enabled, false) AS precheck_enabled,
+         COALESCE(v.tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
+         COALESCE(v.tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
+         COALESCE(v.kiosk_enabled, false) AS kiosk_enabled,
+         COALESCE(v.kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
+         v.kiosk_qr_image_url,
+         COALESCE(a.hold_cash_receipts, false) AS hold_cash_receipts,
+         COALESCE(a.cash_auto_quota, 1) AS cash_auto_quota
+  FROM venues v
+  LEFT JOIN venue_atol_settings a ON a.venue_id = v.id
+`;
+
 async function fetchVenue(id) {
-  const { rows } = await pool.query(
-    `SELECT id, name, address,
-            COALESCE(precheck_enabled, false) AS precheck_enabled,
-            COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
-            COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
-            COALESCE(kiosk_enabled, false) AS kiosk_enabled,
-            COALESCE(kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
-            kiosk_qr_image_url
-     FROM venues WHERE id = $1`,
-    [id]
-  );
+  const { rows } = await pool.query(`${VENUE_CARD_SQL} WHERE v.id = $1`, [id]);
   return rows[0] || null;
 }
 
@@ -46,14 +50,7 @@ async function fetchAssignedStaffNames(venueId) {
 
 async function fetchAllVenueCards() {
   const { rows: venueRows } = await pool.query(
-    `SELECT id, name, address,
-            COALESCE(precheck_enabled, false) AS precheck_enabled,
-            COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
-            COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
-            COALESCE(kiosk_enabled, false) AS kiosk_enabled,
-            COALESCE(kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
-            kiosk_qr_image_url
-     FROM venues ORDER BY name`
+    `${VENUE_CARD_SQL} ORDER BY v.name`
   );
   const cards = [];
   for (const venue of venueRows) {
@@ -136,6 +133,54 @@ venues.post('/:id/precheck-toggle', async (c) => {
     [id]
   );
 
+  const updated = await fetchVenue(id);
+  const assignedNames = await fetchAssignedStaffNames(id);
+  return c.html(renderVenueCard(updated, assignedNames));
+});
+
+venues.post('/:id/cash-hold-toggle', async (c) => {
+  const id = c.req.param('id');
+  const current = await fetchVenue(id);
+  if (!current) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+
+  await pool.query(
+    `INSERT INTO venue_atol_settings (venue_id, hold_cash_receipts, updated_at)
+     VALUES ($1, true, now())
+     ON CONFLICT (venue_id) DO UPDATE
+       SET hold_cash_receipts = NOT COALESCE(venue_atol_settings.hold_cash_receipts, false),
+           updated_at = now()`,
+    [id]
+  );
+
+  const updated = await fetchVenue(id);
+  const assignedNames = await fetchAssignedStaffNames(id);
+  return c.html(renderVenueCard(updated, assignedNames));
+});
+
+venues.post('/:id/cash-quota', async (c) => {
+  const id = c.req.param('id');
+  const current = await fetchVenue(id);
+  if (!current) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+  const body = await c.req.parseBody();
+  const { clampCashAutoQuota } = await import('../services/cashFiscalHold.js');
+  const quota = clampCashAutoQuota(body.cash_auto_quota);
+  if (quota == null) {
+    const assignedNames = await fetchAssignedStaffNames(id);
+    return c.html(renderVenueCard(current, assignedNames));
+  }
+  await pool.query(
+    `INSERT INTO venue_atol_settings (venue_id, cash_auto_quota, updated_at)
+     VALUES ($1, $2, now())
+     ON CONFLICT (venue_id) DO UPDATE
+       SET cash_auto_quota = $2, updated_at = now()`,
+    [id, quota]
+  );
   const updated = await fetchVenue(id);
   const assignedNames = await fetchAssignedStaffNames(id);
   return c.html(renderVenueCard(updated, assignedNames));

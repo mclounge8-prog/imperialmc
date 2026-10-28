@@ -1,4 +1,5 @@
 import { pool } from '../db.js';
+import { cashOfdReportLines, cashPaymentOfdLabel } from './cashFiscalHold.js';
 
 const SETTINGS_ID = 1;
 const DEFAULT_CHANNEL_KEY = 'mc_lounge';
@@ -338,14 +339,37 @@ function header(title, venueName, when = new Date()) {
   ].join('\n');
 }
 
-export function buildCashPaymentMessage({ venueName, amount, cashier, tableName, guestLabel, when }) {
+export function buildCashPaymentMessage({
+  venueName,
+  amount,
+  cashier,
+  tableName,
+  guestLabel,
+  when,
+  fiscalStatus = null,
+}) {
   const where = [tableName ? `стол ${tableName}` : 'быстрый заказ', guestLabel].filter(Boolean).join(' · ');
   return [
     header('💵 Оплата наличными', venueName, when),
     '',
     `Сумма: <b>${escapeHtml(formatMoney(amount))}</b>`,
+    `ОФД: <b>${escapeHtml(cashPaymentOfdLabel(fiscalStatus))}</b>`,
     `Кассир: ${escapeHtml(cashier || '—')}`,
     where ? `Чек: ${escapeHtml(where)}` : null,
+  ]
+    .filter((x) => x != null)
+    .join('\n');
+}
+
+export function buildQrPaymentMessage({ venueName, amount, cashier, tableName, guestLabel, when }) {
+  const where = [tableName ? `стол ${tableName}` : 'быстрый заказ', guestLabel].filter(Boolean).join(' · ');
+  return [
+    header('📲 Оплата QR', venueName, when),
+    '',
+    `Сумма: <b>${escapeHtml(formatMoney(amount))}</b>`,
+    `Кассир: ${escapeHtml(cashier || '—')}`,
+    where ? `Чек: ${escapeHtml(where)}` : null,
+    'В выручку входит отдельно от наличных и карты. В кассу АТОЛ не отправляется.',
   ]
     .filter((x) => x != null)
     .join('\n');
@@ -459,8 +483,12 @@ export function buildShiftCloseMessage({
   cashier,
   when,
   expectedCash,
+  showCashOfd = false,
+  cashReceipts = null,
+  cashQuota = null,
+  totalReceipts = null,
 }) {
-  return [
+  const lines = [
     header('🔴 Закрытие смены', venueName, when),
     '',
     `Наличные при закрытии: <b>${escapeHtml(formatMoney(closingCash))}</b>`,
@@ -474,9 +502,20 @@ export function buildShiftCloseMessage({
     `Инкассации: ${escapeHtml(formatMoney(withdrawals))}`,
     `Внесения: ${escapeHtml(formatMoney(deposits))}`,
     `Кассир: ${escapeHtml(cashier || '—')}`,
-  ]
-    .filter((x) => x != null)
-    .join('\n');
+  ];
+  if (showCashOfd) {
+    lines.push('');
+    lines.push('<b>Наличные и ОФД</b>');
+    lines.push('Только целиком наличные чеки. Смешанная оплата в этот список не входит.');
+    for (const line of cashOfdReportLines({
+      totalReceipts: totalReceipts ?? receiptsCount,
+      receipts: cashReceipts || [],
+      quota: cashQuota,
+    })) {
+      lines.push(escapeHtml(line));
+    }
+  }
+  return lines.filter((line) => line != null).join('\n');
 }
 
 function formatGrams(value) {

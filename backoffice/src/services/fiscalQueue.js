@@ -4,6 +4,7 @@
 // (fiscal_jobs), а выполняет их сам terminal-app.
 import { pool } from '../db.js';
 import { formatVenueDateTime } from '../utils/timezone.js';
+import { queueProgressiveCash, shouldHoldCashReceipt } from './cashFiscalHold.js';
 
 export async function fetchAtolSettings(venueId) {
   const { rows } = await pool.query('SELECT * FROM venue_atol_settings WHERE venue_id = $1', [
@@ -12,12 +13,20 @@ export async function fetchAtolSettings(venueId) {
   return rows[0] || null;
 }
 
-async function isAtolEnabledForVenue(client, venueId) {
+async function fetchAtolFlags(client, venueId) {
   const { rows } = await client.query(
-    'SELECT enabled FROM venue_atol_settings WHERE venue_id = $1',
+    'SELECT enabled, hold_cash_receipts FROM venue_atol_settings WHERE venue_id = $1',
     [venueId]
   );
-  return !!(rows[0] && rows[0].enabled);
+  return {
+    enabled: !!(rows[0] && rows[0].enabled),
+    holdCash: !!(rows[0] && rows[0].hold_cash_receipts),
+  };
+}
+
+async function isAtolEnabledForVenue(client, venueId) {
+  const flags = await fetchAtolFlags(client, venueId);
+  return flags.enabled;
 }
 
 function isDefaultModifier(mod) {
@@ -300,17 +309,29 @@ export async function enqueueReceiptFiscalJob(
     Array.isArray(payments) && payments.length > 0 && payments.every((p) => p.method === 'qr');
   if (onlyQr) {
     await client.query('UPDATE receipts SET fiscal_status = NULL WHERE id = $1', [receiptId]);
+    await queueProgressiveCash(client, receiptId);
     return;
   }
-  const enabled = await isAtolEnabledForVenue(client, venueId);
-  if (!enabled) return;
+  const flags = await fetchAtolFlags(client, venueId);
+  if (!flags.enabled) return;
 
   const payload = buildSellTaskPayload({ items, payments, total, operatorName });
+  if (shouldHoldCashReceipt({ holdCash: flags.holdCash, payments, total })) {
+    await client.query(
+      `UPDATE receipts
+       SET fiscal_status = 'held', fiscal_hold_payload = $2::jsonb
+       WHERE id = $1`,
+      [receiptId, JSON.stringify(payload)]
+    );
+    await queueProgressiveCash(client, receiptId);
+    return;
+  }
   await client.query(
     `INSERT INTO fiscal_jobs (venue_id, type, receipt_id, payload) VALUES ($1, 'receipt', $2, $3)`,
     [venueId, receiptId, JSON.stringify(payload)]
   );
   await client.query("UPDATE receipts SET fiscal_status = 'pending' WHERE id = $1", [receiptId]);
+  await queueProgressiveCash(client, receiptId);
 }
 
 /** Фискальный чек возврата (sellReturn) — нал и безнал по исходным оплатам. */
@@ -323,10 +344,41 @@ export async function enqueueReceiptReturnFiscalJob(
     await client.query("UPDATE receipts SET fiscal_status = NULL WHERE id = $1", [receiptId]);
     return;
   }
-  const enabled = await isAtolEnabledForVenue(client, venueId);
-  if (!enabled) return;
+  const flags = await fetchAtolFlags(client, venueId);
+  if (!flags.enabled) return;
 
   const payload = buildSellReturnTaskPayload({ items, payments, total, operatorName });
+  if (shouldHoldCashReceipt({ holdCash: flags.holdCash, payments, total })) {
+    const { rows } = await client.query(
+      `SELECT fiscal_status,
+              EXISTS (
+                SELECT 1 FROM fiscal_jobs
+                WHERE receipt_id = $1
+                  AND type IN ('receipt', 'receipt_return')
+                  AND status IN ('pending', 'in_progress', 'done', 'error')
+              ) AS has_job
+       FROM receipts WHERE id = $1`,
+      [receiptId]
+    );
+    const prev = rows[0]?.fiscal_status;
+    // Продажа ещё не уходила в кассу — возврат тоже не фискализируем.
+    if ((prev === 'held' || prev == null) && !rows[0]?.has_job) {
+      await client.query(
+        `UPDATE receipts SET fiscal_status = NULL, fiscal_hold_payload = NULL WHERE id = $1`,
+        [receiptId]
+      );
+      return;
+    }
+    if (prev === 'done') {
+      await client.query(
+        `UPDATE receipts
+         SET fiscal_status = 'held', fiscal_hold_payload = $2::jsonb
+         WHERE id = $1`,
+        [receiptId, JSON.stringify(payload)]
+      );
+      return;
+    }
+  }
   await client.query(
     `INSERT INTO fiscal_jobs (venue_id, type, receipt_id, payload) VALUES ($1, 'receipt_return', $2, $3)`,
     [venueId, receiptId, JSON.stringify(payload)]
@@ -334,7 +386,10 @@ export async function enqueueReceiptReturnFiscalJob(
   await client.query("UPDATE receipts SET fiscal_status = 'pending' WHERE id = $1", [receiptId]);
 }
 
-export async function enqueueShiftFiscalJob(client, { venueId, shiftId, type, operatorName }) {
+export async function enqueueShiftFiscalJob(
+  client,
+  { venueId, shiftId, type, operatorName, status = 'pending' }
+) {
   if (!venueId) return;
   const enabled = await isAtolEnabledForVenue(client, venueId);
   if (!enabled) return;
@@ -342,12 +397,10 @@ export async function enqueueShiftFiscalJob(client, { venueId, shiftId, type, op
   const payload =
     type === 'open_shift' ? buildOpenShiftPayload({ operatorName }) : buildCloseShiftPayload({ operatorName });
 
-  await client.query(`INSERT INTO fiscal_jobs (venue_id, type, shift_id, payload) VALUES ($1, $2, $3, $4)`, [
-    venueId,
-    type,
-    shiftId,
-    JSON.stringify(payload),
-  ]);
+  await client.query(
+    `INSERT INTO fiscal_jobs (venue_id, type, shift_id, payload, status) VALUES ($1, $2, $3, $4, $5)`,
+    [venueId, type, shiftId, JSON.stringify(payload), status]
+  );
 }
 
 // type: 'cash_in' | 'cash_out'

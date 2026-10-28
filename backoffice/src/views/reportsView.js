@@ -2,7 +2,39 @@ import { escapeHtml } from './escapeHtml.js';
 import { formatVenueDateTime } from '../utils/timezone.js';
 
 const METHOD_LABELS = { cash: 'Наличные', card: 'Карта', qr: 'QR-код', other: 'Другое' };
-const STATUS_LABELS = { paid: 'Оплачен', cancelled: 'Отменён' };
+const STATUS_LABELS = { paid: 'Оплачен', cancelled: 'Отменён', refunded: 'Возврат' };
+
+export function renderReceiptFiscalBox(receipt, notice) {
+  const id = receipt.id;
+  const status = receipt.fiscal_status;
+  const manual = status === 'held' || receipt.has_fiscal_hold || receipt.fiscal_hold_payload;
+  let body = '—';
+  if (status === 'held') {
+    body = `
+      <span class="badge badge-inactive">Не в ОФД</span>
+      <button type="button" class="secondary" hx-post="/reports/receipts/${id}/fiscal-send" hx-target="#receipt-fiscal-${id}" hx-swap="outerHTML">Отправить</button>
+    `;
+  } else if (status === 'pending') {
+    body = `<span class="badge">В очереди на кассу</span>`;
+  } else if (status === 'error') {
+    const error = receipt.fiscal_last_error
+      ? `<div class="fiscal-job-error">${escapeHtml(receipt.fiscal_last_error)}</div>`
+      : '';
+    body = `
+      <span class="badge badge-inactive">Ошибка кассы</span>
+      ${error}
+      ${
+        manual
+          ? `<button type="button" class="secondary" hx-post="/reports/receipts/${id}/fiscal-send" hx-target="#receipt-fiscal-${id}" hx-swap="outerHTML">Повторить</button>`
+          : ''
+      }
+    `;
+  } else if (status === 'done') {
+    body = `<span class="badge badge-active">ФД ${escapeHtml(String(receipt.fiscal_doc_number || '—'))}</span>`;
+  }
+  const note = notice ? `<div class="fiscal-job-error">${escapeHtml(notice)}</div>` : '';
+  return `<div id="receipt-fiscal-${id}" class="receipt-fiscal">${body}${note}</div>`;
+}
 
 function formatDateTime(value) {
   return formatVenueDateTime(value);
@@ -124,6 +156,7 @@ export function renderReceiptRow(receipt) {
       <td>${methods}</td>
       <td><span class="badge ${statusClass}">${STATUS_LABELS[receipt.status] || receipt.status}</span>${precheckBadge}</td>
       <td>${Number(receipt.total).toFixed(2)} ₽</td>
+      <td>${renderReceiptFiscalBox(receipt)}</td>
       <td class="row-actions">
         <button hx-get="/reports/receipts/${receipt.id}" hx-target="#main-content" hx-push-url="false">Открыть</button>
       </td>
@@ -188,6 +221,11 @@ export function renderReceiptsSection(venues, selectedVenueId, dateFrom, dateTo,
         },
       ])}
       <p class="hint">По умолчанию — последние 7 дней. CSV выгружает весь выбранный период, не только текущую страницу.</p>
+      ${
+        Number(summary.heldCount) > 0
+          ? `<p class="hint">Не в ОФД: ${summary.heldCount}. В сумме наличных эти чеки уже есть. Z при закрытии уходит всегда и включает только то, что касса приняла. Эти чеки можно отправить в следующую открытую смену. В уже напечатанный Z они не попадут.</p>`
+          : ''
+      }
     </div>
 
     <div class="subsection report-summary">
@@ -229,10 +267,11 @@ export function renderReceiptsSection(venues, selectedVenueId, dateFrom, dateTo,
             <th>Оплата</th>
             <th>Статус</th>
             <th>Сумма</th>
+            <th>Касса</th>
             <th>Действия</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="8" class="empty-hint">Чеков за этот период нет</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="9" class="empty-hint">Чеков за этот период нет</td></tr>'}</tbody>
       </table>
       ${paginationHtml}
     </div>
@@ -283,7 +322,7 @@ export function renderItemStatsSection(venues, selectedVenueId, dateFrom, dateTo
   `;
 }
 
-function renderCashDayRow(day) {
+function renderCashDayRow(day, manualMode) {
   return `
     <tr>
       <td>${formatDay(day.day)}</td>
@@ -292,6 +331,7 @@ function renderCashDayRow(day) {
       <td>${day.receiptsCount}</td>
       <td>${formatMoney(day.revenueTotal)}</td>
       <td>${formatMoney(day.cashSales)}</td>
+      ${manualMode ? `<td>${day.heldCount || 0} · ${formatMoney(day.heldCash || 0)}</td>` : ''}
       <td>${formatMoney(day.cardSales)}</td>
       <td>${formatMoney(day.qrSales)}</td>
       <td>${formatMoney(day.deposits)}</td>
@@ -304,9 +344,14 @@ function renderCashDayRow(day) {
   `;
 }
 
-function renderCashShiftRow(shift) {
+function renderCashShiftRow(shift, manualMode) {
   const statusLabel = shift.status === 'open' ? 'Открыта' : 'Закрыта';
   const statusClass = shift.status === 'open' ? 'badge-active' : 'badge-inactive';
+  const fiscalCell = !manualMode
+    ? ''
+    : shift.holdCashReceipts
+      ? `<td><button type="button" class="secondary" hx-get="/reports/cash/shifts/${shift.id}/fiscal" hx-target="#cash-fiscal-panel" hx-swap="innerHTML">Сверка / Z</button></td>`
+      : '<td>—</td>';
   return `
     <tr>
       <td>${formatDay(shift.day)}</td>
@@ -319,6 +364,7 @@ function renderCashShiftRow(shift) {
       <td>${escapeHtml(shift.closedByName || '—')}</td>
       <td>${formatMoney(shift.openingCash)}</td>
       <td>${formatMoney(shift.cashSales)}</td>
+      ${manualMode ? `<td>${shift.heldCount || 0} · ${formatMoney(shift.heldCash || 0)}</td>` : ''}
       <td>${formatMoney(shift.cardSales)}</td>
       <td>${formatMoney(shift.qrSales)}</td>
       <td>${formatMoney(shift.deposits)}</td>
@@ -327,13 +373,63 @@ function renderCashShiftRow(shift) {
       <td>${shift.countedCash != null ? formatMoney(shift.countedCash) : '—'}</td>
       <td>${shift.difference != null ? formatMoney(shift.difference) : '—'}</td>
       <td>${formatMoney(shift.revenueTotal)}</td>
+      ${fiscalCell}
     </tr>
   `;
 }
 
+function reconcileValue(saved, fallback) {
+  const n = Number(saved);
+  return Number.isFinite(n) ? n.toFixed(2) : Number(fallback || 0).toFixed(2);
+}
+
+export function renderShiftFiscalPanel(shift, notice) {
+  const saved = shift.fiscalReconcile && typeof shift.fiscalReconcile === 'object' ? shift.fiscalReconcile : {};
+  const noncash = Number(shift.cardSales || 0) + Number(shift.qrSales || 0) + Number(shift.otherSales || 0);
+  const zLabel =
+    shift.zStatus === 'done'
+      ? `Z напечатан, ФД ${shift.zDoc || '—'}`
+      : shift.zStatus === 'pending' || shift.zStatus === 'in_progress'
+        ? 'Z уже в очереди кассы'
+        : shift.zStatus === 'error'
+          ? 'Z не напечатан'
+          : 'Z ещё не отправлялся';
+  return `
+    <div class="subsection" id="shift-fiscal-${shift.id}">
+      <h2>Смена #${shift.id} · ${escapeHtml(shift.venueName || '')}</h2>
+      <p class="hint">
+        Наличных чеков: ${shift.cashReceiptCount || 0}. В ОФД: ${shift.ofdSentCount || 0}. Не в ОФД: ${shift.heldCount || 0} на ${formatMoney(shift.heldCash || 0)}.
+        В наличных по чекам ${formatMoney(shift.cashSales)} эта сумма уже есть. Безнал по чекам ${formatMoney(noncash)}.
+        Касса приняла нал ${formatMoney(shift.atolCash || 0)}, безнал ${formatMoney(shift.atolNoncash || 0)}.
+        Z при закрытии уходит всегда. В него входят только чеки, которые касса приняла: самые мелкие наличные в пределах квоты и всё безналичное.
+        Поля ниже — ваша сверка. На кассу эти цифры не отправляются.
+      </p>
+      ${notice ? `<p class="fiscal-job-error">${escapeHtml(notice)}</p>` : ''}
+      ${shift.zError ? `<p class="fiscal-job-error">${escapeHtml(shift.zError)}</p>` : ''}
+      <p><strong>${escapeHtml(zLabel)}</strong></p>
+      <form class="section-form" hx-post="/reports/cash/shifts/${shift.id}/reconcile" hx-target="#cash-fiscal-panel" hx-swap="innerHTML">
+        <label>Наличные в сверке
+          <input type="text" name="cash" value="${reconcileValue(saved.cash, shift.cashSales)}">
+        </label>
+        <label>Безнал в сверке
+          <input type="text" name="noncash" value="${reconcileValue(saved.noncash, noncash)}">
+        </label>
+        <label>Заметка
+          <input type="text" name="note" value="${escapeHtml(saved.note || '')}" placeholder="что ответила касса / ОФД">
+        </label>
+        <button type="submit">Сохранить сверку</button>
+      </form>
+      <form hx-post="/reports/cash/shifts/${shift.id}/z" hx-target="#cash-fiscal-panel" hx-swap="innerHTML">
+        <button type="submit" class="secondary">Отправить Z на кассу</button>
+      </form>
+    </div>
+  `;
+}
+
 export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byDay, shifts) {
-  const dayRows = byDay.map((d) => renderCashDayRow(d)).join('');
-  const shiftRows = shifts.map((s) => renderCashShiftRow(s)).join('');
+  const manualMode = shifts.some((s) => s.holdCashReceipts);
+  const dayRows = byDay.map((d) => renderCashDayRow(d, manualMode)).join('');
+  const shiftRows = shifts.map((s) => renderCashShiftRow(s, manualMode)).join('');
   const revenue = shifts.reduce((sum, s) => sum + s.revenueTotal, 0);
   const cashSales = shifts.reduce((sum, s) => sum + s.cashSales, 0);
   const cardSales = shifts.reduce((sum, s) => sum + s.cardSales, 0);
@@ -359,6 +455,11 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
       ])}
       <p class="hint">
         Период считается по дате открытия смены. «По дням» — сумма всех смен заведения за календарный день.
+        ${
+          manualMode
+            ? ' Колонка «Не в ОФД» — наличные чеки, которых нет в Z. В колонке «Нал.» они уже посчитаны.'
+            : ''
+        }
       </p>
     </div>
 
@@ -396,6 +497,7 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
             <th>Чеков</th>
             <th>Выручка</th>
             <th>Нал.</th>
+            ${manualMode ? '<th>Не в ОФД</th>' : ''}
             <th>Карта</th>
             <th>QR-код</th>
             <th>Внесения</th>
@@ -406,7 +508,7 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
             <th>Разница</th>
           </tr>
         </thead>
-        <tbody>${dayRows || '<tr><td colspan="14" class="empty-hint">Смен за период нет</td></tr>'}</tbody>
+        <tbody>${dayRows || `<tr><td colspan="${manualMode ? 15 : 14}" class="empty-hint">Смен за период нет</td></tr>`}</tbody>
       </table>
     </div>
 
@@ -425,6 +527,7 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
             <th>Закрыл</th>
             <th>Начало</th>
             <th>Нал. продажи</th>
+            ${manualMode ? '<th>Не в ОФД</th>' : ''}
             <th>Карта</th>
             <th>QR-код</th>
             <th>Внесения</th>
@@ -433,10 +536,12 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
             <th>Факт</th>
             <th>Разница</th>
             <th>Выручка</th>
+            ${manualMode ? '<th></th>' : ''}
           </tr>
         </thead>
-        <tbody>${shiftRows || '<tr><td colspan="18" class="empty-hint">Смен за период нет</td></tr>'}</tbody>
+        <tbody>${shiftRows || `<tr><td colspan="${manualMode ? 20 : 18}" class="empty-hint">Смен за период нет</td></tr>`}</tbody>
       </table>
+      <div id="cash-fiscal-panel"></div>
     </div>
   `;
 }
@@ -495,6 +600,13 @@ export function renderReceiptDetail(receipt, items, payments) {
       }
       <p><strong>Открыт:</strong> ${formatDateTime(receipt.opened_at)}</p>
       <p><strong>Закрыт:</strong> ${formatDateTime(receipt.closed_at)}</p>
+      <p><strong>Касса АТОЛ:</strong></p>
+      ${renderReceiptFiscalBox(receipt)}
+      ${
+        receipt.fiscal_status === 'held'
+          ? `<p class="hint">Маркер «Не в ОФД»: этого чека нет в Z. «Отправить» ставит его в открытую сейчас фискальную смену. В уже напечатанный Z он не попадёт. Если касса ещё не открыта, кнопка скажет об этом. Смена кассы живёт не дольше 24 часов.</p>`
+          : ''
+      }
       <p><strong>Сумма без скидки:</strong> ${Number(receipt.subtotal).toFixed(2)} ₽</p>
       ${
         Number(receipt.discount) > 0.009 || Number(receipt.discount_percent) > 0

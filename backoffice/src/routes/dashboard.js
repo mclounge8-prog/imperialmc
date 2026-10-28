@@ -39,14 +39,18 @@ export async function renderFragmentHtml(key, c) {
 
   if (key === 'venues') {
     const { rows: venueRows } = await pool.query(
-      `SELECT id, name, address,
-              COALESCE(precheck_enabled, false) AS precheck_enabled,
-              COALESCE(tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
-              COALESCE(tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
-              COALESCE(kiosk_enabled, false) AS kiosk_enabled,
-              COALESCE(kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
-              kiosk_qr_image_url
-       FROM venues ORDER BY name`
+      `SELECT v.id, v.name, v.address,
+              COALESCE(v.precheck_enabled, false) AS precheck_enabled,
+              COALESCE(v.tobacco_accounting_enabled, false) AS tobacco_accounting_enabled,
+              COALESCE(v.tobacco_tolerance_g, 100) AS tobacco_tolerance_g,
+              COALESCE(v.kiosk_enabled, false) AS kiosk_enabled,
+              COALESCE(v.kiosk_cashless_discount_percent, 12) AS kiosk_cashless_discount_percent,
+              v.kiosk_qr_image_url,
+              COALESCE(a.hold_cash_receipts, false) AS hold_cash_receipts,
+              COALESCE(a.cash_auto_quota, 1) AS cash_auto_quota
+       FROM venues v
+       LEFT JOIN venue_atol_settings a ON a.venue_id = v.id
+       ORDER BY v.name`
     );
     const venueCards = [];
     for (const venue of venueRows) {

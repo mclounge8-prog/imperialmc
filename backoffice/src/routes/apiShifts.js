@@ -3,6 +3,13 @@ import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { enqueueCashFiscalJob, enqueueShiftFiscalJob } from '../services/fiscalQueue.js';
 import {
+  autoCashSendQuota,
+  fiscalShiftIsOpen,
+  loadCashOfdSplit,
+  loadFiscalShiftJobs,
+  shouldEnqueueFiscalOpen,
+} from '../services/cashFiscalHold.js';
+import {
   buildCashMovementMessage,
   buildShiftCloseMessage,
   buildShiftOpenMessage,
@@ -207,22 +214,36 @@ apiShifts.post('/open', async (c) => {
     );
     const shift = rows[0];
 
-    await enqueueShiftFiscalJob(client, {
-      venueId,
-      shiftId: shift.id,
-      type: 'open_shift',
-      operatorName: staff.name,
+    const { rows: holdRows } = await client.query(
+      `SELECT COALESCE(hold_cash_receipts, false) AS hold
+       FROM venue_atol_settings WHERE venue_id = $1`,
+      [venueId]
+    );
+    const holdCash = !!holdRows[0]?.hold;
+    const shiftJobs = await loadFiscalShiftJobs(client, venueId);
+    const enqueueFiscalOpen = shouldEnqueueFiscalOpen({
+      holdCash,
+      fiscalShiftOpen: fiscalShiftIsOpen(shiftJobs.opens, shiftJobs.closes),
     });
 
-    // Остаток на открытии = внесение в денежный ящик ККТ (учётный чек cashIn).
-    if (openingCash > 0) {
-      await enqueueCashFiscalJob(client, {
+    if (enqueueFiscalOpen) {
+      await enqueueShiftFiscalJob(client, {
         venueId,
         shiftId: shift.id,
-        type: 'cash_in',
-        amount: openingCash,
+        type: 'open_shift',
         operatorName: staff.name,
       });
+
+      // Остаток на открытии = внесение в денежный ящик ККТ (учётный чек cashIn).
+      if (openingCash > 0) {
+        await enqueueCashFiscalJob(client, {
+          venueId,
+          shiftId: shift.id,
+          type: 'cash_in',
+          amount: openingCash,
+          operatorName: staff.name,
+        });
+      }
     }
 
     await client.query('COMMIT');
@@ -314,6 +335,7 @@ apiShifts.post('/close', async (c) => {
 
   const venueTobacco = await fetchVenueTobaccoSettings(venueId);
   let tobaccoCount = null;
+  let cashOfd = null;
   if (venueTobacco?.tobacco_accounting_enabled) {
     tobaccoCount = await fetchShiftTobaccoCount(shift.id);
     const hasRealCount = Boolean(tobaccoCount && !tobaccoCount.skipped);
@@ -347,6 +369,23 @@ apiShifts.post('/close', async (c) => {
       ]
     );
 
+    const { rows: holdRows } = await client.query(
+      `SELECT COALESCE(hold_cash_receipts, false) AS hold,
+              COALESCE(cash_auto_quota, 1) AS quota
+       FROM venue_atol_settings WHERE venue_id = $1`,
+      [venueId]
+    );
+    if (holdRows[0]?.hold) {
+      const split = await loadCashOfdSplit(client, shift.id);
+      cashOfd = {
+        ...split,
+        quota: autoCashSendQuota({
+          totalReceipts: split.totalReceipts,
+          cashReceipts: split.cashCount,
+          maxQuota: holdRows[0].quota,
+        }),
+      };
+    }
     await enqueueShiftFiscalJob(client, {
       venueId,
       shiftId: shift.id,
@@ -388,6 +427,10 @@ apiShifts.post('/close', async (c) => {
           deposits: stats.cash.deposits,
           withdrawals: stats.cash.withdrawals,
           cashier: staff.name,
+          showCashOfd: !!cashOfd,
+          cashReceipts: cashOfd?.receipts || [],
+          cashQuota: cashOfd?.quota,
+          totalReceipts: cashOfd?.totalReceipts,
         }),
         { venueId }
       );
