@@ -8,6 +8,7 @@ import {
   isPureCashSale,
   fiscalShiftIsOpen,
   autoCashSendQuota,
+  cashOfdReportLines,
   ofdSplitNote,
   pickHeldCashToSend,
   shouldEnqueueFiscalClose,
@@ -123,6 +124,41 @@ test('auto cash quota sends the smallest held receipts and only after 10 checks 
   assert.deepEqual(pickHeldCashToSend(receipts, 2), []);
   assert.deepEqual(pickHeldCashToSend(receipts, 4), [2, 9]);
   assert.deepEqual(pickHeldCashToSend(receipts, 1), []);
+});
+
+test('the close report lists cash that entered this Z and cash still outside OFD', () => {
+  const lines = cashOfdReportLines({
+    totalReceipts: 80,
+    quota: 2,
+    receipts: [
+      { id: 11, total: 240, fiscalStatus: 'pending' },
+      { id: 10, total: 180, fiscalStatus: 'done' },
+      { id: 30, total: 1500, fiscalStatus: 'error', lastError: 'ОФД не ответил' },
+      { id: 20, total: 900, fiscalStatus: 'held', closedAt: '2026-10-28T19:03:00.000Z' },
+    ],
+  }).join('\n');
+  assert.match(lines, /Чеков за смену: 80/);
+  assert.match(lines, /Наличных чеков: 4 на 2820\.00/);
+  assert.match(lines, /Квота автоотправки: 2 самых мелких/);
+  assert.match(lines, /В этот Z: 2 на 420\.00/);
+  assert.match(lines, /№10 · 180\.00 ₽ · уже в кассе/);
+  assert.match(lines, /№11 · 240\.00 ₽ · в очереди на кассу/);
+  assert.match(lines, /Не в ОФД: 2 на 2400\.00/);
+  assert.match(lines, /№20 · 900\.00 ₽ · 29\.10, 00:03/);
+  assert.match(lines, /№30 · 1500\.00 ₽ · касса не приняла · ОФД не ответил/);
+  assert.match(lines, /следующую открытую смену/);
+
+  const small = cashOfdReportLines({
+    totalReceipts: 6,
+    receipts: [
+      { id: 2, total: 3450, fiscalStatus: 'held' },
+      { id: 1, total: 750, fiscalStatus: 'held' },
+    ],
+  }).join('\n');
+  assert.match(small, /Квота автоотправки: 0, чеков меньше 10/);
+  assert.match(small, /В этот Z: 0 на 0\.00/);
+  assert.match(small, /Не в ОФД: 2 на 4200\.00/);
+  assert.ok(small.indexOf('№1') < small.indexOf('№2'));
 });
 
 test('the backoffice Z button does not fire while the shift is open or the next fiscal shift is already open', () => {

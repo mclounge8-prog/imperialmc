@@ -70,7 +70,10 @@ export function pickHeldCashToSend(receipts, quota) {
 }
 
 const PURE_CASH_SQL = `
-  SELECT r.id, r.total, r.fiscal_status
+  SELECT r.id, r.total, r.fiscal_status, r.closed_at,
+    (SELECT j.last_error FROM fiscal_jobs j
+     WHERE j.receipt_id = r.id AND j.last_error IS NOT NULL
+     ORDER BY j.id DESC LIMIT 1) AS last_error
   FROM receipts r
   WHERE r.shift_id = $1
     AND r.status = 'paid'
@@ -105,6 +108,8 @@ export async function loadCashOfdSplit(client, shiftId) {
       id: Number(row.id),
       total: Number(row.total),
       fiscalStatus: row.fiscal_status,
+      closedAt: row.closed_at || null,
+      lastError: row.last_error || null,
     })),
   };
 }
@@ -124,6 +129,82 @@ export async function queueAutoCashBeforeZ(client, shiftId) {
   }
   const after = await loadCashOfdSplit(client, shiftId);
   return { ...after, quota, queuedIds };
+}
+
+function moneyRub(value) {
+  return `${(Number(value) || 0).toFixed(2)} ₽`;
+}
+
+function formatReceiptTime(value) {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('ru-RU', {
+    timeZone: 'Asia/Yekaterinburg',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function sumTotals(rows) {
+  return rows.reduce((sum, row) => sum + Number(row.total || 0), 0);
+}
+
+function receiptMark(row) {
+  const extra = [];
+  const when = formatReceiptTime(row.closedAt);
+  if (when) extra.push(when);
+  if (row.fiscalStatus === 'pending') extra.push('в очереди на кассу');
+  if (row.fiscalStatus === 'done') extra.push('уже в кассе');
+  if (row.fiscalStatus === 'error') extra.push('касса не приняла');
+  const error = String(row.lastError || '').replace(/\s+/g, ' ').trim();
+  if (row.fiscalStatus === 'error' && error) extra.push(error.slice(0, 80));
+  const tail = extra.length ? ` · ${extra.join(' · ')}` : '';
+  return `• №${Number(row.id)} · ${moneyRub(row.total)}${tail}`;
+}
+
+function listReceiptLines(rows) {
+  const sorted = rows
+    .slice()
+    .sort((a, b) => Number(a.total) - Number(b.total) || Number(a.id) - Number(b.id));
+  const shown = sorted.slice(0, 30).map(receiptMark);
+  if (sorted.length > 30) shown.push(`… и ещё ${sorted.length - 30}`);
+  return shown;
+}
+
+function quotaLine(quota, totalReceipts, cashReceipts) {
+  if (quota > 0) return `Квота автоотправки: ${quota} самых мелких`;
+  if (totalReceipts < 10) return 'Квота автоотправки: 0, чеков меньше 10';
+  if (cashReceipts < 3) return 'Квота автоотправки: 0, наличных меньше 3';
+  return 'Квота автоотправки: 0';
+}
+
+/** Строки для Telegram: что попало в этот Z и что осталось с маркером. */
+export function cashOfdReportLines({ totalReceipts, receipts, quota }) {
+  const list = Array.isArray(receipts) ? receipts : [];
+  const total = Number(totalReceipts) || 0;
+  const cash = list.length;
+  const autoQuota = quota == null
+    ? autoCashSendQuota({ totalReceipts: total, cashReceipts: cash })
+    : Number(quota) || 0;
+  const sent = list.filter((row) => row.fiscalStatus === 'done' || row.fiscalStatus === 'pending');
+  const unsent = list.filter((row) => row.fiscalStatus === 'held' || row.fiscalStatus === 'error');
+  const lines = [
+    `Чеков за смену: ${total}`,
+    `Наличных чеков: ${cash} на ${moneyRub(sumTotals(list))}`,
+    quotaLine(autoQuota, total, cash),
+    `В этот Z: ${sent.length} на ${moneyRub(sumTotals(sent))}`,
+    ...listReceiptLines(sent),
+    `Не в ОФД: ${unsent.length} на ${moneyRub(sumTotals(unsent))}`,
+    ...listReceiptLines(unsent),
+    'Z уходит с закрытием. В нём только чеки, которые касса приняла.',
+  ];
+  if (unsent.length > 0) {
+    lines.push('Не в ОФД можно отправить в следующую открытую смену.');
+  }
+  return lines;
 }
 
 /** Z при закрытии смены уходит всегда, и с ручкой, и без неё. */

@@ -334,10 +334,7 @@ apiShifts.post('/close', async (c) => {
 
   const venueTobacco = await fetchVenueTobaccoSettings(venueId);
   let tobaccoCount = null;
-  let heldCashCount = 0;
-  let heldCashTotal = 0;
-  let cashReceiptCount = 0;
-  let ofdSentCount = 0;
+  let cashOfd = null;
   if (venueTobacco?.tobacco_accounting_enabled) {
     tobaccoCount = await fetchShiftTobaccoCount(shift.id);
     const hasRealCount = Boolean(tobaccoCount && !tobaccoCount.skipped);
@@ -377,11 +374,7 @@ apiShifts.post('/close', async (c) => {
       [venueId]
     );
     if (holdRows[0]?.hold) {
-      const split = await queueAutoCashBeforeZ(client, shift.id);
-      heldCashCount = split.unsentCount;
-      heldCashTotal = split.unsentTotal;
-      cashReceiptCount = split.cashCount;
-      ofdSentCount = split.sentCount;
+      cashOfd = await queueAutoCashBeforeZ(client, shift.id);
     }
     await enqueueShiftFiscalJob(client, {
       venueId,
@@ -424,10 +417,10 @@ apiShifts.post('/close', async (c) => {
           deposits: stats.cash.deposits,
           withdrawals: stats.cash.withdrawals,
           cashier: staff.name,
-          heldCashCount,
-          heldCashTotal,
-          cashReceiptCount,
-          ofdSentCount,
+          showCashOfd: !!cashOfd,
+          cashReceipts: cashOfd?.receipts || [],
+          cashQuota: cashOfd?.quota,
+          totalReceipts: cashOfd?.totalReceipts,
         }),
         { venueId }
       );

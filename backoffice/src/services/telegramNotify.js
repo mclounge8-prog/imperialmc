@@ -1,5 +1,5 @@
 import { pool } from '../db.js';
-import { ofdSplitNote } from './cashFiscalHold.js';
+import { cashOfdReportLines } from './cashFiscalHold.js';
 
 const SETTINGS_ID = 1;
 const DEFAULT_CHANNEL_KEY = 'mc_lounge';
@@ -460,18 +460,12 @@ export function buildShiftCloseMessage({
   cashier,
   when,
   expectedCash,
-  heldCashCount = 0,
-  heldCashTotal = 0,
-  cashReceiptCount = 0,
-  ofdSentCount = 0,
+  showCashOfd = false,
+  cashReceipts = null,
+  cashQuota = null,
+  totalReceipts = null,
 }) {
-  const unsentNote = ofdSplitNote({
-    cashCount: cashReceiptCount,
-    sentCount: ofdSentCount,
-    unsentCount: heldCashCount,
-    unsentTotal: heldCashTotal,
-  });
-  return [
+  const lines = [
     header('🔴 Закрытие смены', venueName, when),
     '',
     `Наличные при закрытии: <b>${escapeHtml(formatMoney(closingCash))}</b>`,
@@ -485,10 +479,20 @@ export function buildShiftCloseMessage({
     `Инкассации: ${escapeHtml(formatMoney(withdrawals))}`,
     `Внесения: ${escapeHtml(formatMoney(deposits))}`,
     `Кассир: ${escapeHtml(cashier || '—')}`,
-    unsentNote ? escapeHtml(unsentNote) : null,
-  ]
-    .filter((x) => x != null)
-    .join('\n');
+  ];
+  if (showCashOfd) {
+    lines.push('');
+    lines.push('<b>Наличные и ОФД</b>');
+    lines.push('Только целиком наличные чеки. Смешанная оплата в этот список не входит.');
+    for (const line of cashOfdReportLines({
+      totalReceipts: totalReceipts ?? receiptsCount,
+      receipts: cashReceipts || [],
+      quota: cashQuota,
+    })) {
+      lines.push(escapeHtml(line));
+    }
+  }
+  return lines.filter((line) => line != null).join('\n');
 }
 
 function formatGrams(value) {
