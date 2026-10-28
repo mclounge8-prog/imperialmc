@@ -11,7 +11,7 @@ export function renderReceiptFiscalBox(receipt, notice) {
   let body = '—';
   if (status === 'held') {
     body = `
-      <span class="badge badge-inactive">Ждёт отправки</span>
+      <span class="badge badge-inactive">Не в ОФД</span>
       <button type="button" class="secondary" hx-post="/reports/receipts/${id}/fiscal-send" hx-target="#receipt-fiscal-${id}" hx-swap="outerHTML">Отправить</button>
     `;
   } else if (status === 'pending') {
@@ -223,7 +223,7 @@ export function renderReceiptsSection(venues, selectedVenueId, dateFrom, dateTo,
       <p class="hint">По умолчанию — последние 7 дней. CSV выгружает весь выбранный период, не только текущую страницу.</p>
       ${
         Number(summary.heldCount) > 0
-          ? `<p class="hint">Наличные чеки ждут ручной отправки в кассу: ${summary.heldCount}. В сумме наличных они уже есть. Z при закрытии смены на кассу не уходит, его отправляет кнопка «Отправить Z». В уже закрытый Z чек добавить нельзя.</p>`
+          ? `<p class="hint">Не в ОФД: ${summary.heldCount}. В сумме наличных эти чеки уже есть. Z при закрытии уходит всегда и включает только то, что касса приняла. Эти чеки можно отправить в следующую открытую смену. В уже напечатанный Z они не попадут.</p>`
           : ''
       }
     </div>
@@ -331,7 +331,7 @@ function renderCashDayRow(day, manualMode) {
       <td>${day.receiptsCount}</td>
       <td>${formatMoney(day.revenueTotal)}</td>
       <td>${formatMoney(day.cashSales)}</td>
-      ${manualMode ? `<td>${formatMoney(day.heldCash || 0)}</td>` : ''}
+      ${manualMode ? `<td>${day.heldCount || 0} · ${formatMoney(day.heldCash || 0)}</td>` : ''}
       <td>${formatMoney(day.cardSales)}</td>
       <td>${formatMoney(day.qrSales)}</td>
       <td>${formatMoney(day.deposits)}</td>
@@ -364,7 +364,7 @@ function renderCashShiftRow(shift, manualMode) {
       <td>${escapeHtml(shift.closedByName || '—')}</td>
       <td>${formatMoney(shift.openingCash)}</td>
       <td>${formatMoney(shift.cashSales)}</td>
-      ${manualMode ? `<td>${formatMoney(shift.heldCash || 0)}</td>` : ''}
+      ${manualMode ? `<td>${shift.heldCount || 0} · ${formatMoney(shift.heldCash || 0)}</td>` : ''}
       <td>${formatMoney(shift.cardSales)}</td>
       <td>${formatMoney(shift.qrSales)}</td>
       <td>${formatMoney(shift.deposits)}</td>
@@ -398,10 +398,11 @@ export function renderShiftFiscalPanel(shift, notice) {
     <div class="subsection" id="shift-fiscal-${shift.id}">
       <h2>Смена #${shift.id} · ${escapeHtml(shift.venueName || '')}</h2>
       <p class="hint">
-        Наличные по чекам ${formatMoney(shift.cashSales)} уже включают неотправленные ${formatMoney(shift.heldCash || 0)}
-        (${shift.heldCount || 0} чек.). Безнал по чекам ${formatMoney(noncash)}.
+        Наличных чеков: ${shift.cashReceiptCount || 0}. В ОФД: ${shift.ofdSentCount || 0}. Не в ОФД: ${shift.heldCount || 0} на ${formatMoney(shift.heldCash || 0)}.
+        В наличных по чекам ${formatMoney(shift.cashSales)} эта сумма уже есть. Безнал по чекам ${formatMoney(noncash)}.
         Касса приняла нал ${formatMoney(shift.atolCash || 0)}, безнал ${formatMoney(shift.atolNoncash || 0)}.
-        Поля ниже — сверка для вас и для оператора ОФД. На кассу эти цифры не отправляются: Z касса печатает сама по принятым чекам.
+        Z при закрытии уходит всегда. В него входят только чеки, которые касса приняла: самые мелкие наличные в пределах квоты и всё безналичное.
+        Поля ниже — ваша сверка. На кассу эти цифры не отправляются.
       </p>
       ${notice ? `<p class="fiscal-job-error">${escapeHtml(notice)}</p>` : ''}
       ${shift.zError ? `<p class="fiscal-job-error">${escapeHtml(shift.zError)}</p>` : ''}
@@ -456,7 +457,7 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
         Период считается по дате открытия смены. «По дням» — сумма всех смен заведения за календарный день.
         ${
           manualMode
-            ? ' Колонка «Не в АТОЛ» — наличные, которые ждут ручной отправки. В колонке «Нал.» они уже посчитаны.'
+            ? ' Колонка «Не в ОФД» — наличные чеки, которых нет в Z. В колонке «Нал.» они уже посчитаны.'
             : ''
         }
       </p>
@@ -496,7 +497,7 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
             <th>Чеков</th>
             <th>Выручка</th>
             <th>Нал.</th>
-            ${manualMode ? '<th>Не в АТОЛ</th>' : ''}
+            ${manualMode ? '<th>Не в ОФД</th>' : ''}
             <th>Карта</th>
             <th>QR-код</th>
             <th>Внесения</th>
@@ -526,7 +527,7 @@ export function renderCashSection(venues, selectedVenueId, dateFrom, dateTo, byD
             <th>Закрыл</th>
             <th>Начало</th>
             <th>Нал. продажи</th>
-            ${manualMode ? '<th>Не в АТОЛ</th>' : ''}
+            ${manualMode ? '<th>Не в ОФД</th>' : ''}
             <th>Карта</th>
             <th>QR-код</th>
             <th>Внесения</th>
@@ -603,7 +604,7 @@ export function renderReceiptDetail(receipt, items, payments) {
       ${renderReceiptFiscalBox(receipt)}
       ${
         receipt.fiscal_status === 'held'
-          ? `<p class="hint">Чек не уходил в кассу автоматически. «Отправить» ставит его в открытую фискальную смену. Если смена кассы уже закрыта Z-отчётом, кнопка объяснит почему: в закрытый отчёт чек добавить нельзя. Смена кассы живёт не дольше 24 часов.</p>`
+          ? `<p class="hint">Маркер «Не в ОФД»: этого чека нет в Z. «Отправить» ставит его в открытую сейчас фискальную смену. В уже напечатанный Z он не попадёт. Если касса ещё не открыта, кнопка скажет об этом. Смена кассы живёт не дольше 24 часов.</p>`
           : ''
       }
       <p><strong>Сумма без скидки:</strong> ${Number(receipt.subtotal).toFixed(2)} ₽</p>

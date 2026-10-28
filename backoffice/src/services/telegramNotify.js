@@ -1,5 +1,5 @@
 import { pool } from '../db.js';
-import { unsentCashNote } from './cashFiscalHold.js';
+import { ofdSplitNote } from './cashFiscalHold.js';
 
 const SETTINGS_ID = 1;
 const DEFAULT_CHANNEL_KEY = 'mc_lounge';
@@ -462,9 +462,15 @@ export function buildShiftCloseMessage({
   expectedCash,
   heldCashCount = 0,
   heldCashTotal = 0,
-  zSkipped = false,
+  cashReceiptCount = 0,
+  ofdSentCount = 0,
 }) {
-  const unsentNote = unsentCashNote(heldCashCount, heldCashTotal, { zSkipped });
+  const unsentNote = ofdSplitNote({
+    cashCount: cashReceiptCount,
+    sentCount: ofdSentCount,
+    unsentCount: heldCashCount,
+    unsentTotal: heldCashTotal,
+  });
   return [
     header('🔴 Закрытие смены', venueName, when),
     '',

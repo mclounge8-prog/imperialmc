@@ -1,7 +1,9 @@
-// Ручная отправка наличных чеков в АТОЛ.
+// Ручная отправка части наличных чеков в АТОЛ.
 // Весь режим включается только галочкой venue_atol_settings.hold_cash_receipts.
-// Пока она снята, чеки и Z уходят как раньше, персонал ничего не замечает.
-// В уже напечатанный Z чек добавить нельзя: касса собирает Z сама из принятых документов.
+// Пока она снята, чеки и Z уходят как раньше.
+// При включённой ручке в Z сами попадают только мелкие наличные чеки по квоте.
+// Остальные помечаются и отправляются кнопкой в любую следующую открытую фискальную смену.
+// Z при закрытии смены уходит всегда. В уже напечатанный Z чек добавить нельзя.
 
 export async function ensureAtolCashHoldSchema() {
   const { pool } = await import('../db.js');
@@ -22,24 +24,111 @@ export const FISCAL_SEND_CLOSING =
 export const FISCAL_SEND_NO_SHIFT =
   'Фискальная смена на кассе не открыта. Чек можно отправить, когда планшет откроет смену на кассе. В уже закрытый Z он не попадает.';
 
-export function unsentCashNote(count, total, { zSkipped = false } = {}) {
+export function unsentCashNote(count, total) {
   const n = Number(count) || 0;
-  const parts = [];
-  if (n > 0) {
-    const money = (Number(total) || 0).toFixed(2);
-    parts.push(
-      `Из них не отправлено в АТОЛ: ${n} на ${money} ₽. В строке «Наличные оплаты» эта сумма уже учтена.`
-    );
-  }
-  if (zSkipped) {
-    parts.push('Z на кассу не отправлялся. Смена в программе закрыта, Z печатается кнопкой в бэкофисе.');
-  }
-  return parts.length ? parts.join(' ') : null;
+  if (n <= 0) return null;
+  const money = (Number(total) || 0).toFixed(2);
+  return `Из них не в ОФД: ${n} на ${money} ₽. В строке «Наличные оплаты» эта сумма уже учтена. В Z эти чеки не входят.`;
 }
 
-/** Пока ручная отправка включена, закрытие смены в программе не ставит Z в очередь кассы. */
-export function shouldEnqueueFiscalClose(holdCash) {
-  return !holdCash;
+/** Сколько наличных чеков ушло в кассу, а сколько помечено и осталось вне Z. */
+export function ofdSplitNote({ cashCount, sentCount, unsentCount, unsentTotal }) {
+  const unsent = Number(unsentCount) || 0;
+  if (unsent <= 0) return null;
+  const money = (Number(unsentTotal) || 0).toFixed(2);
+  return `Наличных чеков: ${Number(cashCount) || 0}. В ОФД: ${Number(sentCount) || 0}. Не в ОФД: ${unsent} на ${money} ₽. В «Наличные оплаты» входят все. В Z только отправленные.`;
+}
+
+/**
+ * Квота автоотправки наличных.
+ * Меньше 10 чеков за смену или меньше 3 наличных — сами не отправляем.
+ * Дальше один самый мелкий на каждые 40 чеков смены, но не меньше одного:
+ * 10 чеков → 1, 80 чеков → 2.
+ */
+export function autoCashSendQuota({ totalReceipts, cashReceipts }) {
+  const total = Number(totalReceipts) || 0;
+  const cash = Number(cashReceipts) || 0;
+  if (total < 10 || cash < 3) return 0;
+  return Math.min(cash, Math.max(1, Math.floor(total / 40)));
+}
+
+/** Самые мелкие ещё не отправленные наличные, чтобы добрать квоту. Уже ушедшие в кассу квоту занимают. */
+export function pickHeldCashToSend(receipts, quota) {
+  const list = Array.isArray(receipts) ? receipts : [];
+  const already = list.filter((row) => row.fiscalStatus === 'done' || row.fiscalStatus === 'pending').length;
+  const need = Math.max(0, Number(quota) - already);
+  return list
+    .filter((row) => row.fiscalStatus === 'held')
+    .slice()
+    .sort((a, b) => {
+      const byTotal = Number(a.total) - Number(b.total);
+      if (byTotal !== 0) return byTotal;
+      return Number(a.id) - Number(b.id);
+    })
+    .slice(0, need)
+    .map((row) => Number(row.id));
+}
+
+const PURE_CASH_SQL = `
+  SELECT r.id, r.total, r.fiscal_status
+  FROM receipts r
+  WHERE r.shift_id = $1
+    AND r.status = 'paid'
+    AND r.total > 0.009
+    AND EXISTS (
+      SELECT 1 FROM receipt_payments rp
+      WHERE rp.receipt_id = r.id AND rp.method = 'cash'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM receipt_payments rp
+      WHERE rp.receipt_id = r.id AND rp.method <> 'cash'
+    )
+`;
+
+export async function loadCashOfdSplit(client, shiftId) {
+  const { rows: totalRows } = await client.query(
+    `SELECT COUNT(*)::int AS n
+     FROM receipts
+     WHERE shift_id = $1 AND status = 'paid' AND total > 0.009`,
+    [shiftId]
+  );
+  const { rows } = await client.query(PURE_CASH_SQL, [shiftId]);
+  const sent = rows.filter((row) => row.fiscal_status === 'done' || row.fiscal_status === 'pending');
+  const unsent = rows.filter((row) => row.fiscal_status === 'held' || row.fiscal_status === 'error');
+  return {
+    totalReceipts: Number(totalRows[0]?.n || 0),
+    cashCount: rows.length,
+    sentCount: sent.length,
+    unsentCount: unsent.length,
+    unsentTotal: unsent.reduce((sum, row) => sum + Number(row.total || 0), 0),
+    receipts: rows.map((row) => ({
+      id: Number(row.id),
+      total: Number(row.total),
+      fiscalStatus: row.fiscal_status,
+    })),
+  };
+}
+
+/** Перед Z ставит в очередь самые мелкие наличные чеки в пределах квоты. */
+export async function queueAutoCashBeforeZ(client, shiftId) {
+  const before = await loadCashOfdSplit(client, shiftId);
+  const quota = autoCashSendQuota({
+    totalReceipts: before.totalReceipts,
+    cashReceipts: before.cashCount,
+  });
+  const ids = pickHeldCashToSend(before.receipts, quota);
+  const queuedIds = [];
+  for (const id of ids) {
+    const sent = await sendHeldCashReceipt(client, id);
+    if (sent.ok) queuedIds.push(id);
+  }
+  const after = await loadCashOfdSplit(client, shiftId);
+  return { ...after, quota, queuedIds };
+}
+
+/** Z при закрытии смены уходит всегда, и с ручкой, и без неё. */
+export function shouldEnqueueFiscalClose() {
+  return true;
 }
 
 /** Фискальная смена ещё открыта: был успешный open_shift и после него Z не напечатан и не в очереди. */

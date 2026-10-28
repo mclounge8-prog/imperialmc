@@ -131,7 +131,10 @@ export async function fetchReceiptsSummary({ venueId, dateFrom, dateTo }) {
          COUNT(*) FILTER (WHERE r.status = 'cancelled')::int AS cancelled_count,
          COALESCE(SUM(r.total) FILTER (WHERE r.status = 'paid'), 0) AS paid_total,
          COALESCE(SUM(r.discount) FILTER (WHERE r.status = 'paid'), 0) AS discount_total,
-         COUNT(*) FILTER (WHERE r.fiscal_status = 'held')::int AS held_count
+         COUNT(*) FILTER (
+           WHERE r.fiscal_status = 'held'
+              OR (r.fiscal_status = 'error' AND r.fiscal_hold_payload IS NOT NULL)
+         )::int AS held_count
        FROM receipts r
        ${where}`,
       params
@@ -257,6 +260,8 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo, shiftId }) {
             COALESCE(atolset.hold_cash_receipts, false) AS hold_cash_receipts,
             COALESCE(held.held_cash, 0) AS held_cash,
             COALESCE(held.held_count, 0) AS held_count,
+            COALESCE(held.cash_receipt_count, 0) AS cash_receipt_count,
+            COALESCE(held.ofd_sent_count, 0) AS ofd_sent_count,
             COALESCE(atolpay.atol_cash, 0) AS atol_cash,
             COALESCE(atolpay.atol_noncash, 0) AS atol_noncash,
             z.status AS z_status,
@@ -300,8 +305,25 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo, shiftId }) {
      ) mov ON true
      LEFT JOIN LATERAL (
        SELECT
-         COALESCE(SUM(r.total) FILTER (WHERE r.status = 'paid' AND r.fiscal_status = 'held'), 0) AS held_cash,
-         COUNT(*) FILTER (WHERE r.status = 'paid' AND r.fiscal_status = 'held')::int AS held_count
+         COALESCE(SUM(r.total) FILTER (
+           WHERE r.status = 'paid'
+             AND (r.fiscal_status = 'held' OR (r.fiscal_status = 'error' AND r.fiscal_hold_payload IS NOT NULL))
+         ), 0) AS held_cash,
+         COUNT(*) FILTER (
+           WHERE r.status = 'paid'
+             AND (r.fiscal_status = 'held' OR (r.fiscal_status = 'error' AND r.fiscal_hold_payload IS NOT NULL))
+         )::int AS held_count,
+         COUNT(*) FILTER (
+           WHERE r.status = 'paid' AND r.total > 0.009
+             AND EXISTS (SELECT 1 FROM receipt_payments rp WHERE rp.receipt_id = r.id AND rp.method = 'cash')
+             AND NOT EXISTS (SELECT 1 FROM receipt_payments rp WHERE rp.receipt_id = r.id AND rp.method <> 'cash')
+         )::int AS cash_receipt_count,
+         COUNT(*) FILTER (
+           WHERE r.status = 'paid' AND r.total > 0.009
+             AND r.fiscal_status IN ('done', 'pending')
+             AND EXISTS (SELECT 1 FROM receipt_payments rp WHERE rp.receipt_id = r.id AND rp.method = 'cash')
+             AND NOT EXISTS (SELECT 1 FROM receipt_payments rp WHERE rp.receipt_id = r.id AND rp.method <> 'cash')
+         )::int AS ofd_sent_count
        FROM receipts r
        WHERE r.shift_id = s.id
      ) held ON true
@@ -363,6 +385,8 @@ async function fetchCashShifts({ venueId, dateFrom, dateTo, shiftId }) {
       holdCashReceipts: !!row.hold_cash_receipts,
       heldCash: Number(row.held_cash || 0),
       heldCount: Number(row.held_count || 0),
+      cashReceiptCount: Number(row.cash_receipt_count || 0),
+      ofdSentCount: Number(row.ofd_sent_count || 0),
       atolCash: Number(row.atol_cash || 0),
       atolNoncash: Number(row.atol_noncash || 0),
       zStatus: row.z_status || null,
@@ -399,6 +423,7 @@ function aggregateCashByDay(shifts) {
         countedShifts: 0,
         difference: 0,
         heldCash: 0,
+        heldCount: 0,
       });
     }
     const row = map.get(key);
@@ -407,6 +432,7 @@ function aggregateCashByDay(shifts) {
     row.revenueTotal = roundMoney(row.revenueTotal + s.revenueTotal);
     row.cashSales = roundMoney(row.cashSales + s.cashSales);
     row.heldCash = roundMoney((row.heldCash || 0) + (s.heldCash || 0));
+    row.heldCount = (row.heldCount || 0) + (s.heldCount || 0);
     row.cardSales = roundMoney(row.cardSales + s.cardSales);
     row.qrSales = roundMoney(row.qrSales + s.qrSales);
     row.otherSales = roundMoney(row.otherSales + s.otherSales);

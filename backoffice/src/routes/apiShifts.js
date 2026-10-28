@@ -5,7 +5,7 @@ import { enqueueCashFiscalJob, enqueueShiftFiscalJob } from '../services/fiscalQ
 import {
   fiscalShiftIsOpen,
   loadFiscalShiftJobs,
-  shouldEnqueueFiscalClose,
+  queueAutoCashBeforeZ,
   shouldEnqueueFiscalOpen,
 } from '../services/cashFiscalHold.js';
 import {
@@ -336,6 +336,8 @@ apiShifts.post('/close', async (c) => {
   let tobaccoCount = null;
   let heldCashCount = 0;
   let heldCashTotal = 0;
+  let cashReceiptCount = 0;
+  let ofdSentCount = 0;
   if (venueTobacco?.tobacco_accounting_enabled) {
     tobaccoCount = await fetchShiftTobaccoCount(shift.id);
     const hasRealCount = Boolean(tobaccoCount && !tobaccoCount.skipped);
@@ -374,23 +376,19 @@ apiShifts.post('/close', async (c) => {
        FROM venue_atol_settings WHERE venue_id = $1`,
       [venueId]
     );
-    const skipFiscalZ = !shouldEnqueueFiscalClose(!!holdRows[0]?.hold);
-    if (!skipFiscalZ) {
-      await enqueueShiftFiscalJob(client, {
-        venueId,
-        shiftId: shift.id,
-        type: 'close_shift',
-        operatorName: staff.name,
-      });
+    if (holdRows[0]?.hold) {
+      const split = await queueAutoCashBeforeZ(client, shift.id);
+      heldCashCount = split.unsentCount;
+      heldCashTotal = split.unsentTotal;
+      cashReceiptCount = split.cashCount;
+      ofdSentCount = split.sentCount;
     }
-    const { rows: heldRows } = await client.query(
-      `SELECT COUNT(*)::int AS count, COALESCE(SUM(total), 0) AS total
-       FROM receipts
-       WHERE shift_id = $1 AND fiscal_status = 'held'`,
-      [shift.id]
-    );
-    heldCashCount = Number(heldRows[0]?.count || 0);
-    heldCashTotal = Number(heldRows[0]?.total || 0);
+    await enqueueShiftFiscalJob(client, {
+      venueId,
+      shiftId: shift.id,
+      type: 'close_shift',
+      operatorName: staff.name,
+    });
 
     await client.query('COMMIT');
 
@@ -428,7 +426,8 @@ apiShifts.post('/close', async (c) => {
           cashier: staff.name,
           heldCashCount,
           heldCashTotal,
-          zSkipped: skipFiscalZ,
+          cashReceiptCount,
+          ofdSentCount,
         }),
         { venueId }
       );
