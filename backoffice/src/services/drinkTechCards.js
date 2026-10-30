@@ -6,6 +6,10 @@ const SCHEMA = [
   `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS serve_in VARCHAR(80)`,
   `ALTER TABLE modifiers ADD COLUMN IF NOT EXISTS unit VARCHAR(8)`,
   `ALTER TABLE kitchen_ticket_items ADD COLUMN IF NOT EXISTS serve_in VARCHAR(80)`,
+  // Способ приготовления пишется строкой состава. У мохито с приставкой «Способ:» это 151 символ.
+  `ALTER TABLE modifiers ALTER COLUMN name TYPE VARCHAR(300)`,
+  `ALTER TABLE order_item_modifiers ALTER COLUMN name TYPE VARCHAR(300)`,
+  `ALTER TABLE receipt_item_modifiers ALTER COLUMN name TYPE VARCHAR(300)`,
   `CREATE TABLE IF NOT EXISTS drink_tech_card_applied (
      menu_item_id INT PRIMARY KEY REFERENCES menu_items(id) ON DELETE CASCADE,
      card_id TEXT NOT NULL,
@@ -26,6 +30,28 @@ async function findWarehouse(client, name) {
   return rows[0] || null;
 }
 
+async function ensureWarehouse(client, spec) {
+  if (!spec.warehouseName) return null;
+  const existing = await findWarehouse(client, spec.warehouseName);
+  if (existing) return existing;
+  if (!spec.unit) return null;
+  let categoryId = null;
+  if (spec.warehouseCategory) {
+    const { rows } = await client.query(
+      `SELECT id FROM warehouse_categories WHERE lower(name) = lower($1) ORDER BY id LIMIT 1`,
+      [spec.warehouseCategory]
+    );
+    categoryId = rows[0] ? rows[0].id : null;
+  }
+  const inserted = await client.query(
+    `INSERT INTO warehouse_items (category_id, name, unit)
+     VALUES ($1, $2, $3)
+     RETURNING id, unit`,
+    [categoryId, spec.warehouseName, spec.unit]
+  );
+  return inserted.rows[0];
+}
+
 async function ensureModifier(client, spec) {
   const { rows } = await client.query(
     `SELECT id, warehouse_item_id
@@ -35,28 +61,25 @@ async function ensureModifier(client, spec) {
      LIMIT 1`,
     [spec.modifier]
   );
+  const warehouse = await ensureWarehouse(client, spec);
   let row = rows[0];
   if (!row) {
-    const warehouse = await findWarehouse(client, spec.warehouseName);
     const inserted = await client.query(
       `INSERT INTO modifiers (name, price, warehouse_item_id, qty, unit)
        VALUES ($1, 0, $2, 0, $3)
        RETURNING id, warehouse_item_id`,
-      [spec.modifier, warehouse ? warehouse.id : null, warehouse ? warehouse.unit : null]
+      [spec.modifier, warehouse ? warehouse.id : null, warehouse ? warehouse.unit : spec.unit]
     );
     return inserted.rows[0];
   }
-  if (!row.warehouse_item_id && spec.warehouseName) {
-    const warehouse = await findWarehouse(client, spec.warehouseName);
-    if (warehouse) {
-      await client.query(
-        `UPDATE modifiers
-         SET warehouse_item_id = $2
-         WHERE id = $1 AND warehouse_item_id IS NULL`,
-        [row.id, warehouse.id]
-      );
-      row = { ...row, warehouse_item_id: warehouse.id };
-    }
+  if (!row.warehouse_item_id && warehouse) {
+    await client.query(
+      `UPDATE modifiers
+       SET warehouse_item_id = $2, unit = COALESCE(unit, $3)
+       WHERE id = $1 AND warehouse_item_id IS NULL`,
+      [row.id, warehouse.id, warehouse.unit]
+    );
+    row = { ...row, warehouse_item_id: warehouse.id };
   }
   return row;
 }
@@ -118,7 +141,8 @@ export async function ensureDrinkTechCards() {
      FROM menu_items mi
      LEFT JOIN menu_categories mc ON mc.id = mi.category_id
      LEFT JOIN drink_tech_card_applied applied ON applied.menu_item_id = mi.id
-     WHERE mi.is_active = true`
+     WHERE mi.is_active = true
+        OR lower(replace(mi.name, 'ё', 'е')) = 'лимонад зеленый раш'`
   );
 
   const client = await pool.connect();

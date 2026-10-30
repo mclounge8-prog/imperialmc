@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS modifier_groups (
 CREATE TABLE IF NOT EXISTS modifiers (
   id                SERIAL PRIMARY KEY,
   group_id          INT REFERENCES modifier_groups(id) ON DELETE SET NULL,
-  name              VARCHAR(150) NOT NULL,
+  name              VARCHAR(300) NOT NULL,
   price             NUMERIC(10,2) NOT NULL DEFAULT 0,
   warehouse_item_id INT REFERENCES warehouse_items(id) ON DELETE SET NULL,
   qty               NUMERIC(10,3) NOT NULL DEFAULT 0, -- списание при выборе; 0 = не списывается
@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS order_item_modifiers (
   id                SERIAL PRIMARY KEY,
   order_item_id     INT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
   modifier_id       INT REFERENCES modifiers(id) ON DELETE SET NULL,
-  name              VARCHAR(150) NOT NULL,
+  name              VARCHAR(300) NOT NULL,
   price             NUMERIC(10,2) NOT NULL DEFAULT 0,
   warehouse_item_id INT REFERENCES warehouse_items(id) ON DELETE SET NULL,
   qty               NUMERIC(10,3) NOT NULL DEFAULT 0
@@ -192,7 +192,7 @@ CREATE TABLE IF NOT EXISTS receipt_item_modifiers (
   id               SERIAL PRIMARY KEY,
   receipt_item_id  INT NOT NULL REFERENCES receipt_items(id) ON DELETE CASCADE,
   modifier_id      INT REFERENCES modifiers(id) ON DELETE SET NULL,
-  name             VARCHAR(150) NOT NULL,
+  name             VARCHAR(300) NOT NULL,
   price            NUMERIC(10,2) NOT NULL DEFAULT 0
 );
 
