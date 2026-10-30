@@ -5,13 +5,25 @@
 
 export const DRINK_TECH_CARD_VERSION = 2;
 
-function ingredient(modifier, qty, warehouseName) {
+function ingredient(modifier, qty, warehouseName, extra = {}) {
   return {
     modifier,
     qty,
     warehouseName: warehouseName === undefined ? modifier : warehouseName,
+    unit: extra.unit || null,
+    warehouseCategory: extra.warehouseCategory || null,
   };
 }
+
+function preparation(text) {
+  return ingredient(`Способ: ${text}`, 0, null);
+}
+
+// В этой таблице у льда, лимона и мяты нет граммов. Строка остаётся в составе,
+// со склада не списывается.
+const UNSCORED_ICE = ingredient('Лёд', 0, 'Лёд');
+const UNSCORED_LEMON = ingredient('Лимон', 0, 'Лимон');
+const TEA = { unit: 'g', warehouseCategory: 'Чай' };
 
 // В таблице лёд без граммовки. В кассе порция уже была 120 г — так и списываем,
 // чтобы пустой дубль модификатора не обнулил списание.
@@ -203,6 +215,155 @@ export const DRINK_CARDS = [
       ingredient('Кокосовый сироп', 45),
     ],
   },
+  {
+    id: 'rosa-strawberry-mojito',
+    group: 'rosa',
+    keys: ['лимонад мохито'],
+    serveIn: 'Хайболл 470',
+    ingredients: [
+      ingredient('Газированная вода', 100),
+      ingredient('Спрайт', 100),
+      ingredient('Сахарный сироп', 10),
+      ingredient('Клубничный сироп', 25),
+      ingredient('Лайм', 30),
+      ingredient('Мята', 4),
+      UNSCORED_ICE,
+      preparation(
+        '1. В стакан добавить лайм, мяту и сахар. сироп, размять мадлером. 2. Добавить лед, затем все остальные ингредиенты. 3. Размешать барной ложкой.'
+      ),
+    ],
+  },
+  {
+    id: 'rosa-blue-lagoon',
+    group: 'rosa',
+    keys: ['лимонад голубая лагуна'],
+    serveIn: 'Хайболл 470',
+    ingredients: [
+      ingredient('Спрайт', 160),
+      ingredient('Газированная вода', 80),
+      ingredient('Лимонный сок', 10),
+      ingredient('Блю кюрасао сироп', 30),
+      UNSCORED_LEMON,
+      UNSCORED_ICE,
+    ],
+  },
+  {
+    id: 'rosa-pina',
+    group: 'rosa',
+    keys: ['лимонад пина-колада'],
+    serveIn: 'Хайболл 470',
+    ingredients: [
+      ingredient('Молоко', 130),
+      ingredient('Ананасовый сок', 130),
+      ingredient('Кокосовый сироп', 30),
+      ingredient('Лимонный сок', 10),
+      UNSCORED_ICE,
+      preparation(
+        '1. Поместить все ингридиенты в шейкер со льдом. 2. Взболтать и перелить через фильтр.'
+      ),
+    ],
+  },
+  {
+    id: 'rosa-citrus-pomegranate',
+    group: 'rosa',
+    keys: ['лимонад цитрус-гранат'],
+    serveIn: 'Хайболл 470',
+    ingredients: [
+      ingredient('Апельсиновый сок', 80),
+      ingredient('Спрайт', 150),
+      ingredient('Гренадин', 25),
+      ingredient('Лимонный сок', 10),
+      UNSCORED_LEMON,
+      UNSCORED_ICE,
+    ],
+  },
+  {
+    id: 'rosa-forest-berries',
+    group: 'rosa',
+    keys: ['лимонад лесные ягоды'],
+    serveIn: 'Хайболл 470',
+    ingredients: [
+      ingredient('Спрайт', 150),
+      ingredient('Клюквенный сок', 80),
+      ingredient('Лимонный сок', 10),
+      ingredient('Малиновый сироп', 15),
+      ingredient('Клубничный сироп', 10),
+      UNSCORED_ICE,
+    ],
+  },
+  {
+    id: 'rosa-pineapple-blackberry',
+    group: 'rosa',
+    keys: ['лимонад ананас-ежевика', 'лимонад ананас ежевика'],
+    serveIn: 'Хайболл 470',
+    ingredients: [
+      ingredient('Ананасовый сок', 80),
+      ingredient('Спрайт', 150),
+      ingredient('Ежевичный сироп', 25),
+      ingredient('Лимонный сок', 10),
+      UNSCORED_ICE,
+    ],
+  },
+  {
+    id: 'rosa-citrus-rush',
+    group: 'rosa',
+    keys: ['цитрусовый раш'],
+    serveIn: 'Хайболл 470',
+    ingredients: [
+      ingredient('Энергетик', 150),
+      ingredient('Апельсиновый сок', 80),
+      ingredient('Лимонный сок', 15),
+      UNSCORED_ICE,
+    ],
+  },
+  {
+    id: 'rosa-green-rush',
+    group: 'rosa',
+    keys: ['зеленый раш'],
+    serveIn: 'Хайболл 470',
+    ingredients: [
+      ingredient('Энергетик', 150),
+      ingredient('Апельсиновый сок', 80),
+      ingredient('Лимонный сок', 15),
+      ingredient('Блю кюрасао сироп', 15),
+      UNSCORED_ICE,
+    ],
+  },
+  {
+    id: 'rosa-grape-rush',
+    group: 'rosa',
+    keys: ['виноградный раш'],
+    serveIn: 'Хайболл 470',
+    ingredients: [
+      ingredient('Энергетик', 150),
+      ingredient('Виноградный сок', 80),
+      ingredient('Ежевичный сироп', 15),
+      ingredient('Мята', 0),
+      UNSCORED_ICE,
+    ],
+  },
+  {
+    id: 'rosa-sea-buckthorn-tea',
+    group: 'rosa',
+    keys: ['чай авторский облепиховый'],
+    serveIn: 'Чайник',
+    ingredients: [
+      ingredient('Облепиховое пюре', 170, 'Облепиховое пюре', TEA),
+      ingredient('Сахарный сироп', 40),
+      preparation('залить все кипятком в чайник и размешать'),
+    ],
+  },
+  {
+    id: 'rosa-raspberry-mandarin-tea',
+    group: 'rosa',
+    keys: ['чай авторский малина мандарин'],
+    serveIn: 'Чайник',
+    ingredients: [
+      ingredient('Малиновое пюре', 160, 'Малиновое пюре', TEA),
+      ingredient('Мандарин', 100, 'Мандарин', TEA),
+      preparation('залить пюре и мандарины в чайник, размять мадлером и залить кипятком'),
+    ],
+  },
 ];
 
 export function normalizeDrinkLabel(value) {
@@ -231,6 +392,10 @@ function isBeerContext(category) {
 export function matchDrinkCard(itemName, categoryName) {
   const name = normalizeDrinkLabel(itemName);
   const category = normalizeDrinkLabel(categoryName);
+  for (const card of DRINK_CARDS) {
+    if (card.group !== 'rosa') continue;
+    if (card.keys.some((key) => includesKey(name, key))) return card;
+  }
   for (const card of DRINK_CARDS) {
     if (card.group !== 'premium') continue;
     if (card.keys.some((key) => includesKey(name, key))) return card;
