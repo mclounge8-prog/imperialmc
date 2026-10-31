@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Text,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
@@ -536,8 +538,13 @@ export default function OrderScreen({ route, navigation }: Props) {
       showAlert('Нужен пречек', 'Сначала напечатайте пречек, затем проводите оплату.');
       return;
     }
-    if (!(await ensureShiftOpen(guest.total))) return;
+    // Окно оплаты сразу, чтобы нажатие было видно. Смену проверяем следом
+    // и закрываем окно, только если оплатить всё же нельзя.
     setPaymentTarget(guest);
+    const shiftOpen = await ensureShiftOpen(guest.total);
+    if (!shiftOpen) {
+      setPaymentTarget((current) => (current?.id === guest.id ? null : current));
+    }
   };
 
   const handleSendKitchen = async () => {
@@ -755,6 +762,21 @@ export default function OrderScreen({ route, navigation }: Props) {
         0
       )
     : 0;
+  const guestAmount = selectedGuest?.subtotal ?? selectedGuest?.total ?? 0;
+  const discountDisabled = busy || !selectedGuest || guestAmount <= 0 || precheckLocked;
+  const kitchenDisabled = busy || !selectedGuest || kitchenUnsent <= 0;
+  const precheckDisabled = busy || !selectedGuest || guestAmount <= 0;
+  const payDisabled = busy || !selectedGuest || guestAmount <= 0;
+  const closeDisabled = busy || !selectedGuest;
+  const tileStyle =
+    (disabled: boolean, extra: StyleProp<ViewStyle>) =>
+    ({ pressed }: { pressed: boolean }) =>
+      [
+        styles.actionTile,
+        extra,
+        disabled && styles.actionButtonDisabled,
+        pressed && !disabled && styles.actionPressed,
+      ];
   const moveTargetGuests = moveTarget
     ? order.guests.filter((g) => g.id !== moveTarget.currentGuestId)
     : [];
@@ -927,86 +949,81 @@ export default function OrderScreen({ route, navigation }: Props) {
         </View>
 
         <View style={styles.actions}>
-          {order.table && (
-            <Pressable style={styles.transferButton} disabled={busy} onPress={openTransferModal}>
-              <Text style={styles.transferButtonText}>🔀 Пересадить</Text>
-            </Pressable>
-          )}
-          <Pressable
-            style={[styles.actionButton, styles.discountButton]}
-            disabled={
-              busy ||
-              !selectedGuest ||
-              (selectedGuest.subtotal ?? selectedGuest.total) <= 0 ||
-              precheckLocked
-            }
-            onPress={openDiscountModal}
-          >
-            <Text style={styles.discountButtonText}>
-              Скидка
-              {selectedGuest && Number(selectedGuest.discountPercent) > 0
-                ? ` ${selectedGuest.discountPercent}%`
-                : ''}
-            </Text>
-          </Pressable>
-          {kitchenOn && !precheckLocked ? (
+          <View style={styles.actionGrid}>
+            {order.table && (
+              <Pressable
+                style={tileStyle(busy, styles.transferButton)}
+                disabled={busy}
+                onPress={openTransferModal}
+              >
+                <Text style={styles.transferButtonText}>🔀 Пересадить</Text>
+              </Pressable>
+            )}
             <Pressable
-              style={[styles.actionButton, styles.kitchenButton]}
-              disabled={busy || !selectedGuest || kitchenUnsent <= 0}
-              onPress={() => void handleSendKitchen()}
+              style={tileStyle(discountDisabled, styles.discountButton)}
+              disabled={discountDisabled}
+              onPress={openDiscountModal}
             >
-              <Text style={styles.kitchenButtonText}>
-                {kitchenUnsent <= 0 ? 'На кухне' : 'Отправить на кухню'}
+              <Text style={styles.discountButtonText}>
+                Скидка
+                {selectedGuest && Number(selectedGuest.discountPercent) > 0
+                  ? ` ${selectedGuest.discountPercent}%`
+                  : ''}
               </Text>
             </Pressable>
-          ) : null}
+            {kitchenOn && !precheckLocked ? (
+              <Pressable
+                style={tileStyle(kitchenDisabled, styles.kitchenButton)}
+                disabled={kitchenDisabled}
+                onPress={() => void handleSendKitchen()}
+              >
+                <Text style={styles.kitchenButtonText}>
+                  {kitchenUnsent <= 0 ? 'На кухне' : 'Отправить на кухню'}
+                </Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              style={tileStyle(closeDisabled, styles.closeButton)}
+              disabled={closeDisabled}
+              onPress={handleClose}
+            >
+              <Text style={styles.closeButtonText}>
+                {precheckLocked ? 'Отменить пречек' : `Закрыть чек — ${selectedGuest?.label ?? ''}`}
+              </Text>
+            </Pressable>
+          </View>
           {precheckMode && !precheckLocked ? (
             <Pressable
-              style={[styles.actionButton, styles.precheckButton]}
-              disabled={
-                busy ||
-                !selectedGuest ||
-                (selectedGuest.subtotal ?? selectedGuest.total) <= 0
-              }
+              style={({ pressed }) => [
+                styles.actionButton,
+                styles.precheckButton,
+                precheckDisabled && styles.actionButtonDisabled,
+                pressed && !precheckDisabled && styles.actionPressed,
+              ]}
+              disabled={precheckDisabled}
               onPress={() => void handlePrecheck()}
             >
               <Text style={styles.precheckButtonText}>Пречек</Text>
             </Pressable>
           ) : (
             <Pressable
-              style={styles.payButtonWrapper}
-              disabled={
-                busy ||
-                !selectedGuest ||
-                (selectedGuest.subtotal ?? selectedGuest.total) <= 0
-              }
+              style={({ pressed }) => [
+                styles.payButtonWrapper,
+                pressed && !payDisabled && styles.actionPressed,
+              ]}
+              disabled={payDisabled}
               onPress={handlePay}
             >
               <LinearGradient
                 colors={GRADIENT_BLUE}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={[
-                  styles.actionButton,
-                  (busy ||
-                    !selectedGuest ||
-                    (selectedGuest.subtotal ?? selectedGuest.total) <= 0) &&
-                    styles.actionButtonDisabled,
-                ]}
+                style={[styles.actionButton, payDisabled && styles.actionButtonDisabled]}
               >
                 <Text style={styles.payButtonText}>Оплата — {selectedGuest?.label ?? ''}</Text>
               </LinearGradient>
             </Pressable>
           )}
-          <Pressable
-            style={[styles.actionButton, styles.closeButton]}
-            disabled={busy || !selectedGuest}
-            onPress={handleClose}
-          >
-            <Text style={styles.closeButtonText}>
-              {precheckLocked ? 'Отменить пречек' : `Закрыть чек — ${selectedGuest?.label ?? ''}`}
-            </Text>
-          </Pressable>
         </View>
       </View>
 
@@ -1546,47 +1563,69 @@ const styles = StyleSheet.create({
   totalLabel: { color: colors.textMuted, fontSize: 15 },
   totalValue: { color: colors.text, fontSize: 22, fontWeight: '700' },
 
-  actions: { gap: 12 },
-  payButtonWrapper: { width: '100%' },
-  transferButton: {
+  actions: { gap: 8 },
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 8,
+  },
+  actionTile: {
+    width: '48.5%',
+    minHeight: 46,
     borderRadius: 12,
-    minHeight: 54,
-    paddingVertical: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  actionPressed: { opacity: 0.65 },
+  payButtonWrapper: { width: '100%' },
+  transferButton: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  transferButtonText: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  transferButtonText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   actionButton: {
     width: '100%',
-    minHeight: 54,
+    minHeight: 48,
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionButtonDisabled: { opacity: 0.5 },
-  payButtonText: { color: '#f1f1f3', fontSize: 17, fontWeight: '700' },
+  payButtonText: { color: '#f1f1f3', fontSize: 17, fontWeight: '700', textAlign: 'center' },
   closeButton: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  closeButtonText: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
+  closeButtonText: {
+    color: colors.textMuted,
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   precheckButton: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.accent2,
   },
-  precheckButtonText: { color: colors.accent2, fontSize: 16, fontWeight: '700' },
+  precheckButtonText: { color: colors.accent2, fontSize: 16, fontWeight: '700', textAlign: 'center' },
   kitchenButton: {
     backgroundColor: 'rgba(63, 99, 230, 0.16)',
     borderWidth: 1,
     borderColor: colors.accent2,
   },
-  kitchenButtonText: { color: colors.accent2, fontSize: 16, fontWeight: '700' },
+  kitchenButtonText: { color: colors.accent2, fontSize: 15, fontWeight: '700', textAlign: 'center' },
   kitchenSentLabel: { color: colors.accent2, fontSize: 11, marginTop: 2 },
   kitchenReadyLabel: { color: '#6ee7a8', fontSize: 12, marginTop: 2, fontWeight: '700' },
   discountButton: {
@@ -1594,7 +1633,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e6a03f',
   },
-  discountButtonText: { color: '#e6a03f', fontSize: 16, fontWeight: '700' },
+  discountButtonText: { color: '#e6a03f', fontSize: 15, fontWeight: '700', textAlign: 'center' },
   discountInline: {
     color: colors.textMuted,
     fontSize: 12,
