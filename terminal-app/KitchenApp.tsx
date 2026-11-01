@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  PanResponder,
   Pressable,
   ScrollView,
   StatusBar,
@@ -64,49 +63,6 @@ function Pulse({ style, color }: { style?: object; color?: string }) {
   return <Animated.View pointerEvents="none" style={[styles.pulse, style, color ? { backgroundColor: color } : null, { opacity }]} />;
 }
 
-function SwipeToDismiss({ onDismiss, children }: { onDismiss: () => void; children: React.ReactNode }) {
-  const onDismissRef = useRef(onDismiss);
-  onDismissRef.current = onDismiss;
-  const translateX = useRef(new Animated.Value(0)).current;
-  const pan = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) =>
-        Math.abs(gesture.dx) > 18 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
-      onPanResponderMove: (_, gesture) => {
-        translateX.setValue(gesture.dx);
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (Math.abs(gesture.dx) > 72) {
-          Animated.timing(translateX, {
-            toValue: gesture.dx > 0 ? 520 : -520,
-            duration: 140,
-            useNativeDriver: true,
-          }).start(({ finished }) => {
-            if (finished) onDismissRef.current();
-          });
-          return;
-        }
-        Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
-      },
-    })
-  ).current;
-
-  return (
-    <View style={styles.swipeWrap}>
-      <View style={styles.swipeUnder}>
-        <Text style={styles.swipeUnderText}>Убрать</Text>
-        <Text style={styles.swipeUnderText}>Убрать</Text>
-      </View>
-      <Animated.View style={{ transform: [{ translateX }] }} {...pan.panHandlers}>
-        {children}
-      </Animated.View>
-    </View>
-  );
-}
-
 function KitchenRoot() {
   const insets = useSafeAreaInsets();
   const [venueId, setVenueId] = useState<number | null>(null);
@@ -118,8 +74,6 @@ function KitchenRoot() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [now, setNow] = useState(() => Date.now());
-  const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set());
-  const [hiddenReady, setHiddenReady] = useState(false);
   const venueIdRef = useRef<number | null>(null);
   const seenTickets = useRef<Set<number> | null>(null);
   const seenVenue = useRef<number | null>(null);
@@ -167,21 +121,8 @@ function KitchenRoot() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    void AsyncStorage.getItem(HIDDEN_KEY)
-      .then((raw) => {
-        if (cancelled || !raw) return;
-        const parsed = JSON.parse(raw) as unknown;
-        if (!Array.isArray(parsed)) return;
-        setHiddenIds(new Set(parsed.map(Number).filter((id) => Number.isInteger(id) && id > 0)));
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setHiddenReady(true);
-      });
-    return () => {
-      cancelled = true;
-    };
+    // Старый свайп прятал заказы на этом планшете. Возвращаем их в список.
+    void AsyncStorage.removeItem(HIDDEN_KEY).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -197,31 +138,6 @@ function KitchenRoot() {
     seenTickets.current = known;
     if (fresh) playNewKitchenOrderSound();
   }, [board]);
-
-  useEffect(() => {
-    if (!board || !hiddenReady) return;
-    const live = new Set(board.tickets.map((ticket) => ticket.id));
-    setHiddenIds((prev) => {
-      let changed = false;
-      const next = new Set<number>();
-      for (const id of prev) {
-        if (live.has(id)) next.add(id);
-        else changed = true;
-      }
-      if (!changed) return prev;
-      void AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]));
-      return next;
-    });
-  }, [board, hiddenReady]);
-
-  const hideTicket = (id: number) => {
-    setHiddenIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      void AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]));
-      return next;
-    });
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -280,9 +196,7 @@ function KitchenRoot() {
       ? layoutTablesOnViewport(preparedTables, viewport.width, viewport.height)
       : null;
 
-  const visibleTickets = hiddenReady
-    ? (board?.tickets ?? []).filter((ticket) => !hiddenIds.has(ticket.id))
-    : [];
+  const visibleTickets = board?.tickets ?? [];
   const ticketBands = splitKitchenTickets(visibleTickets, now);
   const newByTable = new Map<number, number>();
   const timingByTable = new Map<number, KitchenTimingState>();
@@ -336,7 +250,7 @@ function KitchenRoot() {
             ? readyCount > 0
               ? ` · готово ${readyCount} из ${ticket.items.length}`
               : ' · новый'
-            : ' · готов · смахните, чтобы убрать'}
+            : ' · готов'}
         </Text>
         {ticket.items.map((item) => (
           <View key={item.id} style={[styles.itemBlock, item.ready && styles.itemReady]}>
@@ -366,12 +280,7 @@ function KitchenRoot() {
         ))}
       </View>
     );
-    if (pending) return <View key={ticket.id}>{card}</View>;
-    return (
-      <SwipeToDismiss key={ticket.id} onDismiss={() => hideTicket(ticket.id)}>
-        {card}
-      </SwipeToDismiss>
-    );
+    return <View key={ticket.id}>{card}</View>;
   };
 
   if (loading && !board && venues.length === 0) {
@@ -500,7 +409,7 @@ function KitchenRoot() {
               {ticketBands.active.map((ticket) => renderTicket(ticket))}
               {ticketBands.sunk.length ? <Text style={styles.sunkTitle}>Готовые</Text> : null}
               {ticketBands.sunk.map((ticket) => renderTicket(ticket))}
-              {hiddenReady && !visibleTickets.length ? (
+              {!visibleTickets.length ? (
                 <Text style={styles.hint}>Пока ничего не отправили на кухню</Text>
               ) : null}
             </ScrollView>
@@ -593,17 +502,6 @@ const styles = StyleSheet.create({
   cardNew: { borderColor: colors.accent2 },
   cardDone: { borderColor: '#6ee7a8' },
   sunkTitle: { color: colors.textMuted, fontSize: 13, fontWeight: '700', marginTop: 4 },
-  swipeWrap: { position: 'relative' },
-  swipeUnder: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: colors.danger,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-  },
-  swipeUnderText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   cardWarn: {
     borderWidth: 2,
     borderColor: '#f0c14b',
