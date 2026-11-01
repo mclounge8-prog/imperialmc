@@ -3,6 +3,7 @@ import { pool } from '../db.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { findDeviceByToken } from '../middleware/deviceAuth.js';
 import { withTableDimensions } from '../tableSizes.js';
+import { kitchenItemIdsFromBody, pickKitchenItems } from '../services/kitchenSend.js';
 
 const apiKitchen = new Hono();
 
@@ -444,10 +445,28 @@ apiKitchen.post('/orders/:orderId/guests/:guestId/kitchen', requireStaffToken, a
       [orderId, guestId]
     );
 
-    const fresh = itemRows.filter((item) => Number(item.qty) - Number(item.sent_qty) > 0);
+    let body = {};
+    try {
+      const parsed = await c.req.json();
+      if (parsed && typeof parsed === 'object') body = parsed;
+    } catch {
+      body = {};
+    }
+    const fresh = pickKitchenItems(
+      itemRows.map((item) => ({
+        id: item.id,
+        qty: item.qty,
+        sentQty: item.sent_qty,
+        row: item,
+      })),
+      kitchenItemIdsFromBody(body)
+    ).map((item) => item.row);
     if (!fresh.length) {
       await client.query('ROLLBACK');
-      return sendError(c, 409, 'Новых позиций для кухни нет — всё уже отправлено', 'NOTHING_TO_SEND');
+      const message = Array.isArray(kitchenItemIdsFromBody(body))
+        ? 'Отметьте позиции, которые нужно отправить на кухню'
+        : 'Новых позиций для кухни нет — всё уже отправлено';
+      return sendError(c, 409, message, 'NOTHING_TO_SEND');
     }
 
     const itemIds = fresh.map((item) => item.id);

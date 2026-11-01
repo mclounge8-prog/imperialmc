@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  PanResponder,
   Pressable,
   ScrollView,
   StatusBar,
@@ -20,12 +21,14 @@ import {
   type Zone,
 } from './src/api/client';
 import { layoutTablesOnViewport, normalizeTableSize, snapToGrid, layoutSizeForTable } from './src/utils/tableLayout';
-import { kitchenFinishedAt, kitchenTiming, moreUrgent, type KitchenTimingState } from './src/kitchen/timing';
+import { kitchenFinishedAt, kitchenTiming, moreUrgent, splitKitchenTickets, type KitchenTimingState } from './src/kitchen/timing';
+import { playNewKitchenOrderSound } from './src/kitchen/sound';
 import AppUpdateGate from './src/components/AppUpdateGate';
 import UpdateCheckRow from './src/components/UpdateCheckRow';
 import { requestUpdateCheck } from './src/services/updateEvents';
 
 const VENUE_KEY = 'imperial-mc:kitchen-venue';
+const HIDDEN_KEY = 'imperial-mc:kitchen-hidden';
 
 const STATUS_COLORS: Record<string, string> = {
   free: colors.accent2,
@@ -61,6 +64,49 @@ function Pulse({ style, color }: { style?: object; color?: string }) {
   return <Animated.View pointerEvents="none" style={[styles.pulse, style, color ? { backgroundColor: color } : null, { opacity }]} />;
 }
 
+function SwipeToDismiss({ onDismiss, children }: { onDismiss: () => void; children: React.ReactNode }) {
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 18 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
+      onPanResponderMove: (_, gesture) => {
+        translateX.setValue(gesture.dx);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (Math.abs(gesture.dx) > 72) {
+          Animated.timing(translateX, {
+            toValue: gesture.dx > 0 ? 520 : -520,
+            duration: 140,
+            useNativeDriver: true,
+          }).start(({ finished }) => {
+            if (finished) onDismissRef.current();
+          });
+          return;
+        }
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+      },
+    })
+  ).current;
+
+  return (
+    <View style={styles.swipeWrap}>
+      <View style={styles.swipeUnder}>
+        <Text style={styles.swipeUnderText}>Убрать</Text>
+        <Text style={styles.swipeUnderText}>Убрать</Text>
+      </View>
+      <Animated.View style={{ transform: [{ translateX }] }} {...pan.panHandlers}>
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
 function KitchenRoot() {
   const insets = useSafeAreaInsets();
   const [venueId, setVenueId] = useState<number | null>(null);
@@ -72,7 +118,11 @@ function KitchenRoot() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [now, setNow] = useState(() => Date.now());
+  const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set());
+  const [hiddenReady, setHiddenReady] = useState(false);
   const venueIdRef = useRef<number | null>(null);
+  const seenTickets = useRef<Set<number> | null>(null);
+  const seenVenue = useRef<number | null>(null);
   venueIdRef.current = venueId;
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
@@ -115,6 +165,63 @@ function KitchenRoot() {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void AsyncStorage.getItem(HIDDEN_KEY)
+      .then((raw) => {
+        if (cancelled || !raw) return;
+        const parsed = JSON.parse(raw) as unknown;
+        if (!Array.isArray(parsed)) return;
+        setHiddenIds(new Set(parsed.map(Number).filter((id) => Number.isInteger(id) && id > 0)));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setHiddenReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!board) return;
+    if (seenVenue.current !== board.venueId) {
+      seenVenue.current = board.venueId;
+      seenTickets.current = new Set(board.tickets.map((ticket) => ticket.id));
+      return;
+    }
+    const known = seenTickets.current ?? new Set<number>();
+    const fresh = board.tickets.some((ticket) => !known.has(ticket.id));
+    for (const ticket of board.tickets) known.add(ticket.id);
+    seenTickets.current = known;
+    if (fresh) playNewKitchenOrderSound();
+  }, [board]);
+
+  useEffect(() => {
+    if (!board || !hiddenReady) return;
+    const live = new Set(board.tickets.map((ticket) => ticket.id));
+    setHiddenIds((prev) => {
+      let changed = false;
+      const next = new Set<number>();
+      for (const id of prev) {
+        if (live.has(id)) next.add(id);
+        else changed = true;
+      }
+      if (!changed) return prev;
+      void AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, [board, hiddenReady]);
+
+  const hideTicket = (id: number) => {
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      void AsyncStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -173,15 +280,99 @@ function KitchenRoot() {
       ? layoutTablesOnViewport(preparedTables, viewport.width, viewport.height)
       : null;
 
+  const visibleTickets = hiddenReady
+    ? (board?.tickets ?? []).filter((ticket) => !hiddenIds.has(ticket.id))
+    : [];
+  const ticketBands = splitKitchenTickets(visibleTickets, now);
   const newByTable = new Map<number, number>();
   const timingByTable = new Map<number, KitchenTimingState>();
-  for (const ticket of board?.tickets ?? []) {
+  for (const ticket of visibleTickets) {
     const pending = ticket.items.some((item) => !item.ready);
     if (!ticket.tableId || !pending) continue;
     newByTable.set(ticket.tableId, (newByTable.get(ticket.tableId) || 0) + 1);
     const timing = kitchenTiming(new Date(ticket.createdAt).getTime(), now, true);
     timingByTable.set(ticket.tableId, moreUrgent(timingByTable.get(ticket.tableId), timing.state));
   }
+
+  const renderTicket = (ticket: NonNullable<KitchenBoard>['tickets'][number]) => {
+    const pending = ticket.items.some((item) => !item.ready);
+    const readyCount = ticket.items.filter((item) => item.ready).length;
+    const timing = kitchenTiming(
+      new Date(ticket.createdAt).getTime(),
+      now,
+      pending,
+      pending ? null : kitchenFinishedAt(ticket.readyAt, ticket.items.map((item) => item.readyAt))
+    );
+    const card = (
+      <View
+        style={[
+          styles.card,
+          pending && timing.state === 'ok' && styles.cardNew,
+          timing.state === 'warn' && styles.cardWarn,
+          timing.state === 'late' && styles.cardLate,
+          !pending && styles.cardDone,
+        ]}
+      >
+        {timing.state === 'late' ? <Pulse style={styles.cardPulse} color={colors.danger} /> : null}
+        {timing.state === 'warn' ? <Pulse style={styles.cardPulse} color="#f0c14b" /> : null}
+        {pending && timing.state === 'ok' ? <Pulse style={styles.cardPulse} /> : null}
+        <View style={styles.cardTop}>
+          <Text style={styles.cardTable}>{ticket.tableName}</Text>
+          <Text style={styles.cardTime}>{formatTime(ticket.createdAt)}</Text>
+        </View>
+        <Text
+          style={[
+            styles.timer,
+            timing.state === 'warn' && styles.timerWarn,
+            timing.state === 'late' && styles.timerLate,
+            timing.state === 'done' && styles.timerDone,
+          ]}
+        >
+          {timing.label}
+        </Text>
+        <Text style={styles.cardGuest}>
+          {ticket.guestLabel}
+          {pending
+            ? readyCount > 0
+              ? ` · готово ${readyCount} из ${ticket.items.length}`
+              : ' · новый'
+            : ' · готов · смахните, чтобы убрать'}
+        </Text>
+        {ticket.items.map((item) => (
+          <View key={item.id} style={[styles.itemBlock, item.ready && styles.itemReady]}>
+            <View style={styles.itemRow}>
+              <Text style={styles.itemName}>
+                {item.qty}× {item.name}
+              </Text>
+              {item.ready ? (
+                <Text style={styles.itemReadyLabel}>Готово</Text>
+              ) : (
+                <Pressable
+                  style={styles.itemReadyButton}
+                  disabled={busyId != null}
+                  onPress={() => void markItemReady(item.id)}
+                >
+                  <Text style={styles.itemReadyButtonText}>{busyId === item.id ? '…' : 'Готово'}</Text>
+                </Pressable>
+              )}
+            </View>
+            {item.serveIn ? <Text style={styles.serveIn}>посуда: {item.serveIn}</Text> : null}
+            {item.modifiers.map((mod, index) => (
+              <Text key={`${item.id}-${index}`} style={styles.mod}>
+                {modifierLine(mod)}
+              </Text>
+            ))}
+          </View>
+        ))}
+      </View>
+    );
+    if (pending) return <View key={ticket.id}>{card}</View>;
+    return (
+      <SwipeToDismiss key={ticket.id} onDismiss={() => hideTicket(ticket.id)}>
+        {card}
+      </SwipeToDismiss>
+    );
+  };
 
   if (loading && !board && venues.length === 0) {
     return (
@@ -306,84 +497,12 @@ function KitchenRoot() {
           <View style={styles.list}>
             <Text style={styles.listTitle}>Заказы</Text>
             <ScrollView contentContainerStyle={styles.listContent}>
-              {(board.tickets.length ? board.tickets : []).map((ticket) => {
-                const pending = ticket.items.some((item) => !item.ready);
-                const readyCount = ticket.items.filter((item) => item.ready).length;
-                const timing = kitchenTiming(
-                  new Date(ticket.createdAt).getTime(),
-                  now,
-                  pending,
-                  pending ? null : kitchenFinishedAt(ticket.readyAt, ticket.items.map((item) => item.readyAt))
-                );
-                return (
-                  <View
-                    key={ticket.id}
-                    style={[
-                      styles.card,
-                      pending && timing.state === 'ok' && styles.cardNew,
-                      timing.state === 'warn' && styles.cardWarn,
-                      timing.state === 'late' && styles.cardLate,
-                    ]}
-                  >
-                    {timing.state === 'late' ? <Pulse style={styles.cardPulse} color={colors.danger} /> : null}
-                    {timing.state === 'warn' ? <Pulse style={styles.cardPulse} color="#f0c14b" /> : null}
-                    {pending && timing.state === 'ok' ? <Pulse style={styles.cardPulse} /> : null}
-                    <View style={styles.cardTop}>
-                      <Text style={styles.cardTable}>{ticket.tableName}</Text>
-                      <Text style={styles.cardTime}>{formatTime(ticket.createdAt)}</Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.timer,
-                        timing.state === 'warn' && styles.timerWarn,
-                        timing.state === 'late' && styles.timerLate,
-                        timing.state === 'done' && styles.timerDone,
-                      ]}
-                    >
-                      {timing.label}
-                    </Text>
-                    <Text style={styles.cardGuest}>
-                      {ticket.guestLabel}
-                      {pending
-                        ? readyCount > 0
-                          ? ` · готово ${readyCount} из ${ticket.items.length}`
-                          : ' · новый'
-                        : ' · готов'}
-                    </Text>
-                    {ticket.items.map((item) => (
-                      <View key={item.id} style={[styles.itemBlock, item.ready && styles.itemReady]}>
-                        <View style={styles.itemRow}>
-                          <Text style={styles.itemName}>
-                            {item.qty}× {item.name}
-                          </Text>
-                          {item.ready ? (
-                            <Text style={styles.itemReadyLabel}>Готово</Text>
-                          ) : (
-                            <Pressable
-                              style={styles.itemReadyButton}
-                              disabled={busyId != null}
-                              onPress={() => void markItemReady(item.id)}
-                            >
-                              <Text style={styles.itemReadyButtonText}>
-                                {busyId === item.id ? '…' : 'Готово'}
-                              </Text>
-                            </Pressable>
-                          )}
-                        </View>
-                        {item.serveIn ? (
-                          <Text style={styles.serveIn}>посуда: {item.serveIn}</Text>
-                        ) : null}
-                        {item.modifiers.map((mod, index) => (
-                          <Text key={`${item.id}-${index}`} style={styles.mod}>
-                            {modifierLine(mod)}
-                          </Text>
-                        ))}
-                      </View>
-                    ))}
-                  </View>
-                );
-              })}
-              {!board.tickets.length ? <Text style={styles.hint}>Пока ничего не отправили на кухню</Text> : null}
+              {ticketBands.active.map((ticket) => renderTicket(ticket))}
+              {ticketBands.sunk.length ? <Text style={styles.sunkTitle}>Готовые</Text> : null}
+              {ticketBands.sunk.map((ticket) => renderTicket(ticket))}
+              {hiddenReady && !visibleTickets.length ? (
+                <Text style={styles.hint}>Пока ничего не отправили на кухню</Text>
+              ) : null}
             </ScrollView>
           </View>
         </View>
@@ -472,6 +591,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardNew: { borderColor: colors.accent2 },
+  cardDone: { borderColor: '#6ee7a8' },
+  sunkTitle: { color: colors.textMuted, fontSize: 13, fontWeight: '700', marginTop: 4 },
+  swipeWrap: { position: 'relative' },
+  swipeUnder: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: colors.danger,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  swipeUnderText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   cardWarn: {
     borderWidth: 2,
     borderColor: '#f0c14b',

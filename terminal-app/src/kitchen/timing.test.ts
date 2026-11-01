@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KITCHEN_LIMIT_MS, KITCHEN_WARN_MS, kitchenFinishedAt, kitchenTiming, moreUrgent } from './timing.ts';
+import {
+  KITCHEN_LIMIT_MS,
+  KITCHEN_SINK_AFTER_MS,
+  KITCHEN_WARN_MS,
+  kitchenFinishedAt,
+  kitchenTiming,
+  moreUrgent,
+  splitKitchenTickets,
+} from './timing.ts';
 import { chooseUpdatePlan } from '../services/updatePlan.ts';
 
 const base = Date.parse('2026-10-16T12:00:00.000Z');
@@ -28,6 +36,26 @@ test('finished ticket freezes at the ready moment', () => {
   assert.equal(done.label, 'готов за 12:00');
   assert.equal(later.label, done.label);
   assert.equal(kitchenFinishedAt(null, [new Date(readyAt).toISOString()]), readyAt);
+});
+
+test('ready tickets stay put for a minute and a half, then sink oldest last', () => {
+  const cooking = { id: 1, readyAt: null, items: [{ ready: false, readyAt: null }] };
+  const justReadyAt = new Date(base + 1000).toISOString();
+  const justReady = { id: 2, readyAt: justReadyAt, items: [{ ready: true, readyAt: justReadyAt }] };
+  const oldReadyAt = new Date(base).toISOString();
+  const olderReadyAt = new Date(base - 5000).toISOString();
+  const oldReady = { id: 3, readyAt: oldReadyAt, items: [{ ready: true, readyAt: oldReadyAt }] };
+  const olderReady = { id: 4, readyAt: olderReadyAt, items: [{ ready: true, readyAt: olderReadyAt }] };
+  const now = base + KITCHEN_SINK_AFTER_MS;
+  const split = splitKitchenTickets([cooking, olderReady, justReady, oldReady], now);
+  assert.deepEqual(
+    split.active.map((ticket) => ticket.id),
+    [1, 2]
+  );
+  assert.deepEqual(
+    split.sunk.map((ticket) => ticket.id),
+    [3, 4]
+  );
 });
 
 test('table takes the most urgent unfinished ticket', () => {
