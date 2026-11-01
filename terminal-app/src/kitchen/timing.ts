@@ -1,5 +1,7 @@
 export const KITCHEN_WARN_MS = 15 * 60 * 1000;
 export const KITCHEN_LIMIT_MS = 20 * 60 * 1000;
+// Готовый заказ остаётся на месте полторы минуты, потом уходит в низ списка.
+export const KITCHEN_SINK_AFTER_MS = 90 * 1000;
 
 export type KitchenTimingState = 'ok' | 'warn' | 'late' | 'done';
 
@@ -45,6 +47,34 @@ export function kitchenTiming(
   if (age >= KITCHEN_LIMIT_MS) return { state: 'late', label: `сверх 20 мин · ${clock}` };
   if (age >= KITCHEN_WARN_MS) return { state: 'warn', label: `время выходит · ${clock}` };
   return { state: 'ok', label: `осталось ${formatClock(KITCHEN_LIMIT_MS - age)}` };
+}
+
+export type KitchenListTicket = {
+  readyAt: string | null;
+  items: Array<{ ready: boolean; readyAt: string | null }>;
+};
+
+export function splitKitchenTickets<T extends KitchenListTicket>(
+  tickets: T[],
+  nowMs: number
+): { active: T[]; sunk: T[] } {
+  const active: T[] = [];
+  const sunk: { ticket: T; readyAt: number }[] = [];
+  for (const ticket of tickets) {
+    const pending = ticket.items.some((item) => !item.ready);
+    if (pending) {
+      active.push(ticket);
+      continue;
+    }
+    const readyAt = kitchenFinishedAt(
+      ticket.readyAt,
+      ticket.items.map((item) => item.readyAt)
+    );
+    if (readyAt == null || nowMs - readyAt < KITCHEN_SINK_AFTER_MS) active.push(ticket);
+    else sunk.push({ ticket, readyAt });
+  }
+  sunk.sort((a, b) => b.readyAt - a.readyAt);
+  return { active, sunk: sunk.map((entry) => entry.ticket) };
 }
 
 export function moreUrgent(current: KitchenTimingState | undefined, next: KitchenTimingState): KitchenTimingState {

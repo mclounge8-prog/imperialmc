@@ -131,6 +131,8 @@ export default function OrderScreen({ route, navigation }: Props) {
   const [kitchenSent, setKitchenSent] = useState<Record<number, number>>({});
   const [kitchenReadyQty, setKitchenReadyQty] = useState<Record<number, number>>({});
   const [kitchenReadyGuests, setKitchenReadyGuests] = useState<number[]>([]);
+  const [kitchenPickGuestId, setKitchenPickGuestId] = useState<number | null>(null);
+  const [kitchenPickSelected, setKitchenPickSelected] = useState<number[]>([]);
 
   const showAlert = useCallback((title: string, message: string, buttons?: AlertButton[]) => {
     setAlertState({ title, message, buttons: buttons ?? [{ text: 'ОК' }] });
@@ -547,22 +549,42 @@ export default function OrderScreen({ route, navigation }: Props) {
     }
   };
 
-  const handleSendKitchen = async () => {
-    if (!session || !order || !deviceToken) return;
+  const openKitchenSend = () => {
+    if (!order) return;
     const guest = order.guests.find((g) => g.id === selectedGuestId) ?? order.guests[0];
     if (!guest) return;
     if (guest.precheckPrintedAt) {
       showAlert('Пречек напечатан', 'На кухню отправляют до пречека.');
       return;
     }
+    const unsent = guest.items.filter((item) => item.qty - (kitchenSent[item.id] || 0) > 0);
+    if (!unsent.length) {
+      showAlert('Кухня', 'Новых позиций для кухни нет — всё уже отправлено');
+      return;
+    }
+    setKitchenPickGuestId(guest.id);
+    setKitchenPickSelected(unsent.map((item) => item.id));
+  };
+
+  const handleSendKitchen = async (guestId: number, itemIds: number[]) => {
+    if (!session || !order || !deviceToken || !itemIds.length) return;
+    const guest = order.guests.find((g) => g.id === guestId);
+    if (!guest) return;
+    if (guest.precheckPrintedAt) {
+      setKitchenPickGuestId(null);
+      showAlert('Пречек напечатан', 'На кухню отправляют до пречека.');
+      return;
+    }
     setBusy(true);
     try {
-      const result = await sendGuestToKitchen(order.id, guest.id, session.token, deviceToken);
+      const result = await sendGuestToKitchen(order.id, guest.id, session.token, deviceToken, itemIds);
       const next: Record<number, number> = {};
       for (const item of result.items) next[item.orderItemId] = item.sentQty;
       setKitchenSent(next);
+      setKitchenPickGuestId(null);
       showAlert('Кухня', `Отправлено позиций: ${result.ticket.itemCount}`);
     } catch (e) {
+      setKitchenPickGuestId(null);
       showAlert('Кухня', e instanceof Error ? e.message : 'Не удалось отправить на кухню');
     } finally {
       setBusy(false);
@@ -768,6 +790,16 @@ export default function OrderScreen({ route, navigation }: Props) {
   const precheckDisabled = busy || !selectedGuest || guestAmount <= 0;
   const payDisabled = busy || !selectedGuest || guestAmount <= 0;
   const closeDisabled = busy || !selectedGuest;
+  const kitchenPickGuest =
+    kitchenPickGuestId != null
+      ? order.guests.find((guest) => guest.id === kitchenPickGuestId) ?? null
+      : null;
+  const kitchenPickLines = (kitchenPickGuest?.items ?? [])
+    .map((item) => ({ item, unsent: item.qty - (kitchenSent[item.id] || 0) }))
+    .filter((line) => line.unsent > 0);
+  const kitchenPickIds = kitchenPickSelected.filter((id) =>
+    kitchenPickLines.some((line) => line.item.id === id)
+  );
   const tileStyle =
     (disabled: boolean, extra: StyleProp<ViewStyle>) =>
     ({ pressed }: { pressed: boolean }) =>
@@ -975,7 +1007,7 @@ export default function OrderScreen({ route, navigation }: Props) {
               <Pressable
                 style={tileStyle(kitchenDisabled, styles.kitchenButton)}
                 disabled={kitchenDisabled}
-                onPress={() => void handleSendKitchen()}
+                onPress={openKitchenSend}
               >
                 <Text style={styles.kitchenButtonText}>
                   {kitchenUnsent <= 0 ? 'На кухне' : 'Отправить на кухню'}
@@ -1026,6 +1058,58 @@ export default function OrderScreen({ route, navigation }: Props) {
           )}
         </View>
       </View>
+
+      <Modal
+        visible={kitchenPickGuest != null && kitchenPickLines.length > 0}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !busy && setKitchenPickGuestId(null)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => !busy && setKitchenPickGuestId(null)}>
+          <Pressable style={styles.kitchenPickBox} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>На кухню — {kitchenPickGuest?.label}</Text>
+            <Text style={styles.modalSubtitle}>Отметьте позиции из этого чека</Text>
+            <ScrollView style={styles.kitchenPickList}>
+              {kitchenPickLines.map((line) => {
+                const on = kitchenPickIds.includes(line.item.id);
+                return (
+                  <Pressable
+                    key={line.item.id}
+                    style={[styles.kitchenPickRow, on && styles.kitchenPickRowOn]}
+                    disabled={busy}
+                    onPress={() =>
+                      setKitchenPickSelected((prev) =>
+                        prev.includes(line.item.id)
+                          ? prev.filter((id) => id !== line.item.id)
+                          : [...prev, line.item.id]
+                      )
+                    }
+                  >
+                    <Text style={styles.kitchenPickMark}>{on ? '✓' : ''}</Text>
+                    <Text style={styles.kitchenPickName}>
+                      {line.unsent}× {line.item.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Pressable
+              style={[styles.kitchenPickSend, (!kitchenPickIds.length || busy) && styles.actionButtonDisabled]}
+              disabled={!kitchenPickIds.length || busy}
+              onPress={() =>
+                kitchenPickGuest && void handleSendKitchen(kitchenPickGuest.id, kitchenPickIds)
+              }
+            >
+              <Text style={styles.kitchenPickSendText}>
+                {busy ? 'Отправляем…' : `Отправить (${kitchenPickIds.length})`}
+              </Text>
+            </Pressable>
+            <Pressable style={styles.modalCancel} disabled={busy} onPress={() => setKitchenPickGuestId(null)}>
+              <Text style={styles.modalCancelText}>Отмена</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Перенос позиции между гостями */}
       <Modal
@@ -1639,6 +1723,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  kitchenPickBox: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    padding: 20,
+  },
+  kitchenPickList: { maxHeight: 320, marginBottom: 12 },
+  kitchenPickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: colors.surface2,
+  },
+  kitchenPickRowOn: { borderColor: colors.accent2 },
+  kitchenPickMark: {
+    width: 22,
+    color: colors.accent2,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  kitchenPickName: { color: colors.text, fontSize: 15, flex: 1 },
+  kitchenPickSend: {
+    backgroundColor: colors.accent,
+    borderRadius: 10,
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kitchenPickSendText: { color: '#f1f1f3', fontSize: 16, fontWeight: '700' },
 
   modalBackdrop: {
     flex: 1,

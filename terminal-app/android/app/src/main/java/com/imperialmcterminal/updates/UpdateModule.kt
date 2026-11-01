@@ -2,6 +2,8 @@ package com.imperialmcterminal.updates
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -40,6 +42,28 @@ class UpdateModule(reactContext: ReactApplicationContext) :
 
   @ReactMethod
   fun removeListeners(count: Int) {}
+
+  // Два коротких сигнала на громкости мультимедиа. Вызывает только экран кухни.
+  @ReactMethod
+  fun playNewOrderSound() {
+    thread(name = "kitchen-new-order") {
+      var tone: ToneGenerator? = null
+      try {
+        tone = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+        tone.startTone(ToneGenerator.TONE_PROP_BEEP, 160)
+        Thread.sleep(240)
+        tone.startTone(ToneGenerator.TONE_PROP_BEEP, 160)
+        Thread.sleep(220)
+      } catch (_: Exception) {
+        // Планшет без звука не должен ронять экран кухни.
+      } finally {
+        try {
+          tone?.release()
+        } catch (_: Exception) {
+        }
+      }
+    }
+  }
 
   @ReactMethod
   fun getAppVersion(promise: Promise) {

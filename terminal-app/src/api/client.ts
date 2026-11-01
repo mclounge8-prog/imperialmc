@@ -1221,7 +1221,8 @@ export async function sendGuestToKitchen(
   orderId: number,
   guestId: number,
   staffToken: string,
-  deviceToken: string
+  deviceToken: string,
+  itemIds: number[]
 ): Promise<{ ticket: { id: number; itemCount: number }; items: { orderItemId: number; sentQty: number }[] }> {
   const response = await fetch(
     `${API_BASE_URL}/api/orders/${orderId}/guests/${guestId}/kitchen`,
@@ -1232,7 +1233,7 @@ export async function sendGuestToKitchen(
         'X-Device-Token': deviceToken,
         'Content-Type': 'application/json',
       },
-      body: '{}',
+      body: JSON.stringify({ itemIds }),
     }
   );
   const data = await parseJsonResponse(response);
