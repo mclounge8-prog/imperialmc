@@ -100,7 +100,7 @@ export async function pushRosaBlocks() {
               b.pos_x AS x, b.pos_y AS y, b.width AS w, b.height AS h
        FROM floor_blocks b
        JOIN zones z ON z.id = b.zone_id
-       WHERE z.venue_id = $1 AND z.name <> 'Начальство'
+       WHERE z.venue_id = $1 AND z.name NOT IN ('Начальство', 'Офис')
        ORDER BY z.sort_order, b.id`,
       [ROSA_VENUE_ID]
     );
