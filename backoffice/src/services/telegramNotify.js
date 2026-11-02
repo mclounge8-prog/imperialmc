@@ -567,18 +567,31 @@ export function buildTobaccoCountMessage({
   return linesOut.join('\n');
 }
 
-export function buildCashMovementMessage({ venueName, type, amount, comment, cashier, when }) {
+export function buildCashMovementMessage({
+  venueName,
+  type,
+  amount,
+  declaredAmount,
+  comment,
+  cashier,
+  when,
+}) {
   const isOut = type === 'withdrawal';
   const title = isOut ? '🏦 Инкассация' : '➕ Внесение наличности';
-  return [
+  const taken = Number(amount) || 0;
+  const declared = declaredAmount == null ? null : Number(declaredAmount);
+  const lines = [
     header(title, venueName, when),
     '',
-    `Сумма: <b>${escapeHtml(formatMoney(amount))}</b>`,
-    comment ? `Комментарий: ${escapeHtml(comment)}` : null,
-    `Кассир: ${escapeHtml(cashier || '—')}`,
-  ]
-    .filter((x) => x != null)
-    .join('\n');
+    `Сумма: <b>${escapeHtml(formatMoney(taken))}</b>`,
+  ];
+  if (isOut && declared != null && Math.abs(declared - taken) > 0.009) {
+    lines.push(`Сотрудник указал: ${escapeHtml(formatMoney(declared))}`);
+    lines.push('Изъята сумма наличных в ФН.');
+  }
+  if (comment) lines.push(`Комментарий: ${escapeHtml(comment)}`);
+  lines.push(`Кассир: ${escapeHtml(cashier || '—')}`);
+  return lines.filter((x) => x != null).join('\n');
 }
 
 /** Алерт по приходу / списанию тары на точке. */

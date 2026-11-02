@@ -467,6 +467,9 @@ apiShifts.post('/cash-movements', async (c) => {
   const type = body?.type === 'withdrawal' || body?.type === 'deposit' ? body.type : null;
   const amount = parseMoney(body?.amount, { allowZero: false });
   const comment = typeof body?.comment === 'string' ? body.comment.trim().slice(0, 200) : null;
+  // Планшет уже сверил сумму с денежным ящиком ФН и прислал именно её.
+  const fromFn = body?.from_fn === true || body?.fromFn === true;
+  const declaredAmount = parseMoney(body?.declared_amount ?? body?.declaredAmount);
 
   if (!venueId || !type || amount == null) {
     c.status(400);
@@ -479,7 +482,7 @@ apiShifts.post('/cash-movements', async (c) => {
     return c.json({ error: 'Открытой смены нет — операция с наличными недоступна' });
   }
 
-  if (type === 'withdrawal') {
+  if (type === 'withdrawal' && !fromFn) {
     const stats = await fetchShiftStats(shift);
     if (amount > stats.cash.expectedCash + 0.001) {
       c.status(400);
@@ -515,6 +518,7 @@ apiShifts.post('/cash-movements', async (c) => {
         venueName,
         type,
         amount,
+        declaredAmount: fromFn ? declaredAmount : null,
         comment,
         cashier: staff.name,
       }),
