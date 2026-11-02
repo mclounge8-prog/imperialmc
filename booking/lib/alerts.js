@@ -42,7 +42,7 @@ export function alertText(kind, booking) {
 
 export async function sendBookingAlert(kind, booking, config, fetchImpl = fetch) {
   if (!config?.botToken || !config?.chatId) return { ok: false, reason: 'unconfigured' };
-  try { setDefaultResultOrder('ipv6first'); } catch { /* older runtimes */ }
+  try { setDefaultResultOrder('ipv4first'); } catch { /* older runtimes */ }
   const response = await fetchImpl(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
