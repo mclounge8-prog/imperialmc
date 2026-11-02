@@ -78,7 +78,7 @@ export default function ShiftStatsCard({ shift }: { shift: Shift }) {
               </Text>
             </View>
             <View style={styles.paymentRow}>
-              <Text style={styles.paymentLabel}>Остаток на открытии</Text>
+              <Text style={styles.paymentLabel}>В учёте на открытии</Text>
               <Text style={styles.paymentValue}>{formatMoney(cash.openingCash)}</Text>
             </View>
             <View style={[styles.paymentRow, styles.paymentRowBorder]}>
