@@ -71,6 +71,12 @@ export default function ShiftStatsCard({ shift }: { shift: Shift }) {
               <Text style={styles.cashHeroLabel}>Сейчас в кассе (расчёт)</Text>
               <Text style={styles.cashHeroValue}>{formatMoney(cash.expectedCash)}</Text>
             </View>
+            <View style={[styles.cashHero, styles.cashHeroSecond]}>
+              <Text style={styles.cashHeroLabel}>С открытия смены</Text>
+              <Text style={styles.cashHeroValue}>
+                {formatMoney(cash.cashSales + cash.deposits - cash.withdrawals)}
+              </Text>
+            </View>
             <View style={styles.paymentRow}>
               <Text style={styles.paymentLabel}>Остаток на открытии</Text>
               <Text style={styles.paymentValue}>{formatMoney(cash.openingCash)}</Text>
@@ -149,6 +155,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.surface2,
   },
+  cashHeroSecond: { backgroundColor: colors.surface },
   cashHeroLabel: { color: colors.textMuted, fontSize: 12, marginBottom: 4 },
   cashHeroValue: { color: colors.accent2, fontSize: 28, fontWeight: '800' },
   paymentRow: {

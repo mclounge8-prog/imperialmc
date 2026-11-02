@@ -125,18 +125,22 @@ export default function CashScreen() {
     >
       {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
 
-      <View style={styles.hero}>
-        <Text style={styles.heroLabel}>Сейчас в кассе</Text>
-        <Text style={styles.heroValue}>{formatMoney(shift.cash.expectedCash)}</Text>
-        <View style={styles.openingBlock}>
-          <Text style={styles.openingLabel}>На открытии смены</Text>
-          <Text style={styles.openingValue}>{formatMoney(shift.cash.openingCash)}</Text>
+      <View style={styles.heroRow}>
+        <View style={[styles.hero, styles.heroHalf]}>
+          <Text style={styles.heroLabel}>Сейчас в кассе</Text>
+          <Text style={styles.heroValue}>{formatMoney(shift.cash.expectedCash)}</Text>
         </View>
-        <Text style={styles.heroMeta}>
-          продажи {formatMoney(shift.cash.cashSales)} · внесения {formatMoney(shift.cash.deposits)} ·
-          инкассации {formatMoney(shift.cash.withdrawals)}
-        </Text>
+        <View style={[styles.hero, styles.heroHalf]}>
+          <Text style={styles.heroLabel}>С открытия смены</Text>
+          <Text style={styles.heroValue}>
+            {formatMoney(shift.cash.cashSales + shift.cash.deposits - shift.cash.withdrawals)}
+          </Text>
+        </View>
       </View>
+      <Text style={styles.heroMeta}>
+        на открытии в учёте {formatMoney(shift.cash.openingCash)} · продажи {formatMoney(shift.cash.cashSales)} ·
+        внесения {formatMoney(shift.cash.deposits)} · инкассации {formatMoney(shift.cash.withdrawals)}
+      </Text>
 
       <View style={styles.actions}>
         <Pressable
@@ -224,6 +228,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 13,
   },
+  heroRow: { flexDirection: 'row', gap: 10 },
   hero: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -231,17 +236,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
   },
+  heroHalf: { flex: 1 },
   heroLabel: { color: colors.textMuted, fontSize: 12 },
-  heroValue: { color: colors.accent2, fontSize: 32, fontWeight: '800', marginTop: 4 },
-  openingBlock: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  openingLabel: { color: colors.textMuted, fontSize: 12 },
-  openingValue: { color: colors.text, fontSize: 22, fontWeight: '700', marginTop: 2 },
-  heroMeta: { color: colors.textMuted, fontSize: 12, marginTop: 8, lineHeight: 18 },
+  heroValue: { color: colors.accent2, fontSize: 28, fontWeight: '800', marginTop: 4 },
+  heroMeta: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
   actions: { flexDirection: 'row', gap: 10 },
   actionBtn: {
     flex: 1,
