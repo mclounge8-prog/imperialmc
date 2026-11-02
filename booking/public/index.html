@@ -7,7 +7,7 @@
   <meta name="description" content="Забронировать стол в MC Lounge Роза: схема зала, число мест и цена места.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/app.css?v=7">
+  <link rel="stylesheet" href="/app.css?v=8">
 </head>
 <body>
   <div class="wrap booking" id="booking">
@@ -52,7 +52,8 @@
       <section class="panel floor-card">
         <div class="zones" id="zones"></div>
         <div class="legend">
-          <span><i class="pip taken"></i> уже занято</span>
+          <span><i class="pip taken"></i> место занято</span>
+          <span><i class="pip partial"></i> стол частично занят</span>
           <span><i class="pip"></i> свободно</span>
           <span id="blockLegend" hidden><i class="pip gold"></i> не бронируется</span>
         </div>
@@ -105,7 +106,7 @@
       </div>
     </form>
   </dialog>
-  <script src="/plan.js?v=7"></script>
-  <script src="/app.js?v=7"></script>
+  <script src="/plan.js?v=8"></script>
+  <script src="/app.js?v=8"></script>
 </body>
 </html>

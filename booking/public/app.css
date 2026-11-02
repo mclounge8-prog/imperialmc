@@ -374,13 +374,46 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent-2); }
 .plan.tight .table .count small { font-size: 0.75em; }
 .plan.tight .table .price,
 .plan.tight .pips { display: none; }
+.plan .table .taken-mark {
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 600;
+}
+.plan.tight .table .taken-mark { font-size: calc(11px / var(--scale, 1)); }
+.table.partial {
+  border-color: var(--gold);
+  background: rgba(230, 194, 122, 0.14);
+}
+.table.short {
+  border-color: var(--danger);
+  background: rgba(225, 76, 76, 0.16);
+}
+.plan .table.partial::after,
+.plan .table.short::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+.plan .table.short::after { background: var(--danger); }
+.plan.tight .table.partial::after,
+.plan.tight .table.short::after {
+  width: calc(10px / var(--scale, 1));
+  height: calc(10px / var(--scale, 1));
+  top: calc(4px / var(--scale, 1));
+  right: calc(4px / var(--scale, 1));
+}
 .plan .table .pips { justify-content: center; }
 .table.selected {
   border-color: var(--accent-2);
   background: rgba(38, 71, 199, 0.35);
   box-shadow: inset 0 0 0 1px var(--accent-2);
 }
-.table.short { opacity: 0.45; }
+.table.short { opacity: 0.72; }
 .table.closed { opacity: 0.35; }
 
 .pips { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -393,7 +426,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent-2); }
 }
 .pip.taken { background: #5c6070; border-color: #5c6070; }
 .pip.yours { background: var(--accent-2); border-color: var(--accent-2); }
-.pip.gold { background: transparent; border-color: var(--gold); }
+.pip.gold, .pip.partial { background: transparent; border-color: var(--gold); }
 .plan .block {
   border-style: dashed;
   border-color: rgba(230, 194, 122, 0.75);

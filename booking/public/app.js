@@ -120,17 +120,31 @@ function renderSheet() {
   if (!table) return;
   const free = Math.max(0, table.free);
   if (state.guests > free) state.guests = Math.max(1, free);
+  const chosen = Math.min(Math.max(1, state.guests), free);
+  state.guests = chosen;
   guestCount.innerHTML = Array.from({ length: free }, (_, index) => {
     const count = index + 1;
-    return `<option value="${count}"${count === state.guests ? ' selected' : ''}>${count} ${seatWord(count)}</option>`;
+    return `<option value="${count}"${count === chosen ? ' selected' : ''}>${count} ${seatWord(count)}</option>`;
   }).join('');
-  const price = Number(table.price) || 0;
-  const total = state.guests * price;
+  paintSheetTotal(table);
   document.querySelector('#sheetHint').textContent =
-    `${table.name} · свободно ${table.free} из ${table.seats}`;
-  document.querySelector('#sheetTotal').textContent = price
+    `${table.name} · занято ${table.held} из ${table.seats}, можно ещё ${free}`;
+}
+
+function paintSheetTotal(table) {
+  const price = Number(table?.price) || 0;
+  const total = state.guests * price;
+  const line = document.querySelector('#sheetTotal');
+  if (!line) return;
+  line.textContent = price
     ? `${state.guests} × ${formatMoney(price)} = ${formatMoney(total)}`
     : 'Цену места ещё не указали';
+}
+
+function chosenGuests() {
+  const picked = Number(guestCount.value);
+  if (Number.isInteger(picked) && picked > 0) state.guests = picked;
+  return state.guests;
 }
 
 function render() {
@@ -165,21 +179,29 @@ function render() {
   }).join('');
   stage.innerHTML = blocks + zone.tables.map((table) => {
     const full = table.bookable && table.free < 1;
+    const partial = table.bookable && table.held > 0 && !full;
     const selected = table.id === state.tableId;
     const cls = [
       'table',
       table.h <= 80 ? 'compact' : '',
       selected ? 'selected' : '',
       !table.bookable ? 'closed' : '',
+      partial ? 'partial' : '',
       full ? 'short' : '',
     ].filter(Boolean).join(' ');
-    const count = table.bookable ? `${table.free}<small>/${table.seats}</small>` : '—';
+    const count = !table.bookable
+      ? '—'
+      : full
+        ? 'занято'
+        : `${table.free}<small>/${table.seats}</small>`;
+    const taken = partial ? `<span class="taken-mark">занято ${table.held}</span>` : '';
     const price = table.price ? `<span class="price">${formatMoney(table.price)}</span>` : '';
-    const marks = table.price ? '' : `<span class="pips">${pips(table.seats, table.held, 0)}</span>`;
+    const marks = `<span class="pips">${pips(table.seats, table.held, 0)}</span>`;
     const label = planLabel(table.name, stage.dataset.scale, table.w);
     return `<button type="button" class="${cls}" data-id="${table.id}" style="${placeTable(table)}" aria-label="${table.name}">
       <span class="name">${label}</span>
       <span class="count">${count}</span>
+      ${taken}
       ${price}
       ${marks}
     </button>`;
@@ -202,7 +224,7 @@ function render() {
     ${priceLine}
     <p class="note">${state.date.split('-').reverse().join('.')} · ${state.time}</p>
     <p class="pips" style="margin:10px 0">${pips(table.seats, table.held, 0)}</p>
-    <p class="note">${fits ? 'Число мест выберете в заявке.' : 'Свободных мест нет.'}</p>
+    <p class="note">${table.held ? `Занято ${table.held} из ${table.seats}. ` : ''}${fits ? `Можно занять до ${table.free} ${seatWord(table.free)}.` : 'Свободных мест нет.'}</p>
   `;
 }
 
@@ -234,8 +256,8 @@ floorEl.addEventListener('click', (event) => {
 });
 
 guestCount.onchange = () => {
-  state.guests = Number(guestCount.value) || 1;
-  renderSheet();
+  chosenGuests();
+  paintSheetTotal(selectedTable());
 };
 dateInput.onchange = () => {
   state.date = dateInput.value;
@@ -245,6 +267,7 @@ dateInput.onchange = () => {
 bookBtn.onclick = () => {
   const table = selectedTable();
   if (!table || table.free < 1) return;
+  chosenGuests();
   state.guests = Math.min(Math.max(1, state.guests), table.free);
   openSheet();
 };
@@ -265,7 +288,7 @@ document.querySelector('#form').onsubmit = async (event) => {
       date: state.date,
       time: state.time,
       tableId: state.tableId,
-      guests: state.guests,
+      guests: chosenGuests(),
       name: form.name.value,
       phone: form.phone.value,
       comment: form.comment.value,

@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
+import { sendBookingAlert } from './lib/alerts.js';
 import { canBook, seatsHeld, startMinutes } from './lib/holds.js';
 import { buildTimePool, dateAllowed, sortTimes } from './lib/schedule.js';
 
@@ -331,6 +332,36 @@ function listTables() {
   ).all().map((row) => ({ ...row, bookable: !!row.bookable, zoneOpen: !!row.zoneOpen }));
 }
 
+function bookingNotice(id) {
+  return db.prepare(
+    `SELECT b.date, b.time, b.guests, b.name, b.phone, b.comment, b.status,
+            b.seat_price AS seatPrice, t.name AS "table", t.zone, t.seats
+     FROM bookings b JOIN tables t ON t.id = b.table_id
+     WHERE b.id = ?`
+  ).get(id);
+}
+
+function notifyBooking(kind, row) {
+  if (!row || !TITLES_SENT.has(kind)) return;
+  const file = join(DATA_DIR, 'telegram.json');
+  let config = null;
+  if (existsSync(file)) {
+    try {
+      const data = JSON.parse(readFileSync(file, 'utf8'));
+      if (data.botToken && data.chatId) {
+        config = { botToken: String(data.botToken), chatId: String(data.chatId) };
+      }
+    } catch {
+      config = null;
+    }
+  }
+  void sendBookingAlert(kind, row, config).catch((err) => {
+    console.error('booking alert', err.message);
+  });
+}
+
+const TITLES_SENT = new Set(['new', 'reserved', 'paid', 'cancelled']);
+
 function activeBookings() {
   return db.prepare(
     `SELECT id, date, time, table_id AS tableId, guests, status FROM bookings WHERE status != 'cancelled'`
@@ -547,6 +578,7 @@ const server = createServer(async (req, res) => {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)`
         ).run(new Date().toISOString(), date, time, table.id, guests, name, phone, comment, seatPrice);
         db.exec('COMMIT');
+        notifyBooking('new', bookingNotice(Number(created.lastInsertRowid)));
         json(res, 201, {
         booking: {
           id: Number(created.lastInsertRowid),
@@ -660,10 +692,14 @@ const server = createServer(async (req, res) => {
           json(res, 400, { error: 'Неизвестный статус' });
           return;
         }
-        const updated = db.prepare('UPDATE bookings SET status = ? WHERE id = ?').run(status, Number(statusMatch[1]));
-        if (!updated.changes) {
+        const current = bookingNotice(Number(statusMatch[1]));
+        if (!current) {
           json(res, 404, { error: 'Заявка не найдена' });
           return;
+        }
+        if (current.status !== status) {
+          db.prepare('UPDATE bookings SET status = ? WHERE id = ?').run(status, Number(statusMatch[1]));
+          notifyBooking(status, current);
         }
         json(res, 200, { ok: true });
         return;
