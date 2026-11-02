@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { Hono } from 'hono';
 import { pool } from '../db.js';
 import { requireAuthApi } from '../middleware/auth.js';
@@ -5,12 +6,16 @@ import {
   renderZonesList,
   renderTableTile,
   renderTableEditTile,
+  renderBlockTile,
+  renderBlockEditTile,
   renderFloorPlan,
   renderVenueZonesAndFloorPlan,
 } from '../views/tablesView.js';
 import {
   clampTablePosition,
   dimensionsForSize,
+  FLOOR_PLAN_HEIGHT,
+  FLOOR_PLAN_WIDTH,
   GRID_CELL,
   normalizeTableSizeKey,
   TABLE_SIZE_VALUES,
@@ -21,6 +26,105 @@ const tables = new Hono();
 tables.use('*', requireAuthApi);
 
 const STATUS_VALUES = ['free', 'occupied', 'dirty'];
+const ROSA_VENUE_ID = 1;
+const SYNC_TOKEN_PATH = process.env.BOOKING_SYNC_TOKEN_FILE || '/app/booking-sync.token';
+const SYNC_URL = process.env.BOOKING_SYNC_URL || 'http://mcl-roze-booking:3000/api/sync/blocks';
+
+let blocksReady = null;
+function ensureBlocks() {
+  if (!blocksReady) {
+    blocksReady = pool.query(`
+      CREATE TABLE IF NOT EXISTS floor_blocks (
+        id SERIAL PRIMARY KEY,
+        zone_id INTEGER NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+        name VARCHAR(50) NOT NULL DEFAULT '',
+        seats INTEGER NOT NULL DEFAULT 0,
+        pos_x INTEGER NOT NULL DEFAULT 0,
+        pos_y INTEGER NOT NULL DEFAULT 0,
+        width INTEGER NOT NULL DEFAULT 160,
+        height INTEGER NOT NULL DEFAULT 80
+      )
+    `).catch((err) => {
+      blocksReady = null;
+      throw err;
+    });
+  }
+  return blocksReady;
+}
+
+async function fetchBlocks(zoneId) {
+  await ensureBlocks();
+  const { rows } = await pool.query(
+    `SELECT id, zone_id, name, seats, pos_x, pos_y, width, height
+     FROM floor_blocks WHERE zone_id = $1 ORDER BY id`,
+    [zoneId]
+  );
+  return rows;
+}
+
+function blockSize(body) {
+  const cols = Math.round(Number(body.cols));
+  const rows = Math.round(Number(body.rows));
+  if (!Number.isInteger(cols) || cols < 1 || cols > 16) return null;
+  if (!Number.isInteger(rows) || rows < 1 || rows > 10) return null;
+  const width = cols * GRID_CELL;
+  const height = rows * GRID_CELL;
+  if (width > FLOOR_PLAN_WIDTH || height > FLOOR_PLAN_HEIGHT) return null;
+  return { width, height };
+}
+
+function blockSeats(value) {
+  if (value === '' || value == null) return 0;
+  const seats = Math.round(Number(value));
+  if (!Number.isInteger(seats) || seats < 0 || seats > 99) return null;
+  return seats;
+}
+
+async function fetchBlock(id) {
+  await ensureBlocks();
+  const { rows } = await pool.query(
+    'SELECT id, zone_id, name, seats, pos_x, pos_y, width, height FROM floor_blocks WHERE id = $1',
+    [id]
+  );
+  return rows[0] || null;
+}
+
+export async function pushRosaBlocks() {
+  try {
+    if (!existsSync(SYNC_TOKEN_PATH)) return;
+    const token = readFileSync(SYNC_TOKEN_PATH, 'utf8').trim();
+    if (!token) return;
+    await ensureBlocks();
+    const { rows } = await pool.query(
+      `SELECT b.id, z.name AS zone, z.sort_order AS zone_order, b.name, b.seats,
+              b.pos_x AS x, b.pos_y AS y, b.width AS w, b.height AS h
+       FROM floor_blocks b
+       JOIN zones z ON z.id = b.zone_id
+       WHERE z.venue_id = $1 AND z.name <> 'Начальство'
+       ORDER BY z.sort_order, b.id`,
+      [ROSA_VENUE_ID]
+    );
+    await fetch(SYNC_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-sync-token': token },
+      body: JSON.stringify({
+        blocks: rows.map((row) => ({
+          id: row.id,
+          zone: row.zone,
+          zoneOrder: row.zone_order,
+          name: row.name,
+          seats: row.seats,
+          x: row.x,
+          y: row.y,
+          w: row.w,
+          h: row.h,
+        })),
+      }),
+    });
+  } catch {
+    // Схема в бэкофисе сохраняется, даже если сайт брони сейчас недоступен.
+  }
+}
 const TABLE_SELECT =
   'SELECT id, zone_id, name, capacity, pos_x, pos_y, width, height, size, status FROM tables';
 const ZONE_ORDER = 'ORDER BY sort_order ASC, id ASC';
@@ -48,15 +152,15 @@ async function fetchZonesAndFirstFloorPlan(venueId) {
     ]);
     tableRows = rows.map(withTableDimensions);
   }
-  return { zones, selectedZone, tableRows };
+  return { zones, selectedZone, tableRows, blockRows: selectedZone ? await fetchBlocks(selectedZone.id) : [] };
 }
 
 // ---------- Переключение заведения ----------
 
 tables.get('/venue-view', async (c) => {
   const venueId = c.req.query('venueId');
-  const { zones, selectedZone, tableRows } = await fetchZonesAndFirstFloorPlan(venueId);
-  return c.html(renderVenueZonesAndFloorPlan(venueId, zones, selectedZone, tableRows));
+  const { zones, selectedZone, tableRows, blockRows } = await fetchZonesAndFirstFloorPlan(venueId);
+  return c.html(renderVenueZonesAndFloorPlan(venueId, zones, selectedZone, tableRows, blockRows));
 });
 
 // ---------- Зоны ----------
@@ -141,8 +245,9 @@ tables.get('/zones/:id/floor-plan', async (c) => {
   const { rows: tableRows } = await pool.query(`${TABLE_SELECT} WHERE zone_id = $1 ORDER BY id`, [
     zoneId,
   ]);
+  const blockRows = await fetchBlocks(zoneId);
 
-  return c.html(renderFloorPlan(zone, tableRows.map(withTableDimensions)));
+  return c.html(renderFloorPlan(zone, tableRows.map(withTableDimensions), blockRows));
 });
 
 // ---------- Столы ----------
@@ -193,6 +298,100 @@ tables.get('/:id/view', async (c) => {
     return c.text('Стол не найден');
   }
   return c.html(renderTableTile(table));
+});
+
+tables.post('/zones/:zoneId/blocks', async (c) => {
+  const zoneId = c.req.param('zoneId');
+  const body = await c.req.parseBody();
+  const name = String(body.name || '').trim().slice(0, 50);
+  const seats = blockSeats(body.seats);
+  const size = blockSize(body);
+  if (seats == null) return c.html('<p>Мест — число от 0 до 99</p>');
+  if (!size) return c.html('<p>Размер — от 1×1 до 16×10 клеток</p>');
+
+  const { posX, posY } = clampTablePosition(
+    GRID_CELL + Math.floor(Math.random() * 6) * GRID_CELL,
+    GRID_CELL + Math.floor(Math.random() * 4) * GRID_CELL,
+    size.width,
+    size.height
+  );
+  await ensureBlocks();
+  const { rows } = await pool.query(
+    `INSERT INTO floor_blocks (zone_id, name, seats, pos_x, pos_y, width, height)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [zoneId, name, seats, posX, posY, size.width, size.height]
+  );
+  const created = await fetchBlock(rows[0].id);
+  await pushRosaBlocks();
+  return c.html(renderBlockTile(created, { oob: true, zoneId }));
+});
+
+tables.get('/blocks/:id/edit', async (c) => {
+  const block = await fetchBlock(c.req.param('id'));
+  if (!block) {
+    c.status(404);
+    return c.text('Прямоугольник не найден');
+  }
+  return c.html(renderBlockEditTile(block));
+});
+
+tables.get('/blocks/:id/view', async (c) => {
+  const block = await fetchBlock(c.req.param('id'));
+  if (!block) {
+    c.status(404);
+    return c.text('Прямоугольник не найден');
+  }
+  return c.html(renderBlockTile(block));
+});
+
+tables.put('/blocks/:id', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.parseBody();
+  const current = await fetchBlock(id);
+  if (!current) {
+    c.status(404);
+    return c.text('Прямоугольник не найден');
+  }
+  const name = String(body.name || '').trim().slice(0, 50);
+  const seats = blockSeats(body.seats);
+  const size = blockSize(body);
+  if (seats == null) return c.html(renderBlockEditTile({ ...current, name }, 'Мест — число от 0 до 99'));
+  if (!size) return c.html(renderBlockEditTile({ ...current, name, seats }, 'Размер — от 1×1 до 16×10 клеток'));
+  const clamped = clampTablePosition(current.pos_x, current.pos_y, size.width, size.height);
+  await pool.query(
+    'UPDATE floor_blocks SET name = $1, seats = $2, width = $3, height = $4, pos_x = $5, pos_y = $6 WHERE id = $7',
+    [name, seats, size.width, size.height, clamped.posX, clamped.posY, id]
+  );
+  const updated = await fetchBlock(id);
+  await pushRosaBlocks();
+  return c.html(renderBlockTile(updated));
+});
+
+tables.put('/blocks/:id/position', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.parseBody();
+  const rawX = Math.round(Number(body.pos_x));
+  const rawY = Math.round(Number(body.pos_y));
+  if (Number.isNaN(rawX) || Number.isNaN(rawY)) {
+    c.status(400);
+    return c.body(null);
+  }
+  const current = await fetchBlock(id);
+  if (!current) {
+    c.status(404);
+    return c.body(null);
+  }
+  const { posX, posY } = clampTablePosition(rawX, rawY, current.width, current.height);
+  await pool.query('UPDATE floor_blocks SET pos_x = $1, pos_y = $2 WHERE id = $3', [posX, posY, id]);
+  await pushRosaBlocks();
+  return c.body(null);
+});
+
+tables.delete('/blocks/:id', async (c) => {
+  await ensureBlocks();
+  await pool.query('DELETE FROM floor_blocks WHERE id = $1', [c.req.param('id')]);
+  await pushRosaBlocks();
+  return c.body(null);
 });
 
 tables.put('/:id', async (c) => {
