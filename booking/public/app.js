@@ -35,9 +35,27 @@ function pips(seats, held, yours) {
   return html.join('');
 }
 
+function applyDateBounds() {
+  const today = state.floor?.today || state.date;
+  const from = state.floor?.dateFrom || '';
+  const to = state.floor?.dateTo || '';
+  const min = from && from > today ? from : today;
+  dateInput.min = min;
+  dateInput.max = to || '';
+  if (to && to < min) return false;
+  let next = state.date;
+  if (next < min) next = min;
+  if (to && next > to) next = to;
+  if (next === state.date) return false;
+  state.date = next;
+  dateInput.value = next;
+  return true;
+}
+
 async function loadFloor() {
   const response = await fetch(`/api/floor?date=${state.date}&time=${state.time}`);
   state.floor = await response.json();
+  if (applyDateBounds()) return loadFloor();
   const slots = state.floor.times || [];
   if (!slots.some((slot) => slot.time === state.time && slot.open)) {
     const next = slots.find((slot) => slot.open);
@@ -86,6 +104,8 @@ function renderSheet() {
 }
 
 function render() {
+  const dateNote = document.querySelector('#dateNote');
+  if (dateNote) dateNote.hidden = state.floor?.dateOpen !== false;
   renderTimes();
   const zones = state.floor?.zones || [];
   zonesEl.innerHTML = zones.map((zone) =>
@@ -93,7 +113,11 @@ function render() {
   ).join('');
   const zone = currentZone();
   if (!zone) {
-    floorEl.innerHTML = '';
+    floorEl.replaceChildren();
+    floorEl.style.height = '';
+    floorEl.innerHTML = '<p class="note empty-hall">Сейчас ни один зал не открыт для брони.</p>';
+    bookBtn.disabled = true;
+    pickEl.innerHTML = '<p class="note">Выберите стол на схеме.</p>';
     return;
   }
   const stage = mountPlan(floorEl, zone);
@@ -236,4 +260,13 @@ document.querySelector('#again').onclick = () => {
 state.date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yekaterinburg' }).format(new Date());
 dateInput.value = state.date;
 dateInput.min = state.date;
+const posterDay = '2026-11-14';
+const poster = document.querySelector('#poster');
+if (state.date > posterDay) poster.hidden = true;
+document.querySelector('#posterDate').onclick = () => {
+  state.date = posterDay;
+  dateInput.value = posterDay;
+  loadFloor();
+  document.querySelector('#floor')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
 loadFloor();

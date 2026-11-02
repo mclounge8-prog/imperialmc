@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { canBook, seatsHeld, startMinutes } from './lib/holds.js';
+import { buildTimePool, dateAllowed, sortTimes } from './lib/schedule.js';
 
 const ROOT = new URL('.', import.meta.url).pathname;
 const PUBLIC = join(ROOT, 'public');
@@ -43,6 +44,10 @@ db.exec(`
     comment TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 function columnNames(table) {
@@ -53,6 +58,9 @@ if (!columnNames('tables').includes('seat_price')) {
 }
 if (!columnNames('bookings').includes('seat_price')) {
   db.exec('ALTER TABLE bookings ADD COLUMN seat_price INTEGER NOT NULL DEFAULT 0');
+}
+if (!columnNames('tables').includes('zone_open')) {
+  db.exec('ALTER TABLE tables ADD COLUMN zone_open INTEGER NOT NULL DEFAULT 1');
 }
 
 const floor = JSON.parse(readFileSync(join(ROOT, 'data', 'floor.json'), 'utf8'));
@@ -82,7 +90,6 @@ if (!existing) {
   }
 }
 
-const times = floor.times;
 const PLAN_CELL = 40;
 const PLAN_W = 800;
 const PLAN_H = 480;
@@ -92,6 +99,41 @@ const PLAN_SIZES = {
   large: [160, 120],
 };
 db.prepare('UPDATE tables SET bounds_w = ?, bounds_h = ?').run(PLAN_W, PLAN_H);
+
+function readSetting(key, fallback) {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+  if (!row) return fallback;
+  try {
+    return JSON.parse(row.value);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeSetting(key, value) {
+  db.prepare(
+    `INSERT INTO settings (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+  ).run(key, JSON.stringify(value));
+}
+
+function getSchedule() {
+  const stored = readSetting('times', null);
+  const times = Array.isArray(stored) && stored.length ? sortTimes(stored) : sortTimes(floor.times);
+  const dateFrom = String(readSetting('dateFrom', '') || '');
+  const dateTo = String(readSetting('dateTo', '') || '');
+  return {
+    times: times.length ? times : sortTimes(floor.times),
+    dateFrom: /^\d{4}-\d{2}-\d{2}$/.test(dateFrom) ? dateFrom : '',
+    dateTo: /^\d{4}-\d{2}-\d{2}$/.test(dateTo) ? dateTo : '',
+  };
+}
+
+function cleanDate(value) {
+  const text = String(value || '');
+  if (!text) return '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+}
 
 function snapPlan(value, limit) {
   const n = Math.round(Number(value) / PLAN_CELL) * PLAN_CELL;
@@ -209,11 +251,11 @@ function clearCookie(res) {
 
 function listTables() {
   return db.prepare(
-    `SELECT id, zone, zone_order AS zoneOrder, name, seats, bookable, seat_price AS price,
+    `SELECT id, zone, zone_order AS zoneOrder, name, seats, bookable, zone_open AS zoneOpen, seat_price AS price,
             pos_x AS x, pos_y AS y, width AS w, height AS h,
             bounds_w AS boundsW, bounds_h AS boundsH
      FROM tables ORDER BY zone_order, name`
-  ).all().map((row) => ({ ...row, bookable: !!row.bookable }));
+  ).all().map((row) => ({ ...row, bookable: !!row.bookable, zoneOpen: !!row.zoneOpen }));
 }
 
 function activeBookings() {
@@ -224,7 +266,9 @@ function activeBookings() {
 
 function floorPayload(date, time) {
   const bookings = activeBookings();
-  const tables = listTables();
+  const tables = listTables().filter((table) => table.zoneOpen);
+  const schedule = getSchedule();
+  const dateOpen = dateAllowed(date, schedule.dateFrom, schedule.dateTo);
   const zones = [];
   for (const table of tables) {
     let zone = zones.find((item) => item.name === table.zone);
@@ -258,8 +302,11 @@ function floorPayload(date, time) {
     venue: floor.venue,
     address: floor.address,
     holdMinutes: HOLD_MINUTES,
-    times: times.map((time) => ({ time, open: slotStillOpen(date, time) })),
+    times: schedule.times.map((slot) => ({ time: slot, open: dateOpen && slotStillOpen(date, slot) })),
     today: ekbParts().date,
+    dateFrom: schedule.dateFrom,
+    dateTo: schedule.dateTo,
+    dateOpen,
     zones,
   };
 }
@@ -343,8 +390,13 @@ const server = createServer(async (req, res) => {
       const name = String(body.name || '').trim().replace(/\s+/g, ' ');
       const phone = digits(body.phone);
       const comment = String(body.comment || '').trim().slice(0, 400);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !times.includes(time)) {
-        json(res, 400, { error: 'Выберите дату и время из списка' });
+      const schedule = getSchedule();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !dateAllowed(date, schedule.dateFrom, schedule.dateTo)) {
+        json(res, 400, { error: 'На эту дату бронь не открыта' });
+        return;
+      }
+      if (!schedule.times.includes(time)) {
+        json(res, 400, { error: 'Выберите время из списка' });
         return;
       }
       if (!slotStillOpen(date, time)) {
@@ -363,9 +415,11 @@ const server = createServer(async (req, res) => {
       let created;
       try {
         const table = db.prepare('SELECT * FROM tables WHERE id = ?').get(tableId);
-        if (!table) {
+        if (!table || !table.zone_open) {
           db.exec('ROLLBACK');
-          json(res, 404, { error: 'Такого стола нет' });
+          json(res, table ? 409 : 404, {
+            error: table ? 'Этот зал сейчас не бронируется' : 'Такого стола нет',
+          });
           return;
         }
         const held = seatsHeld(activeBookings(), table.id, date, time, HOLD_MINUTES);
@@ -443,7 +497,57 @@ const server = createServer(async (req, res) => {
                     b.time,
                     b.id`
         ).all();
-        json(res, 200, { bookings: rows, tables: listTables() });
+        json(res, 200, { bookings: rows, tables: listTables(), schedule: getSchedule() });
+        return;
+      }
+      if (req.method === 'POST' && path === '/api/admin/schedule/pool') {
+        const body = await readBody(req);
+        const built = buildTimePool({ from: body.from, to: body.to, step: Number(body.step) });
+        if (!built.ok) {
+          const message = built.reason === 'step'
+            ? 'Шаг — от 5 до 180 минут'
+            : built.reason === 'long'
+              ? 'Слишком плотный пул. Увеличьте шаг'
+              : 'Укажите время с и до';
+          json(res, 400, { error: message });
+          return;
+        }
+        json(res, 200, { times: built.times });
+        return;
+      }
+      if (req.method === 'POST' && path === '/api/admin/schedule') {
+        const body = await readBody(req);
+        const dateFrom = cleanDate(body.dateFrom);
+        const dateTo = cleanDate(body.dateTo);
+        const times = sortTimes(Array.isArray(body.times) ? body.times : []);
+        if (dateFrom == null || dateTo == null) {
+          json(res, 400, { error: 'Дата указана неверно' });
+          return;
+        }
+        if (dateFrom && dateTo && dateFrom > dateTo) {
+          json(res, 400, { error: 'Дата «с» позже даты «по»' });
+          return;
+        }
+        if (!times.length || times.length > 96) {
+          json(res, 400, { error: 'В пуле нужно от 1 до 96 времён' });
+          return;
+        }
+        writeSetting('dateFrom', dateFrom);
+        writeSetting('dateTo', dateTo);
+        writeSetting('times', times);
+        json(res, 200, { schedule: getSchedule() });
+        return;
+      }
+      if (req.method === 'POST' && path === '/api/admin/zones') {
+        const body = await readBody(req);
+        const name = String(body.name || '');
+        const open = body.open ? 1 : 0;
+        const updated = db.prepare('UPDATE tables SET zone_open = ? WHERE zone = ?').run(open, name);
+        if (!updated.changes) {
+          json(res, 404, { error: 'Такого зала нет' });
+          return;
+        }
+        json(res, 200, { ok: true });
         return;
       }
       const statusMatch = path.match(/^\/api\/admin\/bookings\/(\d+)\/status$/);

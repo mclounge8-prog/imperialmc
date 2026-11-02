@@ -23,9 +23,17 @@
     </header>
 
     <section class="hero">
-      <p class="eyebrow">Роза Люксембург, 22</p>
-      <h1>Стол<br>на вечер</h1>
-      <p class="lede">Выберите стол на схеме. Сколько мест занять — укажете в заявке, сумма считается по цене этого стола.</p>
+      <div>
+        <p class="eyebrow">Роза Люксембург, 22</p>
+        <h1>Стол<br>на вечер</h1>
+        <p class="lede">Выберите стол на схеме. Сколько мест занять — укажете в заявке, сумма считается по цене этого стола.</p>
+      </div>
+      <aside class="poster" id="poster">
+        <p class="poster-kicker">14 ноября</p>
+        <h2>Стендап</h2>
+        <p>Программа вечера в MC Lounge Роза.</p>
+        <button class="ghost" type="button" id="posterDate">Стол на этот вечер</button>
+      </aside>
     </section>
 
     <section class="panel controls">
@@ -37,6 +45,7 @@
         <span>Время</span>
         <div id="times" class="times"></div>
       </div>
+      <p class="note" id="dateNote" hidden>На эту дату бронь закрыта.</p>
     </section>
 
     <div class="layout">

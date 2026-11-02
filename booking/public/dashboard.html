@@ -31,9 +31,38 @@
       <button class="ghost" type="button" id="logout">Выйти</button>
     </header>
     <div class="stats" id="stats"></div>
+    <section class="panel schedule">
+      <h2>Залы и время</h2>
+      <p class="note">Выключенный зал гости не видят. Пул времени задаётся вплоть до минуты, даты — с какого дня по какой. Пустые даты значат «без границы».</p>
+      <div class="field">
+        <span>Залы для гостей</span>
+        <div class="zones" id="zoneToggles"></div>
+      </div>
+      <div class="schedule-row">
+        <label class="field"><span>С даты</span><input id="dateFrom" type="date"></label>
+        <label class="field"><span>По дату</span><input id="dateTo" type="date"></label>
+      </div>
+      <div class="schedule-row">
+        <label class="field"><span>С</span><input id="poolFrom" type="time" value="16:00"></label>
+        <label class="field"><span>До</span><input id="poolTo" type="time" value="01:00"></label>
+        <label class="field"><span>Шаг, мин</span><input id="poolStep" type="number" min="5" max="180" step="5" value="60"></label>
+        <button class="ghost" type="button" id="poolBuild">Собрать пул</button>
+      </div>
+      <div class="field">
+        <span>Пул времени</span>
+        <div class="times" id="poolTimes"></div>
+      </div>
+      <div class="schedule-row">
+        <label class="field"><span>Своё время</span><input id="poolAdd" type="time"></label>
+        <button class="ghost" type="button" id="poolAddBtn">Добавить</button>
+        <button class="primary" type="button" id="poolSave">Сохранить расписание</button>
+      </div>
+      <p class="error" id="scheduleError"></p>
+    </section>
     <h2 style="font-family:var(--font-display);font-weight:600">Схема зала</h2>
     <p class="note">Та же сетка, что в расстановке столов. Перетащите стол — гости увидят новое место. Цена одного места своя у каждого стола и кассу не меняет.</p>
     <div class="zones" id="zones"></div>
+    <p class="note zone-paused-note" id="zonePause" hidden>Гости этот зал не видят.</p>
     <div id="floor" class="floor"></div>
     <form class="panel table-editor" id="tableEditor" hidden>
       <strong id="editorTitle"></strong>

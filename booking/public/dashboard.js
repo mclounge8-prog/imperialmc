@@ -16,6 +16,7 @@ const state = {
   zone: '',
   tableId: null,
   size: 'medium',
+  times: [],
 };
 
 const floorEl = document.querySelector('#floor');
@@ -101,19 +102,65 @@ function renderEditor() {
   });
 }
 
+function nightSort(times) {
+  const mins = (time) => {
+    const [hour, minute] = time.split(':').map(Number);
+    const value = hour * 60 + minute;
+    return value < 360 ? value + 1440 : value;
+  };
+  return [...times].sort((a, b) => mins(a) - mins(b));
+}
+
+function hhmm(value) {
+  const match = /^(\d{2}):(\d{2})/.exec(String(value || ''));
+  return match ? `${match[1]}:${match[2]}` : '';
+}
+
+function renderPool() {
+  document.querySelector('#poolTimes').innerHTML = state.times.length
+    ? state.times.map((time) => `<button type="button" class="chip" data-time="${time}">${time} <span aria-hidden="true">×</span></button>`).join('')
+    : '<p class="note">Пул пуст. Соберите его или добавьте время.</p>';
+}
+
+function renderZoneToggles() {
+  const zones = zonesOf(state.data?.tables || []);
+  document.querySelector('#zoneToggles').innerHTML = zones.map((zone) => {
+    const open = zone.tables[0]?.zoneOpen !== false;
+    const name = zone.name.replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[ch]));
+    return `<button type="button" class="chip ${open ? 'on' : ''}" data-zone-toggle="${name}" aria-pressed="${open}">${name}${open ? '' : ' · выкл'}</button>`;
+  }).join('');
+}
+
+function applySchedule(schedule) {
+  state.times = nightSort(schedule?.times || []);
+  document.querySelector('#dateFrom').value = schedule?.dateFrom || '';
+  document.querySelector('#dateTo').value = schedule?.dateTo || '';
+  renderPool();
+  renderZoneToggles();
+}
+
 function renderPlan() {
   const zones = zonesOf(state.data?.tables || []);
   if (!state.zone || !zones.some((zone) => zone.name === state.zone)) {
     state.zone = zones[0]?.name || '';
   }
-  zonesEl.innerHTML = zones.map((zone) =>
-    `<button type="button" class="chip zone ${zone.name === state.zone ? 'on' : ''}" data-zone="${zone.name}">${zone.name}</button>`
-  ).join('');
+  zonesEl.innerHTML = zones.map((zone) => {
+    const open = zone.tables[0]?.zoneOpen !== false;
+    return `<button type="button" class="chip zone ${zone.name === state.zone ? 'on' : ''}" data-zone="${zone.name}">${zone.name}${open ? '' : ' · выкл'}</button>`;
+  }).join('');
   const zone = currentZone();
+  const pause = document.querySelector('#zonePause');
   if (!zone) {
     floorEl.replaceChildren();
+    floorEl.classList.remove('zone-paused');
+    if (pause) pause.hidden = true;
     return;
   }
+  const guestsSee = zone.tables[0]?.zoneOpen !== false;
+  floorEl.classList.toggle('zone-paused', !guestsSee);
+  if (pause) pause.hidden = guestsSee;
   const stage = mountPlan(floorEl, zone);
   stage.innerHTML = zone.tables.map((table) => `
     <button type="button" class="table ${table.h <= 80 ? 'compact' : ''} ${table.id === state.tableId ? 'selected' : ''} ${table.bookable ? '' : 'closed'}"
@@ -161,6 +208,7 @@ function renderBookings() {
 async function load() {
   state.data = await api('/api/admin/bookings');
   showDesk();
+  applySchedule(state.data.schedule);
   renderBookings();
   renderPlan();
 }
@@ -300,5 +348,76 @@ document.querySelector('#board').onclick = async (event) => {
 window.addEventListener('resize', () => {
   if (state.data && !drag) renderPlan();
 });
+
+document.querySelector('#zoneToggles').addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-zone-toggle]');
+  if (!button) return;
+  const name = button.dataset.zoneToggle;
+  const zone = zonesOf(state.data?.tables || []).find((item) => item.name === name);
+  const open = zone?.tables[0]?.zoneOpen === false;
+  try {
+    await api('/api/admin/zones', {
+      method: 'POST',
+      body: JSON.stringify({ name, open }),
+    });
+    for (const table of state.data.tables) {
+      if (table.zone === name) table.zoneOpen = open;
+    }
+    renderZoneToggles();
+    renderPlan();
+  } catch (err) {
+    if (err.message !== 'auth') document.querySelector('#scheduleError').textContent = err.message;
+  }
+});
+
+document.querySelector('#poolTimes').addEventListener('click', (event) => {
+  const time = event.target.closest('[data-time]')?.dataset.time;
+  if (!time) return;
+  state.times = state.times.filter((item) => item !== time);
+  renderPool();
+});
+
+document.querySelector('#poolBuild').onclick = async () => {
+  document.querySelector('#scheduleError').textContent = '';
+  try {
+    const data = await api('/api/admin/schedule/pool', {
+      method: 'POST',
+      body: JSON.stringify({
+        from: hhmm(document.querySelector('#poolFrom').value),
+        to: hhmm(document.querySelector('#poolTo').value),
+        step: Number(document.querySelector('#poolStep').value),
+      }),
+    });
+    state.times = data.times;
+    renderPool();
+  } catch (err) {
+    if (err.message !== 'auth') document.querySelector('#scheduleError').textContent = err.message;
+  }
+};
+
+document.querySelector('#poolAddBtn').onclick = () => {
+  const time = hhmm(document.querySelector('#poolAdd').value);
+  document.querySelector('#scheduleError').textContent = time ? '' : 'Укажите время';
+  if (!time || state.times.includes(time)) return;
+  state.times = nightSort([...state.times, time]);
+  renderPool();
+};
+
+document.querySelector('#poolSave').onclick = async () => {
+  document.querySelector('#scheduleError').textContent = '';
+  try {
+    const data = await api('/api/admin/schedule', {
+      method: 'POST',
+      body: JSON.stringify({
+        dateFrom: document.querySelector('#dateFrom').value,
+        dateTo: document.querySelector('#dateTo').value,
+        times: state.times,
+      }),
+    });
+    applySchedule(data.schedule);
+  } catch (err) {
+    if (err.message !== 'auth') document.querySelector('#scheduleError').textContent = err.message;
+  }
+};
 
 load().catch(() => showLogin());
