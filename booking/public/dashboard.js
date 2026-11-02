@@ -94,6 +94,7 @@ function renderEditor() {
   state.size = sizeOf(table);
   document.querySelector('#editorTitle').textContent = `${table.zone} · ${table.name}`;
   document.querySelector('#editorSeats').value = table.seats;
+  document.querySelector('#editorPrice').value = table.price || 0;
   document.querySelector('#editorOpen').checked = table.bookable;
   document.querySelectorAll('#editorSizes .chip').forEach((chip) => {
     chip.classList.toggle('on', chip.dataset.size === state.size);
@@ -119,6 +120,7 @@ function renderPlan() {
       data-id="${table.id}" style="${placeTable(table)}">
       <span class="name">${table.name}</span>
       <span class="count">${table.seats}</span>
+      ${table.price ? `<span class="price">${formatMoney(table.price)}</span>` : ''}
     </button>
   `).join('');
   renderEditor();
@@ -142,7 +144,7 @@ function renderBookings() {
           <p>${booking.date.split('-').reverse().join('.')} · ${booking.time}</p>
         </div>
         <div>
-          <h3>${booking.tableName} · ${booking.guests} из ${booking.seats}</h3>
+          <h3>${booking.tableName} · ${booking.guests} из ${booking.seats}${booking.seatPrice ? ` · ${formatMoney(booking.guests * booking.seatPrice)}` : ''}</h3>
           <p>${booking.name} · ${prettyPhone(booking.phone)}${booking.comment ? ` · ${booking.comment}` : ''}</p>
           <p>${booking.zone}</p>
         </div>
@@ -209,6 +211,7 @@ editor.onsubmit = async (event) => {
       method: 'POST',
       body: JSON.stringify({
         seats: Number(document.querySelector('#editorSeats').value),
+        price: Number(document.querySelector('#editorPrice').value),
         bookable: document.querySelector('#editorOpen').checked,
         size: state.size,
       }),

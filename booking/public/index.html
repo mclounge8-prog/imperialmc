@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Бронь стола — MC Lounge Роза</title>
-  <meta name="description" content="Забронировать стол в MC Lounge Роза: выберите число гостей и свободные места.">
+  <meta name="description" content="Забронировать стол в MC Lounge Роза: схема зала, число мест и цена места.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/app.css">
@@ -25,7 +25,7 @@
     <section class="hero">
       <p class="eyebrow">Роза Люксембург, 22</p>
       <h1>Стол<br>на вечер</h1>
-      <p class="lede">Сначала число гостей, потом стол, на котором хватает свободных мест. Заявка падает администратору: он подтверждает бронь и оплату.</p>
+      <p class="lede">Выберите стол на схеме. Сколько мест занять — укажете в заявке, сумма считается по цене этого стола.</p>
     </section>
 
     <section class="panel controls">
@@ -37,21 +37,12 @@
         <span>Время</span>
         <div id="times" class="times"></div>
       </div>
-      <div class="field">
-        <span>Гости</span>
-        <div class="stepper">
-          <button type="button" id="less" aria-label="Меньше гостей">−</button>
-          <strong id="guestLabel">2 гостя</strong>
-          <button type="button" id="more" aria-label="Больше гостей">+</button>
-        </div>
-      </div>
     </section>
 
     <div class="layout">
       <section class="panel floor-card">
         <div class="zones" id="zones"></div>
         <div class="legend">
-          <span><i class="pip yours"></i> ваша компания</span>
           <span><i class="pip taken"></i> уже занято</span>
           <span><i class="pip"></i> свободно</span>
         </div>
@@ -61,9 +52,9 @@
       <aside class="panel summary">
         <p class="block-title">Ваш стол</p>
         <div id="pick">
-          <p class="note">Выберите стол, где свободных мест не меньше компании.</p>
+          <p class="note">Выберите стол на схеме.</p>
         </div>
-        <button class="primary" id="book" type="button" disabled>Оставить заявку</button>
+        <button class="primary" id="book" type="button" disabled>Забронировать</button>
         <p class="note">Места держатся два часа от выбранного времени. Пока заявка не отменена, они не предлагаются другим.</p>
       </aside>
     </div>
@@ -83,9 +74,18 @@
   </div>
 
   <dialog id="sheet">
-    <h3>Кто придёт</h3>
+    <h3>Бронь</h3>
     <p class="note" id="sheetHint"></p>
     <form class="form" id="form">
+      <div class="field">
+        <span>Мест</span>
+        <div class="stepper">
+          <button type="button" id="less" aria-label="Меньше мест">−</button>
+          <strong id="guestLabel">1 место</strong>
+          <button type="button" id="more" aria-label="Больше мест">+</button>
+        </div>
+      </div>
+      <p class="sheet-total" id="sheetTotal"></p>
       <label class="field"><span>Имя</span><input name="name" type="text" autocomplete="name" required maxlength="80"></label>
       <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" required placeholder="+7 900 000-00-00"></label>
       <label class="field"><span>Комментарий</span><textarea name="comment" maxlength="400" placeholder="День рождения, кальян, тихий угол"></textarea></label>

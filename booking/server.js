@@ -45,12 +45,22 @@ db.exec(`
   );
 `);
 
+function columnNames(table) {
+  return db.prepare(`PRAGMA table_info(${table})`).all().map((column) => column.name);
+}
+if (!columnNames('tables').includes('seat_price')) {
+  db.exec('ALTER TABLE tables ADD COLUMN seat_price INTEGER NOT NULL DEFAULT 0');
+}
+if (!columnNames('bookings').includes('seat_price')) {
+  db.exec('ALTER TABLE bookings ADD COLUMN seat_price INTEGER NOT NULL DEFAULT 0');
+}
+
 const floor = JSON.parse(readFileSync(join(ROOT, 'data', 'floor.json'), 'utf8'));
 const existing = db.prepare('SELECT COUNT(*) AS n FROM tables').get().n;
 if (!existing) {
   const insert = db.prepare(
-    `INSERT INTO tables (id, zone, zone_order, name, seats, bookable, pos_x, pos_y, width, height, bounds_w, bounds_h)
-     VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO tables (id, zone, zone_order, name, seats, bookable, pos_x, pos_y, width, height, bounds_w, bounds_h, seat_price)
+     VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`
   );
   for (const zone of floor.zones) {
     for (const table of zone.tables) {
@@ -65,7 +75,8 @@ if (!existing) {
         table.w,
         table.h,
         zone.bounds.width,
-        zone.bounds.height
+        zone.bounds.height,
+        Number.isInteger(table.price) ? table.price : 0
       );
     }
   }
@@ -198,7 +209,7 @@ function clearCookie(res) {
 
 function listTables() {
   return db.prepare(
-    `SELECT id, zone, zone_order AS zoneOrder, name, seats, bookable,
+    `SELECT id, zone, zone_order AS zoneOrder, name, seats, bookable, seat_price AS price,
             pos_x AS x, pos_y AS y, width AS w, height AS h,
             bounds_w AS boundsW, bounds_h AS boundsH
      FROM tables ORDER BY zone_order, name`
@@ -234,6 +245,7 @@ function floorPayload(date, time) {
       seats: table.seats,
       free,
       held,
+      price: table.price,
       bookable: table.bookable,
       x: table.x,
       y: table.y,
@@ -373,10 +385,11 @@ const server = createServer(async (req, res) => {
           json(res, 409, { error: message, free: verdict.free, seats: table.seats });
           return;
         }
+        const seatPrice = Number(table.seat_price) || 0;
         created = db.prepare(
-          `INSERT INTO bookings (created_at, date, time, table_id, guests, name, phone, comment, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new')`
-        ).run(new Date().toISOString(), date, time, table.id, guests, name, phone, comment);
+          `INSERT INTO bookings (created_at, date, time, table_id, guests, name, phone, comment, status, seat_price)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)`
+        ).run(new Date().toISOString(), date, time, table.id, guests, name, phone, comment, seatPrice);
         db.exec('COMMIT');
         json(res, 201, {
         booking: {
@@ -387,6 +400,8 @@ const server = createServer(async (req, res) => {
           zone: table.zone,
           guests,
           seats: table.seats,
+          seatPrice,
+          total: guests * seatPrice,
           status: 'new',
         },
       });
@@ -420,7 +435,7 @@ const server = createServer(async (req, res) => {
       if (req.method === 'GET' && path === '/api/admin/bookings') {
         const rows = db.prepare(
           `SELECT b.id, b.created_at AS createdAt, b.date, b.time, b.guests, b.name, b.phone,
-                  b.comment, b.status, t.name AS tableName, t.zone, t.seats
+                  b.comment, b.status, b.seat_price AS seatPrice, t.name AS tableName, t.zone, t.seats
            FROM bookings b JOIN tables t ON t.id = b.table_id
            ORDER BY CASE WHEN b.status = 'cancelled' THEN 1 ELSE 0 END,
                     b.date,
@@ -457,10 +472,18 @@ const server = createServer(async (req, res) => {
         }
         let seats = current.seats;
         let bookable = current.bookable;
+        let price = current.seat_price;
         let x = current.pos_x;
         let y = current.pos_y;
         let width = current.width;
         let height = current.height;
+        if (body.price != null) {
+          price = Number(body.price);
+          if (!Number.isInteger(price) || price < 0 || price > 1_000_000) {
+            json(res, 400, { error: 'Цена места — целое число рублей, до 1 000 000' });
+            return;
+          }
+        }
         if (body.seats != null || body.bookable != null) {
           seats = Number(body.seats);
           bookable = body.bookable ? 1 : 0;
@@ -489,8 +512,8 @@ const server = createServer(async (req, res) => {
           y = Math.min(y, PLAN_H - height);
         }
         db.prepare(
-          'UPDATE tables SET seats = ?, bookable = ?, pos_x = ?, pos_y = ?, width = ?, height = ? WHERE id = ?'
-        ).run(seats, bookable, x, y, width, height, current.id);
+          'UPDATE tables SET seats = ?, bookable = ?, seat_price = ?, pos_x = ?, pos_y = ?, width = ?, height = ? WHERE id = ?'
+        ).run(seats, bookable, price, x, y, width, height, current.id);
         json(res, 200, { ok: true });
         return;
       }

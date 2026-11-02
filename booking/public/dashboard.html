@@ -32,13 +32,16 @@
     </header>
     <div class="stats" id="stats"></div>
     <h2 style="font-family:var(--font-display);font-weight:600">Схема зала</h2>
-    <p class="note">Та же сетка, что в расстановке столов. Перетащите стол — гости увидят новое место. Число мест для брони кассу не меняет.</p>
+    <p class="note">Та же сетка, что в расстановке столов. Перетащите стол — гости увидят новое место. Цена одного места своя у каждого стола и кассу не меняет.</p>
     <div class="zones" id="zones"></div>
     <div id="floor" class="floor"></div>
     <form class="panel table-editor" id="tableEditor" hidden>
       <strong id="editorTitle"></strong>
       <label class="field"><span>Мест к брони</span>
         <input id="editorSeats" type="number" min="1" max="30">
+      </label>
+      <label class="field"><span>Цена места, ₽</span>
+        <input id="editorPrice" type="number" min="0" max="1000000" step="1" inputmode="numeric">
       </label>
       <div class="field">
         <span>Размер на сетке</span>

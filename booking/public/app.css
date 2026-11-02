@@ -120,7 +120,7 @@ h1 {
 
 .controls {
   display: grid;
-  grid-template-columns: 180px 1fr auto;
+  grid-template-columns: 180px 1fr;
   gap: 18px;
   align-items: end;
   padding: 18px;
@@ -265,6 +265,13 @@ input:focus, textarea:focus { border-color: var(--accent-2); }
 .plan .table.compact .count { font-size: 13px; }
 .plan .table.compact .pip { width: 6px; height: 6px; }
 .plan .table .count small { color: var(--muted); font-size: 11px; }
+.plan .table .price {
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 600;
+}
+.plan .table.compact .price { font-size: 10px; }
+.plan .table.compact .pips { display: none; }
 .plan .table .pips { justify-content: center; }
 .table.selected {
   border-color: var(--accent-2);
@@ -306,6 +313,25 @@ input:focus, textarea:focus { border-color: var(--accent-2); }
   font-family: var(--font-body);
   font-size: 14px;
   letter-spacing: 0;
+}
+
+.price-line {
+  margin: 8px 0 0;
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+.price-line span {
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.sheet-total {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  letter-spacing: -0.03em;
 }
 
 .primary {
@@ -413,7 +439,7 @@ dialog h3 {
 
 .table-editor {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) 150px minmax(180px, 1.2fr) auto;
+  grid-template-columns: minmax(150px, 1fr) 110px 130px minmax(190px, 1.3fr) auto auto;
   gap: 12px;
   align-items: end;
   padding: 14px;

@@ -1,7 +1,7 @@
 const state = {
   date: '',
   time: '20:00',
-  guests: 2,
+  guests: 1,
   zone: '',
   tableId: null,
   floor: null,
@@ -15,14 +15,6 @@ const pickEl = document.querySelector('#pick');
 const bookBtn = document.querySelector('#book');
 const guestLabel = document.querySelector('#guestLabel');
 const sheet = document.querySelector('#sheet');
-
-function guestWord(n) {
-  const n10 = n % 10;
-  const n100 = n % 100;
-  if (n10 === 1 && n100 !== 11) return 'гость';
-  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return 'гостя';
-  return 'гостей';
-}
 
 function seatWord(n) {
   const n10 = n % 10;
@@ -80,8 +72,20 @@ function timeOpen() {
   return state.floor?.times?.find((slot) => slot.time === state.time)?.open !== false;
 }
 
+function renderSheet() {
+  const table = selectedTable();
+  guestLabel.textContent = `${state.guests} ${seatWord(state.guests)}`;
+  if (!table) return;
+  const price = Number(table.price) || 0;
+  const total = state.guests * price;
+  document.querySelector('#sheetHint').textContent =
+    `${table.name} · свободно ${table.free} из ${table.seats}`;
+  document.querySelector('#sheetTotal').textContent = price
+    ? `${state.guests} × ${formatMoney(price)} = ${formatMoney(total)}`
+    : 'Цену места ещё не указали';
+}
+
 function render() {
-  guestLabel.textContent = `${state.guests} ${guestWord(state.guests)}`;
   renderTimes();
   const zones = state.floor?.zones || [];
   zonesEl.innerHTML = zones.map((zone) =>
@@ -96,37 +100,44 @@ function render() {
   const panHint = document.querySelector('#panHint');
   if (panHint) panHint.hidden = floorEl.dataset.pan !== '1';
   stage.innerHTML = zone.tables.map((table) => {
-    const short = table.bookable && table.free < state.guests;
+    const full = table.bookable && table.free < 1;
     const selected = table.id === state.tableId;
     const cls = [
       'table',
       table.h <= 80 ? 'compact' : '',
       selected ? 'selected' : '',
       !table.bookable ? 'closed' : '',
-      short ? 'short' : '',
+      full ? 'short' : '',
     ].filter(Boolean).join(' ');
-    const yours = selected ? Math.min(state.guests, table.free) : 0;
     const count = table.bookable ? `${table.free}<small>/${table.seats}</small>` : '—';
+    const price = table.price ? `<span class="price">${formatMoney(table.price)}</span>` : '';
+    const marks = table.price ? '' : `<span class="pips">${pips(table.seats, table.held, 0)}</span>`;
     return `<button type="button" class="${cls}" data-id="${table.id}" style="${placeTable(table)}">
       <span class="name">${table.name}</span>
       <span class="count">${count}</span>
-      <span class="pips">${pips(table.seats, table.held, yours)}</span>
+      ${price}
+      ${marks}
     </button>`;
   }).join('');
 
   const table = selectedTable();
-  const fits = table && table.bookable && table.free >= state.guests && timeOpen();
+  const fits = table && table.bookable && table.free >= 1 && timeOpen();
   bookBtn.disabled = !fits;
+  if (sheet.open) renderSheet();
   if (!table) {
-    pickEl.innerHTML = '<p class="note">Выберите стол, где свободных мест не меньше компании.</p>';
+    pickEl.innerHTML = '<p class="note">Выберите стол на схеме.</p>';
     return;
   }
+  const priceLine = table.price
+    ? `<p class="price-line">${formatMoney(table.price)} <span>за место</span></p>`
+    : '<p class="note">Цену места ещё не указали.</p>';
   pickEl.innerHTML = `
-    <div class="seats-big">${table.seats}<span>${seatWord(table.seats)} за столом</span></div>
+    <div class="seats-big">${table.free}<span>свободно из ${table.seats}</span></div>
     <h2>${table.name}</h2>
-    <p class="note">${state.date.split('-').reverse().join('.')} · ${state.time} · ${state.guests} ${guestWord(state.guests)}</p>
-    <p class="pips" style="margin:10px 0">${pips(table.seats, table.held, fits ? state.guests : 0)}</p>
-    <p class="note">${fits ? `Займёте ${state.guests} из ${table.free} свободных.` : `Свободно ${table.free} ${seatWord(table.free)} — для этой компании мало.`}</p>
+    ${priceLine}
+    <p class="note">${state.date.split('-').reverse().join('.')} · ${state.time}</p>
+    <p class="pips" style="margin:10px 0">${pips(table.seats, table.held, 0)}</p>
+    <p class="note">${fits ? 'Число мест выберете в заявке.' : 'Свободных мест нет.'}</p>
   `;
 }
 
@@ -149,18 +160,21 @@ floorEl.addEventListener('click', (event) => {
   const id = Number(event.target.closest('[data-id]')?.dataset.id);
   if (!id) return;
   const table = currentZone()?.tables.find((item) => item.id === id);
-  if (!table?.bookable || table.free < state.guests) return;
+  if (!table?.bookable || table.free < 1) return;
   state.tableId = id;
+  state.guests = 1;
   render();
 });
 
 document.querySelector('#less').onclick = () => {
   state.guests = Math.max(1, state.guests - 1);
-  render();
+  renderSheet();
 };
 document.querySelector('#more').onclick = () => {
-  state.guests = Math.min(12, state.guests + 1);
-  render();
+  const table = selectedTable();
+  const limit = table ? Math.max(1, table.free) : 1;
+  state.guests = Math.min(limit, state.guests + 1);
+  renderSheet();
 };
 dateInput.onchange = () => {
   state.date = dateInput.value;
@@ -169,10 +183,10 @@ dateInput.onchange = () => {
 
 bookBtn.onclick = () => {
   const table = selectedTable();
-  if (!table) return;
-  document.querySelector('#sheetHint').textContent =
-    `${table.name} · ${table.seats} ${seatWord(table.seats)} · придут ${state.guests} ${guestWord(state.guests)}`;
+  if (!table || table.free < 1) return;
+  state.guests = Math.min(Math.max(1, state.guests), table.free);
   document.querySelector('#formError').textContent = '';
+  renderSheet();
   sheet.showModal();
 };
 document.querySelector('#closeSheet').onclick = () => sheet.close();
@@ -201,8 +215,11 @@ document.querySelector('#form').onsubmit = async (event) => {
   sheet.close();
   document.querySelector('#booking').classList.add('hide');
   document.querySelector('#success').classList.add('show');
+  const sum = data.booking.seatPrice
+    ? ` ${formatMoney(data.booking.total)}.`
+    : '';
   document.querySelector('#successText').textContent =
-    `${data.booking.table}, ${data.booking.guests} ${guestWord(data.booking.guests)} из ${data.booking.seats} ${seatWord(data.booking.seats)}. ${data.booking.date.split('-').reverse().join('.')} в ${data.booking.time}. Мы перезвоним, чтобы подтвердить бронь и оплату.`;
+    `${data.booking.table}, ${data.booking.guests} ${seatWord(data.booking.guests)} из ${data.booking.seats}.${sum} ${data.booking.date.split('-').reverse().join('.')} в ${data.booking.time}. Мы перезвоним, чтобы подтвердить бронь и оплату.`;
 };
 
 window.addEventListener('resize', () => {

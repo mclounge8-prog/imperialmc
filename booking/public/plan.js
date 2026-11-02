@@ -43,3 +43,7 @@ function snapPlan(value, limit) {
   const n = Math.round(Number(value) / PLAN_CELL) * PLAN_CELL;
   return Math.max(0, Math.min(limit, n));
 }
+
+function formatMoney(value) {
+  return `${new Intl.NumberFormat('ru-RU').format(Number(value) || 0)} ₽`;
+}
