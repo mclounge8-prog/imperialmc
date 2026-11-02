@@ -92,23 +92,25 @@ function render() {
     floorEl.innerHTML = '';
     return;
   }
-  const tables = [...zone.tables].sort((a, b) => a.y - b.y || a.x - b.x);
-  floorEl.innerHTML = tables.map((table) => {
+  const stage = mountPlan(floorEl, zone);
+  const panHint = document.querySelector('#panHint');
+  if (panHint) panHint.hidden = floorEl.dataset.pan !== '1';
+  stage.innerHTML = zone.tables.map((table) => {
     const short = table.bookable && table.free < state.guests;
     const selected = table.id === state.tableId;
     const cls = [
       'table',
+      table.h <= 80 ? 'compact' : '',
       selected ? 'selected' : '',
       !table.bookable ? 'closed' : '',
       short ? 'short' : '',
     ].filter(Boolean).join(' ');
     const yours = selected ? Math.min(state.guests, table.free) : 0;
     const count = table.bookable ? `${table.free}<small>/${table.seats}</small>` : '—';
-    return `<button type="button" class="${cls}" data-id="${table.id}">
+    return `<button type="button" class="${cls}" data-id="${table.id}" style="${placeTable(table)}">
       <span class="name">${table.name}</span>
       <span class="count">${count}</span>
       <span class="pips">${pips(table.seats, table.held, yours)}</span>
-      <span class="meta">${table.bookable ? `свободно ${table.free} из ${table.seats}` : 'закрыт'}</span>
     </button>`;
   }).join('');
 
@@ -202,6 +204,10 @@ document.querySelector('#form').onsubmit = async (event) => {
   document.querySelector('#successText').textContent =
     `${data.booking.table}, ${data.booking.guests} ${guestWord(data.booking.guests)} из ${data.booking.seats} ${seatWord(data.booking.seats)}. ${data.booking.date.split('-').reverse().join('.')} в ${data.booking.time}. Мы перезвоним, чтобы подтвердить бронь и оплату.`;
 };
+
+window.addEventListener('resize', () => {
+  if (state.floor) render();
+});
 
 document.querySelector('#again').onclick = () => {
   document.querySelector('#success').classList.remove('show');

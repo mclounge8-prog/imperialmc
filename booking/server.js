@@ -72,6 +72,21 @@ if (!existing) {
 }
 
 const times = floor.times;
+const PLAN_CELL = 40;
+const PLAN_W = 800;
+const PLAN_H = 480;
+const PLAN_SIZES = {
+  small: [80, 80],
+  medium: [120, 80],
+  large: [160, 120],
+};
+db.prepare('UPDATE tables SET bounds_w = ?, bounds_h = ?').run(PLAN_W, PLAN_H);
+
+function snapPlan(value, limit) {
+  const n = Math.round(Number(value) / PLAN_CELL) * PLAN_CELL;
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(limit, n));
+}
 
 function ekbParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -435,21 +450,47 @@ const server = createServer(async (req, res) => {
       const seatsMatch = path.match(/^\/api\/admin\/tables\/(\d+)$/);
       if (req.method === 'POST' && seatsMatch) {
         const body = await readBody(req);
-        const seats = Number(body.seats);
-        const bookable = body.bookable ? 1 : 0;
-        if (!Number.isInteger(seats) || seats < 1 || seats > 30) {
-          json(res, 400, { error: 'Мест может быть от 1 до 30' });
-          return;
-        }
-        const updated = db.prepare('UPDATE tables SET seats = ?, bookable = ? WHERE id = ?').run(
-          seats,
-          bookable,
-          Number(seatsMatch[1])
-        );
-        if (!updated.changes) {
+        const current = db.prepare('SELECT * FROM tables WHERE id = ?').get(Number(seatsMatch[1]));
+        if (!current) {
           json(res, 404, { error: 'Стол не найден' });
           return;
         }
+        let seats = current.seats;
+        let bookable = current.bookable;
+        let x = current.pos_x;
+        let y = current.pos_y;
+        let width = current.width;
+        let height = current.height;
+        if (body.seats != null || body.bookable != null) {
+          seats = Number(body.seats);
+          bookable = body.bookable ? 1 : 0;
+          if (!Number.isInteger(seats) || seats < 1 || seats > 30) {
+            json(res, 400, { error: 'Мест может быть от 1 до 30' });
+            return;
+          }
+        }
+        if (body.size != null) {
+          const dims = PLAN_SIZES[body.size];
+          if (!dims) {
+            json(res, 400, { error: 'Неизвестный размер стола' });
+            return;
+          }
+          [width, height] = dims;
+        }
+        if (body.x != null || body.y != null) {
+          x = snapPlan(body.x ?? x, PLAN_W - width);
+          y = snapPlan(body.y ?? y, PLAN_H - height);
+          if (x == null || y == null) {
+            json(res, 400, { error: 'Некорректное место на схеме' });
+            return;
+          }
+        } else if (body.size != null) {
+          x = Math.min(x, PLAN_W - width);
+          y = Math.min(y, PLAN_H - height);
+        }
+        db.prepare(
+          'UPDATE tables SET seats = ?, bookable = ?, pos_x = ?, pos_y = ?, width = ?, height = ? WHERE id = ?'
+        ).run(seats, bookable, x, y, width, height, current.id);
         json(res, 200, { ok: true });
         return;
       }

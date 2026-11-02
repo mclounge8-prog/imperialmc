@@ -7,7 +7,7 @@
     {
       "name": "Основной зал",
       "order": 0,
-      "bounds": { "width": 780, "height": 540 },
+      "bounds": { "width": 800, "height": 480 },
       "tables": [
         { "id": 11, "name": "Стол 1", "seats": 4, "x": 600, "y": 0, "w": 120, "h": 80 },
         { "id": 43, "name": "Стол 2", "seats": 4, "x": 600, "y": 80, "w": 120, "h": 80 },
@@ -30,7 +30,7 @@
     {
       "name": "VIP",
       "order": 1,
-      "bounds": { "width": 280, "height": 220 },
+      "bounds": { "width": 800, "height": 480 },
       "tables": [
         { "id": 27, "name": "VIP", "seats": 10, "x": 40, "y": 40, "w": 200, "h": 140 }
       ]

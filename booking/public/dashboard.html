@@ -31,12 +31,30 @@
       <button class="ghost" type="button" id="logout">Выйти</button>
     </header>
     <div class="stats" id="stats"></div>
-    <h2 style="font-family:var(--font-display);font-weight:600">Места для брони</h2>
-    <p class="note">Число мест — это сколько гостей можно посадить на бронь. На кассе эти цифры не меняются.</p>
-    <div class="seat-editor" id="seats"></div>
+    <h2 style="font-family:var(--font-display);font-weight:600">Схема зала</h2>
+    <p class="note">Та же сетка, что в расстановке столов. Перетащите стол — гости увидят новое место. Число мест для брони кассу не меняет.</p>
+    <div class="zones" id="zones"></div>
+    <div id="floor" class="floor"></div>
+    <form class="panel table-editor" id="tableEditor" hidden>
+      <strong id="editorTitle"></strong>
+      <label class="field"><span>Мест к брони</span>
+        <input id="editorSeats" type="number" min="1" max="30">
+      </label>
+      <div class="field">
+        <span>Размер на сетке</span>
+        <div class="zones" id="editorSizes">
+          <button type="button" class="chip" data-size="small">2×2</button>
+          <button type="button" class="chip" data-size="medium">3×2</button>
+          <button type="button" class="chip" data-size="large">4×3</button>
+        </div>
+      </div>
+      <label><input id="editorOpen" type="checkbox"> открыт для брони</label>
+      <button class="ghost" type="submit">Сохранить стол</button>
+    </form>
     <h2 style="font-family:var(--font-display);font-weight:600">Заявки</h2>
     <div class="board" id="board"></div>
   </div>
+  <script src="/plan.js"></script>
   <script src="/dashboard.js"></script>
 </body>
 </html>
