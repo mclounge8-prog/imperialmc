@@ -183,11 +183,14 @@ apiShifts.post('/open', async (c) => {
   const staff = c.get('staff');
   const body = await c.req.json().catch(() => null);
   const venueId = body && body.venue_id ? Number(body.venue_id) : null;
-  const openingCash = parseMoney(body?.opening_cash ?? body?.openingCash ?? 0);
-  if (openingCash == null) {
+  // Сумма, которую насчитал сотрудник. В учёт не идёт: касса смены всегда с нуля,
+  // потому что при закрытии наличные изымают. Число остаётся в уведомлении Telegram.
+  const declaredCash = parseMoney(body?.opening_cash ?? body?.openingCash ?? 0);
+  if (declaredCash == null) {
     c.status(400);
     return c.json({ error: 'Некорректный остаток наличных на открытии' });
   }
+  const openingCash = 0;
 
   if (!venueId) {
     c.status(400);
@@ -226,6 +229,8 @@ apiShifts.post('/open', async (c) => {
       fiscalShiftOpen: fiscalShiftIsOpen(shiftJobs.opens, shiftJobs.closes),
     });
 
+    // Фискальное открытие смены — да. Внесение в ККТ суммы сотрудника — нет:
+    // в учёте касса стартует с 0.
     if (enqueueFiscalOpen) {
       await enqueueShiftFiscalJob(client, {
         venueId,
@@ -233,17 +238,6 @@ apiShifts.post('/open', async (c) => {
         type: 'open_shift',
         operatorName: staff.name,
       });
-
-      // Остаток на открытии = внесение в денежный ящик ККТ (учётный чек cashIn).
-      if (openingCash > 0) {
-        await enqueueCashFiscalJob(client, {
-          venueId,
-          shiftId: shift.id,
-          type: 'cash_in',
-          amount: openingCash,
-          operatorName: staff.name,
-        });
-      }
     }
 
     await client.query('COMMIT');
@@ -253,6 +247,7 @@ apiShifts.post('/open', async (c) => {
       buildShiftOpenMessage({
         venueName,
         openingCash,
+        declaredCash,
         previousClosingCash,
         cashier: staff.name,
       }),

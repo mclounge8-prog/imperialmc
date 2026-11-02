@@ -445,24 +445,27 @@ export function buildReceiptRefundMessage({
 export function buildShiftOpenMessage({
   venueName,
   openingCash,
+  declaredCash,
   previousClosingCash,
   cashier,
   when,
 }) {
   const prev = previousClosingCash == null ? null : Number(previousClosingCash);
   const open = Number(openingCash) || 0;
-  const diff = prev == null ? null : open - prev;
+  const declared = Number(declaredCash ?? openingCash) || 0;
+  const diff = prev == null ? null : declared - prev;
   const lines = [
     header('🟢 Открытие смены', venueName, when),
     '',
-    `Внесено при открытии: <b>${escapeHtml(formatMoney(open))}</b>`,
+    `Сотрудник указал: <b>${escapeHtml(formatMoney(declared))}</b>`,
+    `В учёте на открытии: <b>${escapeHtml(formatMoney(open))}</b>`,
   ];
   if (prev == null) {
     lines.push('Предыдущая смена: нет данных о закрытии');
   } else {
     lines.push(`На закрытии прошлой смены: ${escapeHtml(formatMoney(prev))}`);
     lines.push(
-      `Разница (открытие − прошлое закрытие): <b>${escapeHtml(formatMoney(diff))}</b>`
+      `Разница (указано − прошлое закрытие): <b>${escapeHtml(formatMoney(diff))}</b>`
     );
   }
   lines.push(`Кассир: ${escapeHtml(cashier || '—')}`);
