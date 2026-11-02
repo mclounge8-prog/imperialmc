@@ -86,17 +86,13 @@
     <h3>Бронь</h3>
     <p class="note" id="sheetHint"></p>
     <form class="form" id="form">
-      <div class="field">
+      <label class="field">
         <span>Мест</span>
-        <div class="stepper">
-          <button type="button" id="less" aria-label="Меньше мест">−</button>
-          <strong id="guestLabel">1 место</strong>
-          <button type="button" id="more" aria-label="Больше мест">+</button>
-        </div>
-      </div>
+        <select id="guestCount"></select>
+      </label>
       <p class="sheet-total" id="sheetTotal"></p>
       <label class="field"><span>Имя</span><input name="name" type="text" autocomplete="name" required maxlength="80"></label>
-      <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" required placeholder="+7 900 000-00-00"></label>
+      <label class="field"><span>Телефон</span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" required placeholder="+7 900 000-00-00"></label>
       <label class="field"><span>Комментарий</span><textarea name="comment" maxlength="400" placeholder="День рождения, кальян, тихий угол"></textarea></label>
       <p class="error" id="formError"></p>
       <div class="row">

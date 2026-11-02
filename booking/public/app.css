@@ -175,19 +175,45 @@ label.field { display: flex; flex-direction: column; gap: 8px; }
   text-transform: uppercase;
 }
 
-input[type="date"], input[type="text"], input[type="password"], input[type="number"], textarea {
-  background: var(--surface-2);
+input[type="date"],
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="time"],
+select,
+textarea {
+  max-width: 100%;
+  background-color: var(--surface-2);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px 14px;
   outline: none;
+  font: inherit;
+  color-scheme: dark;
 }
 
-input:focus, textarea:focus { border-color: var(--accent-2); }
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='none' stroke='%2398979f' stroke-width='1.6' d='M1 1.5 6 6.5 11 1.5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 40px;
+  font-family: var(--font-display);
+  font-size: 18px;
+}
 
-.times, .zones { display: flex; flex-wrap: wrap; gap: 8px; }
+select option { background: var(--surface); color: var(--text); }
 
-.chip, .stepper button, .table, .primary, .ghost, .danger {
+input::placeholder, textarea::placeholder { color: #6f6e76; }
+
+input:focus, textarea:focus, select:focus { border-color: var(--accent-2); }
+
+.controls > *, .field, .times, .zones, .hero > * { min-width: 0; }
+.times, .zones { display: flex; flex-wrap: wrap; gap: 8px; max-width: 100%; }
+
+.chip, .table, .primary, .ghost, .danger {
   border: 1px solid var(--border);
   background: var(--surface-2);
   border-radius: 999px;
@@ -201,26 +227,6 @@ input:focus, textarea:focus { border-color: var(--accent-2); }
   background: var(--accent);
   border-color: var(--accent-2);
   color: #f1f1f3;
-}
-
-.stepper {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.stepper strong {
-  min-width: 92px;
-  text-align: center;
-  font-family: var(--font-display);
-  font-size: 22px;
-}
-
-.stepper button {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  font-size: 22px;
 }
 
 .layout {
@@ -407,7 +413,7 @@ dialog h3 {
 }
 
 .form { display: flex; flex-direction: column; gap: 12px; }
-.form input, .form textarea { width: 100%; }
+.controls input, .form input, .form select, .form textarea, .table-editor input { width: 100%; }
 .form textarea { min-height: 88px; resize: vertical; }
 .row { display: flex; gap: 8px; }
 .ghost, .danger { border-radius: 12px; }
@@ -515,4 +521,41 @@ dialog h3 {
 @media (max-width: 980px) {
   .controls, .layout, .ticket, .table-editor, .hero { grid-template-columns: 1fr; }
   .actions { justify-content: flex-start; }
+}
+
+@media (max-width: 720px) {
+  body { overflow-x: hidden; }
+  .wrap { width: min(1280px, calc(100% - 20px)); }
+  .top { padding: 14px 0 4px; }
+  .brand { gap: 10px; }
+  .brand img { width: 72px; }
+  .hero { gap: 14px; padding-top: 10px; }
+  .poster { min-height: 0; }
+  .poster h2 { font-size: 40px; }
+  .controls, .floor-card, .summary, .schedule { padding: 14px; }
+  .controls { margin: 14px 0; }
+  .times {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-padding-inline: 8px;
+  }
+  .chip { min-height: 40px; }
+  .seats-big { font-size: 44px; }
+  .sheet-total { font-size: 22px; }
+  .layout { padding-bottom: 28px; }
+  dialog {
+    width: calc(100% - 16px);
+    max-width: calc(100% - 16px);
+    max-height: calc(100dvh - 16px);
+    margin: auto;
+    padding: 16px;
+    overflow: auto;
+  }
+  .row { flex-direction: column; }
+  .row .primary, .row .ghost { width: 100%; }
+  .schedule-row { flex-direction: column; align-items: stretch; }
+  .schedule-row .field, .schedule-row input, .schedule-row .primary, .schedule-row .ghost { width: 100%; }
+  .ticket h3 { font-size: 18px; }
+  input, select, textarea { font-size: 16px; }
 }

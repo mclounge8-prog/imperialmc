@@ -13,7 +13,7 @@ const floorEl = document.querySelector('#floor');
 const zonesEl = document.querySelector('#zones');
 const pickEl = document.querySelector('#pick');
 const bookBtn = document.querySelector('#book');
-const guestLabel = document.querySelector('#guestLabel');
+const guestCount = document.querySelector('#guestCount');
 const sheet = document.querySelector('#sheet');
 
 function seatWord(n) {
@@ -92,8 +92,13 @@ function timeOpen() {
 
 function renderSheet() {
   const table = selectedTable();
-  guestLabel.textContent = `${state.guests} ${seatWord(state.guests)}`;
   if (!table) return;
+  const free = Math.max(0, table.free);
+  if (state.guests > free) state.guests = Math.max(1, free);
+  guestCount.innerHTML = Array.from({ length: free }, (_, index) => {
+    const count = index + 1;
+    return `<option value="${count}"${count === state.guests ? ' selected' : ''}>${count} ${seatWord(count)}</option>`;
+  }).join('');
   const price = Number(table.price) || 0;
   const total = state.guests * price;
   document.querySelector('#sheetHint').textContent =
@@ -190,14 +195,8 @@ floorEl.addEventListener('click', (event) => {
   render();
 });
 
-document.querySelector('#less').onclick = () => {
-  state.guests = Math.max(1, state.guests - 1);
-  renderSheet();
-};
-document.querySelector('#more').onclick = () => {
-  const table = selectedTable();
-  const limit = table ? Math.max(1, table.free) : 1;
-  state.guests = Math.min(limit, state.guests + 1);
+guestCount.onchange = () => {
+  state.guests = Number(guestCount.value) || 1;
   renderSheet();
 };
 dateInput.onchange = () => {
