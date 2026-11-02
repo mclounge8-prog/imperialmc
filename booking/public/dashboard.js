@@ -11,6 +11,12 @@ const SIZES = {
   large: [160, 120],
 };
 
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+}
+
 const state = {
   data: null,
   zone: '',
@@ -75,6 +81,11 @@ function zonesOf(tables) {
       zones.push(zone);
     }
     zone.tables.push(table);
+  }
+  for (const zone of zones) zone.blocks = [];
+  for (const block of state.data?.blocks || []) {
+    const zone = zones.find((item) => item.name === block.zone);
+    if (zone) zone.blocks.push(block);
   }
   zones.sort((a, b) => a.order - b.order);
   return zones;
@@ -162,7 +173,13 @@ function renderPlan() {
   floorEl.classList.toggle('zone-paused', !guestsSee);
   if (pause) pause.hidden = guestsSee;
   const stage = mountPlan(floorEl, zone);
-  stage.innerHTML = zone.tables.map((table) => `
+  const blocks = (zone.blocks || []).map((block) => `
+    <div class="table block ${block.h <= 80 ? 'compact' : ''}" style="${placeTable(block)}">
+      <span class="name">${esc(block.name || 'Зона')}</span>
+      <span class="count">${block.seats}</span>
+    </div>
+  `).join('');
+  stage.innerHTML = blocks + zone.tables.map((table) => `
     <button type="button" class="table ${table.h <= 80 ? 'compact' : ''} ${table.id === state.tableId ? 'selected' : ''} ${table.bookable ? '' : 'closed'}"
       data-id="${table.id}" style="${placeTable(table)}" aria-label="${table.name}">
       <span class="name">${planLabel(table.name, stage.dataset.scale, table.w)}</span>
@@ -274,7 +291,7 @@ let drag = null;
 
 floorEl.addEventListener('pointerdown', (event) => {
   const tile = event.target.closest('.table');
-  if (!tile) return;
+  if (!tile || tile.classList.contains('block')) return;
   const table = currentZone()?.tables.find((item) => item.id === Number(tile.dataset.id));
   if (!table) return;
   drag = {

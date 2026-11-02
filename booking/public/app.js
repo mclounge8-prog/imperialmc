@@ -24,6 +24,26 @@ function seatWord(n) {
   return 'мест';
 }
 
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+
+function isPhone() {
+  return window.matchMedia('(max-width: 720px)').matches;
+}
+
+function openSheet() {
+  document.querySelector('#formError').textContent = '';
+  renderSheet();
+  if (!sheet.open) sheet.showModal();
+}
+
 function pips(seats, held, yours) {
   const html = [];
   for (let i = 0; i < seats; i += 1) {
@@ -128,7 +148,17 @@ function render() {
   const stage = mountPlan(floorEl, zone);
   const panHint = document.querySelector('#panHint');
   if (panHint) panHint.hidden = floorEl.dataset.pan !== '1';
-  stage.innerHTML = zone.tables.map((table) => {
+  const blockLegend = document.querySelector('#blockLegend');
+  if (blockLegend) blockLegend.hidden = !(zone.blocks || []).length;
+  const blocks = (zone.blocks || []).map((block) => {
+    const label = planLabel(block.name || 'Зона', stage.dataset.scale, block.w);
+    const count = block.seats > 0 ? `<span class="count">${block.seats}</span>` : '';
+    return `<div class="table block ${block.h <= 80 ? 'compact' : ''}" style="${placeTable(block)}">
+      <span class="name">${esc(label)}</span>
+      ${count}
+    </div>`;
+  }).join('');
+  stage.innerHTML = blocks + zone.tables.map((table) => {
     const full = table.bookable && table.free < 1;
     const selected = table.id === state.tableId;
     const cls = [
@@ -187,6 +217,7 @@ zonesEl.addEventListener('click', (event) => {
 });
 
 floorEl.addEventListener('click', (event) => {
+  if (event.target.closest('.block')) return;
   const id = Number(event.target.closest('[data-id]')?.dataset.id);
   if (!id) return;
   const table = currentZone()?.tables.find((item) => item.id === id);
@@ -194,6 +225,7 @@ floorEl.addEventListener('click', (event) => {
   state.tableId = id;
   state.guests = 1;
   render();
+  if (isPhone()) openSheet();
 });
 
 guestCount.onchange = () => {
@@ -209,11 +241,14 @@ bookBtn.onclick = () => {
   const table = selectedTable();
   if (!table || table.free < 1) return;
   state.guests = Math.min(Math.max(1, state.guests), table.free);
-  document.querySelector('#formError').textContent = '';
-  renderSheet();
-  sheet.showModal();
+  openSheet();
 };
-document.querySelector('#closeSheet').onclick = () => sheet.close();
+document.querySelectorAll('.close-sheet').forEach((button) => {
+  button.onclick = () => sheet.close();
+});
+sheet.addEventListener('click', (event) => {
+  if (event.target === sheet) sheet.close();
+});
 
 document.querySelector('#form').onsubmit = async (event) => {
   event.preventDefault();

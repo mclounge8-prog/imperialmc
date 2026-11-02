@@ -7,7 +7,7 @@
   <meta name="description" content="Забронировать стол в MC Lounge Роза: схема зала, число мест и цена места.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/app.css?v=5">
+  <link rel="stylesheet" href="/app.css?v=6">
 </head>
 <body>
   <div class="wrap booking" id="booking">
@@ -54,6 +54,7 @@
         <div class="legend">
           <span><i class="pip taken"></i> уже занято</span>
           <span><i class="pip"></i> свободно</span>
+          <span id="blockLegend" hidden><i class="pip gold"></i> не бронируется</span>
         </div>
         <div id="floor" class="floor"></div>
         <p class="note pan-hint" id="panHint" hidden>Сдвиньте схему в сторону — так виден весь зал.</p>
@@ -83,7 +84,10 @@
   </div>
 
   <dialog id="sheet">
-    <h3>Бронь</h3>
+    <div class="sheet-top">
+      <h3>Бронь</h3>
+      <button class="icon-close close-sheet" type="button" aria-label="Закрыть">×</button>
+    </div>
     <p class="note" id="sheetHint"></p>
     <form class="form" id="form">
       <label class="field">
@@ -97,11 +101,11 @@
       <p class="error" id="formError"></p>
       <div class="row">
         <button class="primary" type="submit" style="margin-top:0">Отправить</button>
-        <button class="ghost" type="button" id="closeSheet">Отмена</button>
+        <button class="ghost close-sheet" type="button">Отмена</button>
       </div>
     </form>
   </dialog>
-  <script src="/plan.js?v=5"></script>
-  <script src="/app.js?v=5"></script>
+  <script src="/plan.js?v=6"></script>
+  <script src="/app.js?v=6"></script>
 </body>
 </html>

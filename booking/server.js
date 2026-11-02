@@ -48,6 +48,17 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS blocks (
+    id INTEGER PRIMARY KEY,
+    zone TEXT NOT NULL,
+    zone_order INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    seats INTEGER NOT NULL,
+    pos_x INTEGER NOT NULL,
+    pos_y INTEGER NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL
+  );
 `);
 
 function columnNames(table) {
@@ -249,6 +260,64 @@ function clearCookie(res) {
   res.setHeader('Set-Cookie', 'roza_booking=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
 }
 
+function listBlocks() {
+  return db.prepare(
+    `SELECT id, zone, zone_order AS zoneOrder, name, seats,
+            pos_x AS x, pos_y AS y, width AS w, height AS h
+     FROM blocks ORDER BY zone_order, id`
+  ).all();
+}
+
+function replaceBlocks(blocks) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.prepare('DELETE FROM blocks').run();
+    const insert = db.prepare(
+      `INSERT INTO blocks (id, zone, zone_order, name, seats, pos_x, pos_y, width, height)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const block of blocks) {
+      insert.run(block.id, block.zone, block.zoneOrder, block.name, block.seats, block.x, block.y, block.w, block.h);
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch { /* already closed */ }
+    throw err;
+  }
+}
+
+function cleanBlocks(list) {
+  if (!Array.isArray(list) || list.length > 200) return null;
+  const blocks = [];
+  for (const item of list) {
+    const id = Number(item.id);
+    const seats = Number(item.seats);
+    const x = Number(item.x);
+    const y = Number(item.y);
+    const w = Number(item.w);
+    const h = Number(item.h);
+    const zone = String(item.zone || '').trim().slice(0, 100);
+    const name = String(item.name || '').trim().slice(0, 50);
+    const zoneOrder = Number(item.zoneOrder) || 0;
+    if (!Number.isInteger(id) || id < 1 || id > 1_000_000_000) return null;
+    if (!zone || zone === 'Начальство') continue;
+    if (!Number.isInteger(seats) || seats < 0 || seats > 99) return null;
+    if (![x, y, w, h].every((n) => Number.isInteger(n) && n >= 0 && n <= 800)) return null;
+    if (w < 40 || h < 40 || w % 40 || h % 40 || x % 40 || y % 40) return null;
+    if (x + w > 800 || y + h > 480) return null;
+    blocks.push({ id, zone, zoneOrder, name, seats, x, y, w, h });
+  }
+  return blocks;
+}
+
+function syncOk(req) {
+  const file = join(DATA_DIR, 'sync.token');
+  if (!existsSync(file)) return false;
+  const expected = readFileSync(file, 'utf8').trim();
+  const got = String(req.headers['x-sync-token'] || '');
+  return expected.length > 0 && safeEqual(got, expected);
+}
+
 function listTables() {
   return db.prepare(
     `SELECT id, zone, zone_order AS zoneOrder, name, seats, bookable, zone_open AS zoneOpen, seat_price AS price,
@@ -278,6 +347,7 @@ function floorPayload(date, time) {
         order: table.zoneOrder,
         bounds: { width: table.boundsW, height: table.boundsH },
         tables: [],
+        blocks: [],
       };
       zones.push(zone);
     }
@@ -295,6 +365,19 @@ function floorPayload(date, time) {
       y: table.y,
       w: table.w,
       h: table.h,
+    });
+  }
+  for (const block of listBlocks()) {
+    const zone = zones.find((item) => item.name === block.zone);
+    if (!zone) continue;
+    zone.blocks.push({
+      id: block.id,
+      name: block.name,
+      seats: block.seats,
+      x: block.x,
+      y: block.y,
+      w: block.w,
+      h: block.h,
     });
   }
   zones.sort((a, b) => a.order - b.order);
@@ -364,6 +447,21 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && (path === '/dashboard' || path === '/dashboard/')) {
       res.writeHead(302, { Location: '/dashboard.html' });
       res.end();
+      return;
+    }
+    if (req.method === 'POST' && path === '/api/sync/blocks') {
+      if (!syncOk(req)) {
+        json(res, 401, { error: 'Нет доступа' });
+        return;
+      }
+      const body = await readBody(req);
+      const blocks = cleanBlocks(body.blocks);
+      if (!blocks) {
+        json(res, 400, { error: 'Некорректные прямоугольники' });
+        return;
+      }
+      replaceBlocks(blocks);
+      json(res, 200, { ok: true, count: blocks.length });
       return;
     }
     if (req.method === 'GET' && path === '/api/floor') {
@@ -497,7 +595,7 @@ const server = createServer(async (req, res) => {
                     b.time,
                     b.id`
         ).all();
-        json(res, 200, { bookings: rows, tables: listTables(), schedule: getSchedule() });
+        json(res, 200, { bookings: rows, tables: listTables(), blocks: listBlocks(), schedule: getSchedule() });
         return;
       }
       if (req.method === 'POST' && path === '/api/admin/schedule/pool') {
