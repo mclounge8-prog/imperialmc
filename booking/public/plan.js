@@ -54,3 +54,45 @@ function snapPlan(value, limit) {
 function formatMoney(value) {
   return `${new Intl.NumberFormat('ru-RU').format(Number(value) || 0)} ₽`;
 }
+
+function formatIsoDate(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return '';
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function mountDateField(input, emptyLabel) {
+  const box = document.createElement('span');
+  box.className = 'date-box';
+  const face = document.createElement('button');
+  face.type = 'button';
+  face.className = 'date-face';
+  input.classList.add('date-proxy');
+  input.setAttribute('tabindex', '-1');
+  input.before(box);
+  box.append(face, input);
+  const paint = () => {
+    face.textContent = formatIsoDate(input.value) || emptyLabel;
+  };
+  face.addEventListener('click', () => {
+    if (typeof input.showPicker === 'function') {
+      try {
+        input.showPicker();
+        return;
+      } catch {
+        /* The browser refused the picker, so the click below opens it. */
+      }
+    }
+    input.focus();
+    input.click();
+  });
+  input.addEventListener('change', paint);
+  input.addEventListener('input', paint);
+  paint();
+  return paint;
+}

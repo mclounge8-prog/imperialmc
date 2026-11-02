@@ -144,10 +144,15 @@ function renderZoneToggles() {
   }).join('');
 }
 
+const paintDateFrom = mountDateField(document.querySelector('#dateFrom'), 'Без границы');
+const paintDateTo = mountDateField(document.querySelector('#dateTo'), 'Без границы');
+
 function applySchedule(schedule) {
   state.times = nightSort(schedule?.times || []);
   document.querySelector('#dateFrom').value = schedule?.dateFrom || '';
   document.querySelector('#dateTo').value = schedule?.dateTo || '';
+  paintDateFrom();
+  paintDateTo();
   renderPool();
   renderZoneToggles();
 }

@@ -212,15 +212,56 @@ input::placeholder, textarea::placeholder { color: #6f6e76; }
 input:focus, textarea:focus, select:focus { border-color: var(--accent-2); }
 
 .controls > *, .field, .times, .zones, .hero > * { min-width: 0; }
-input[type="date"] {
+.date-box {
+  position: relative;
   display: block;
   width: 100%;
-  min-width: 0;
   max-width: 100%;
-  min-inline-size: 0;
+  min-width: 0;
+  overflow: hidden;
+  contain: paint;
 }
-input[type="date"]::-webkit-datetime-edit,
-input[type="date"]::-webkit-datetime-edit-fields-wrapper { min-width: 0; padding: 0; }
+.date-face {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 12px 42px 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background-color: var(--surface-2);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2398979f' stroke-width='1.8'><rect x='3' y='5' width='18' height='16' rx='2'/><path d='M3 10h18M8 3v4M16 3v4'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 18px 18px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.2;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.date-face:focus { border-color: var(--accent-2); }
+.date-box .date-proxy {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  max-width: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
 .times, .zones { display: flex; flex-wrap: wrap; gap: 8px; max-width: 100%; }
 
 .chip, .table, .primary, .ghost, .danger {
@@ -578,7 +619,7 @@ dialog h3 {
   .poster h2 { font-size: 40px; }
   .controls, .summary, .schedule { padding: 14px; }
   .controls { grid-template-columns: minmax(0, 1fr); }
-  input[type="date"] { width: 100%; }
+  .date-face { font-size: 16px; }
   .floor-card { padding: 12px 8px; }
   .controls { margin: 14px 0; }
   .times {

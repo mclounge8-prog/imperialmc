@@ -8,6 +8,7 @@ const state = {
 };
 
 const dateInput = document.querySelector('#date');
+const paintDate = mountDateField(dateInput, 'Выберите дату');
 const timesEl = document.querySelector('#times');
 const floorEl = document.querySelector('#floor');
 const zonesEl = document.querySelector('#zones');
@@ -66,9 +67,13 @@ function applyDateBounds() {
   let next = state.date;
   if (next < min) next = min;
   if (to && next > to) next = to;
-  if (next === state.date) return false;
+  if (next === state.date) {
+    paintDate();
+    return false;
+  }
   state.date = next;
   dateInput.value = next;
+  paintDate();
   return true;
 }
 
@@ -295,12 +300,14 @@ document.querySelector('#again').onclick = () => {
 state.date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yekaterinburg' }).format(new Date());
 dateInput.value = state.date;
 dateInput.min = state.date;
+paintDate();
 const posterDay = '2026-11-14';
 const poster = document.querySelector('#poster');
 if (state.date > posterDay) poster.hidden = true;
 document.querySelector('#posterDate').onclick = () => {
   state.date = posterDay;
   dateInput.value = posterDay;
+  paintDate();
   loadFloor();
   document.querySelector('#floor')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 };
