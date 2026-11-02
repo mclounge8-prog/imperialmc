@@ -286,6 +286,9 @@ function replaceBlocks(blocks) {
   }
 }
 
+const ZONE_ALIAS = new Map([['VIP Комната', 'VIP']]);
+const HIDDEN_ZONES = new Set(['Начальство', 'Офис']);
+
 function cleanBlocks(list) {
   if (!Array.isArray(list) || list.length > 200) return null;
   const blocks = [];
@@ -300,12 +303,13 @@ function cleanBlocks(list) {
     const name = String(item.name || '').trim().slice(0, 50);
     const zoneOrder = Number(item.zoneOrder) || 0;
     if (!Number.isInteger(id) || id < 1 || id > 1_000_000_000) return null;
-    if (!zone || zone === 'Начальство') continue;
+    if (!zone || HIDDEN_ZONES.has(zone)) continue;
+    const publicZone = ZONE_ALIAS.get(zone) || zone;
     if (!Number.isInteger(seats) || seats < 0 || seats > 99) return null;
     if (![x, y, w, h].every((n) => Number.isInteger(n) && n >= 0 && n <= 800)) return null;
     if (w < 40 || h < 40 || w % 40 || h % 40 || x % 40 || y % 40) return null;
     if (x + w > 800 || y + h > 480) return null;
-    blocks.push({ id, zone, zoneOrder, name, seats, x, y, w, h });
+    blocks.push({ id, zone: publicZone, zoneOrder, name, seats, x, y, w, h });
   }
   return blocks;
 }
