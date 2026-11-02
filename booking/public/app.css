@@ -317,6 +317,12 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent-2); }
 }
 .plan .table.compact .price { font-size: 10px; }
 .plan .table.compact .pips { display: none; }
+.plan.tight .table { padding: 1px; gap: 0; border-width: 3px; }
+.plan.tight .table .name { font-size: calc(13px / var(--scale, 1)); }
+.plan.tight .table .count { font-size: calc(12px / var(--scale, 1)); }
+.plan.tight .table .count small { font-size: 0.75em; }
+.plan.tight .table .price,
+.plan.tight .pips { display: none; }
 .plan .table .pips { justify-content: center; }
 .table.selected {
   border-color: var(--accent-2);
@@ -532,7 +538,8 @@ dialog h3 {
   .hero { gap: 14px; padding-top: 10px; }
   .poster { min-height: 0; }
   .poster h2 { font-size: 40px; }
-  .controls, .floor-card, .summary, .schedule { padding: 14px; }
+  .controls, .summary, .schedule { padding: 14px; }
+  .floor-card { padding: 12px 8px; }
   .controls { margin: 14px 0; }
   .times {
     flex-wrap: nowrap;

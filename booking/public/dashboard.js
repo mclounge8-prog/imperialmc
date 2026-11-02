@@ -164,8 +164,8 @@ function renderPlan() {
   const stage = mountPlan(floorEl, zone);
   stage.innerHTML = zone.tables.map((table) => `
     <button type="button" class="table ${table.h <= 80 ? 'compact' : ''} ${table.id === state.tableId ? 'selected' : ''} ${table.bookable ? '' : 'closed'}"
-      data-id="${table.id}" style="${placeTable(table)}">
-      <span class="name">${table.name}</span>
+      data-id="${table.id}" style="${placeTable(table)}" aria-label="${table.name}">
+      <span class="name">${planLabel(table.name, stage.dataset.scale, table.w)}</span>
       <span class="count">${table.seats}</span>
       ${table.price ? `<span class="price">${formatMoney(table.price)}</span>` : ''}
     </button>

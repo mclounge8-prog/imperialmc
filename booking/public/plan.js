@@ -3,33 +3,40 @@ const PLAN_CELL = 40;
 function planScale(viewport, bounds) {
   const width = viewport.clientWidth;
   if (!width || !bounds.width) return 1;
-  const fit = width / bounds.width;
-  if (width < 720) return Math.max(fit, 0.78);
-  return fit;
+  return width / bounds.width;
+}
+
+function planLabel(name, scale, width) {
+  const visual = Number(width) * Number(scale);
+  if (!Number.isFinite(visual) || visual >= 78) return name;
+  const number = /^Стол\s+(.+)$/.exec(String(name || ''));
+  return number ? number[1] : name;
 }
 
 function mountPlan(viewport, zone) {
   const bounds = zone.bounds;
   const scale = planScale(viewport, bounds);
-  const width = viewport.clientWidth;
-  const wide = width > 0 && width < 720;
-  const visualW = wide ? Math.ceil(bounds.width * scale) : width || Math.ceil(bounds.width * scale);
+  const width = viewport.clientWidth || Math.ceil(bounds.width * scale);
+  const visualW = width;
   const visualH = Math.ceil(bounds.height * scale);
-  viewport.dataset.pan = wide ? '1' : '0';
-  viewport.style.overflow = wide ? 'auto' : 'hidden';
-  viewport.style.height = `${visualH}px`;
+  const box = getComputedStyle(viewport);
+  const frame = (parseFloat(box.borderTopWidth) || 0) + (parseFloat(box.borderBottomWidth) || 0);
+  viewport.dataset.pan = '0';
+  viewport.style.overflow = 'hidden';
+  viewport.style.height = `${visualH + frame}px`;
   viewport.replaceChildren();
   const sizer = document.createElement('div');
   sizer.className = 'plan-sizer';
   sizer.style.width = `${visualW}px`;
   sizer.style.height = `${visualH}px`;
   const stage = document.createElement('div');
-  stage.className = 'plan';
+  stage.className = scale < 0.7 ? 'plan tight' : 'plan';
   stage.style.width = `${bounds.width}px`;
   stage.style.height = `${bounds.height}px`;
   stage.style.transform = `scale(${scale})`;
   stage.dataset.scale = String(scale);
   stage.style.setProperty('--cell', `${PLAN_CELL}px`);
+  stage.style.setProperty('--scale', String(scale));
   sizer.appendChild(stage);
   viewport.appendChild(sizer);
   return stage;

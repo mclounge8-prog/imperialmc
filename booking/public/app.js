@@ -141,8 +141,9 @@ function render() {
     const count = table.bookable ? `${table.free}<small>/${table.seats}</small>` : '—';
     const price = table.price ? `<span class="price">${formatMoney(table.price)}</span>` : '';
     const marks = table.price ? '' : `<span class="pips">${pips(table.seats, table.held, 0)}</span>`;
-    return `<button type="button" class="${cls}" data-id="${table.id}" style="${placeTable(table)}">
-      <span class="name">${table.name}</span>
+    const label = planLabel(table.name, stage.dataset.scale, table.w);
+    return `<button type="button" class="${cls}" data-id="${table.id}" style="${placeTable(table)}" aria-label="${table.name}">
+      <span class="name">${label}</span>
       <span class="count">${count}</span>
       ${price}
       ${marks}
