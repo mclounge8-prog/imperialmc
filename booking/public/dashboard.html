@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Заявки — MC Lounge Роза</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div class="login-screen" id="login">
+    <form class="panel login-card form" id="loginForm">
+      <a class="brand" href="/">
+        <img src="/logo-white.webp" alt="" width="72" height="42">
+        <span><small>MC Lounge</small><strong>Заявки</strong></span>
+      </a>
+      <h1 style="font-size:40px">Вход</h1>
+      <label class="field"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" required></label>
+      <p class="error" id="loginError"></p>
+      <button class="primary" type="submit">Открыть</button>
+    </form>
+  </div>
+  <div class="wrap" id="desk" hidden>
+    <header class="top">
+      <a class="brand" href="/">
+        <img src="/logo-white.webp" alt="" width="92" height="53">
+        <span><small>MC Lounge Роза</small><strong>Заявки</strong></span>
+      </a>
+      <button class="ghost" type="button" id="logout">Выйти</button>
+    </header>
+    <div class="stats" id="stats"></div>
+    <h2 style="font-family:var(--font-display);font-weight:600">Места для брони</h2>
+    <p class="note">Число мест — это сколько гостей можно посадить на бронь. На кассе эти цифры не меняются.</p>
+    <div class="seat-editor" id="seats"></div>
+    <h2 style="font-family:var(--font-display);font-weight:600">Заявки</h2>
+    <div class="board" id="board"></div>
+  </div>
+  <script src="/dashboard.js"></script>
+</body>
+</html>
