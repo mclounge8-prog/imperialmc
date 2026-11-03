@@ -140,12 +140,66 @@ export function renderTableEditTile(table, errorMsg = null) {
   `;
 }
 
-export function renderFloorPlan(zone, tableList) {
+export function renderBlockTile(block, { oob = false, zoneId = null } = {}) {
+  const oobAttr = oob && zoneId ? ` hx-swap-oob="beforeend:#floor-plan-${zoneId}"` : '';
+  const safeName = escapeHtml(block.name || 'Прямоугольник');
+  const cell = GRID_CELL;
+  const maxX = FLOOR_PLAN_WIDTH - block.width;
+  const maxY = FLOOR_PLAN_HEIGHT - block.height;
+  const seatsLabel = block.seats > 0 ? `${block.seats} мест` : 'без мест';
+
+  return `
+    <div
+      class="table-tile floor-block"
+      id="block-tile-${block.id}"
+      style="left:${block.pos_x}px; top:${block.pos_y}px; width:${block.width}px; height:${block.height}px; border-style:dashed; border-color:#e6c27a; background:rgba(230,194,122,0.12);"
+      x-data="{ dragging:false, sx:0, sy:0, ox:${block.pos_x}, oy:${block.pos_y}, cell:${cell}, maxX:${maxX}, maxY:${maxY}, snap(v){ return Math.max(0, Math.round(v/this.cell)*this.cell); } }"
+      @mousedown="dragging=true; sx=$event.clientX; sy=$event.clientY; ox=parseInt($el.style.left); oy=parseInt($el.style.top);"
+      @mousemove.window="if(dragging){ const nx=Math.min(maxX, snap(ox + ($event.clientX - sx))); const ny=Math.min(maxY, snap(oy + ($event.clientY - sy))); $el.style.left = nx + 'px'; $el.style.top = ny + 'px'; }"
+      @mouseup.window="if(dragging){ dragging=false; htmx.ajax('PUT', '/tables/blocks/${block.id}/position', { values: { pos_x: parseInt($el.style.left), pos_y: parseInt($el.style.top) }, swap: 'none' }); }"
+      ${oobAttr}
+    >
+      <button
+        class="table-edit-btn"
+        @mousedown.stop
+        hx-get="/tables/blocks/${block.id}/edit"
+        hx-target="#block-tile-${block.id}"
+        hx-swap="outerHTML"
+        aria-label="Изменить прямоугольник"
+      >✎</button>
+      <div class="table-name">${safeName}</div>
+      <div class="table-capacity">${seatsLabel}</div>
+    </div>
+  `;
+}
+
+export function renderBlockEditTile(block, errorMsg = null) {
+  const errorHtml = errorMsg ? `<div class="field-error">${escapeHtml(errorMsg)}</div>` : '';
+  const cols = Math.round(block.width / GRID_CELL);
+  const rows = Math.round(block.height / GRID_CELL);
+  return `
+    <form class="table-edit-panel" id="block-tile-${block.id}" style="left:${block.pos_x}px; top:${block.pos_y}px; width:200px;">
+      <input type="text" name="name" value="${escapeHtml(block.name || '')}" placeholder="Название" maxlength="50">
+      <input type="number" min="0" max="99" name="seats" value="${Number(block.seats) || 0}" placeholder="Мест">
+      <input type="number" min="1" max="16" name="cols" value="${cols}" title="Клеток в ширину">
+      <input type="number" min="1" max="10" name="rows" value="${rows}" title="Клеток в высоту">
+      ${errorHtml}
+      <div class="edit-actions">
+        <button type="button" class="primary" hx-put="/tables/blocks/${block.id}" hx-target="#block-tile-${block.id}" hx-swap="outerHTML">Сохранить</button>
+        <button type="button" hx-get="/tables/blocks/${block.id}/view" hx-target="#block-tile-${block.id}" hx-swap="outerHTML">Отмена</button>
+      </div>
+      <button type="button" class="danger" hx-delete="/tables/blocks/${block.id}" hx-target="#block-tile-${block.id}" hx-swap="outerHTML" hx-confirm="Убрать прямоугольник?">Удалить</button>
+    </form>
+  `;
+}
+
+export function renderFloorPlan(zone, tableList, blockList = []) {
   if (!zone) {
     return '<p class="empty-hint">Сначала добавь зону выше.</p>';
   }
 
   const tiles = tableList.map((t) => renderTableTile(t)).join('');
+  const blocks = (blockList || []).map((block) => renderBlockTile(block)).join('');
 
   return `
     <form
@@ -161,17 +215,34 @@ export function renderFloorPlan(zone, tableList) {
       <button type="submit">Добавить стол</button>
       <div id="table-form-error" class="error"></div>
     </form>
-    <p class="hint">Сетка ${GRID_CELL}×${GRID_CELL}px (${FLOOR_PLAN_WIDTH}×${FLOOR_PLAN_HEIGHT}). Столы двигаются только по клеткам — та же схема на терминале без масштабирования.</p>
+    <form
+      class="section-form"
+      hx-post="/tables/zones/${zone.id}/blocks"
+      hx-target="#block-form-error"
+      hx-swap="innerHTML"
+      hx-on::after-request="if(event.detail.successful) this.reset()"
+    >
+      <input type="text" name="name" placeholder="Прямоугольник, например диван" maxlength="50">
+      <input type="number" min="0" max="99" name="seats" value="0" title="Мест. Бронь недоступна">
+      <input type="number" min="1" max="16" name="cols" value="4" title="Клеток в ширину">
+      <input type="number" min="1" max="10" name="rows" value="2" title="Клеток в высоту">
+      <button type="submit">Добавить прямоугольник</button>
+      <div id="block-form-error" class="error"></div>
+    </form>
+    <p class="hint">Сетка ${GRID_CELL}×${GRID_CELL}px (${FLOOR_PLAN_WIDTH}×${FLOOR_PLAN_HEIGHT}). Столы двигаются только по клеткам — та же схема на терминале без масштабирования. Пунктир нельзя забронировать, места у него можно указать: для Розы он сам появляется на сайте брони и на терминал не попадает.</p>
     <div
       class="floor-plan floor-plan-grid"
       id="floor-plan-${zone.id}"
       style="width:${FLOOR_PLAN_WIDTH}px; height:${FLOOR_PLAN_HEIGHT}px; --grid-cell:${GRID_CELL}px;"
-    >${tiles}</div>
+    >${tiles}${blocks}</div>
   `;
 }
 
 /** Зоны + схема зала для конкретного заведения — то, что перерисовывается при смене заведения */
-export function renderVenueZonesAndFloorPlan(venueId, zones, selectedZone, tableList) {
+export function renderVenueZonesAndFloorPlan(venueId, zones, selectedZone, tableList, blockList = null) {
+  const load = blockList == null && selectedZone
+    ? ` hx-get="/tables/zones/${selectedZone.id}/floor-plan" hx-trigger="load" hx-swap="innerHTML"`
+    : '';
   return `
     <div class="subsection">
       <h2>Зоны</h2>
@@ -192,7 +263,7 @@ export function renderVenueZonesAndFloorPlan(venueId, zones, selectedZone, table
 
     <div class="subsection">
       <h2>Схема зала</h2>
-      <div id="floor-plan-container">${renderFloorPlan(selectedZone, tableList)}</div>
+      <div id="floor-plan-container"${load}>${renderFloorPlan(selectedZone, tableList, blockList || [])}</div>
     </div>
   `;
 }
