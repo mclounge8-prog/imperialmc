@@ -1,3 +1,9 @@
+/**
+ * Выше этой суммы показание ящика ФН считаем сбоем и инкассацию не проводим.
+ * Держите в паре с FN_WITHDRAWAL_CAP в apiShifts.js.
+ */
+export const FN_CASH_DRAWER_CAP = 100_000;
+
 /** Сумма наличных в денежном ящике по ответу АТОЛ getShiftTotals. */
 export function readFnCashSum(response: unknown): number | null {
   if (!response || typeof response !== 'object') return null;

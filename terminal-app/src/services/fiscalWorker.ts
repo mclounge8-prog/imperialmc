@@ -18,7 +18,7 @@ import {
   receiptHasFiscalDoc,
   shouldAdoptLastDocument,
 } from './fiscalReconcile';
-import { readFnCashSum } from './fnCashSum';
+import { FN_CASH_DRAWER_CAP, readFnCashSum } from './fnCashSum';
 
 // Настройки читаем на каждый проход очереди (раз в ~15с). Раньше кэш на
 // всю сессию ломал Карлу/новые точки: включили АТОЛ в бэкофисе, а терминал
@@ -144,6 +144,11 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
           }
           if (Number(task.cashSum) <= 0.009) {
             throw new Error('В фискальном накопителе нет наличных для инкассации');
+          }
+          if (Number(task.cashSum) > FN_CASH_DRAWER_CAP) {
+            throw new Error(
+              `Сумма в ФН ${task.cashSum} ₽ не похожа на ящик. Инкассация остановлена.`
+            );
           }
         }
         const response = await runAtolTask(connectionOf(settings), task);

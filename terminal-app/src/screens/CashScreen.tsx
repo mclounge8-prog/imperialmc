@@ -23,7 +23,7 @@ import AmountPromptModal from '../components/AmountPromptModal';
 import { useDevice } from '../context/DeviceContext';
 import { useSession } from '../context/SessionContext';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
-import { readFnCashSum } from '../services/fnCashSum';
+import { FN_CASH_DRAWER_CAP, readFnCashSum } from '../services/fnCashSum';
 import { runAtolTask, type AtolConnectionSettings } from '../native/atol';
 import { colors } from '../theme/colors';
 
@@ -110,6 +110,11 @@ export default function CashScreen() {
           const fnCash = await queryFnCashSum(connectionOf(settings));
           if (fnCash <= 0.009) {
             throw new Error('В фискальном накопителе нет наличных. Инкассация не отправлена.');
+          }
+          if (fnCash > FN_CASH_DRAWER_CAP) {
+            throw new Error(
+              `Сумма в ФН ${fnCash} ₽ не похожа на ящик. Инкассация остановлена.`
+            );
           }
           posted = fnCash;
           fromFn = true;
