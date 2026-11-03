@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { sendBookingAlert } from './lib/alerts.js';
+import { applyFloorSync, cleanFloorItems } from './lib/floorSync.js';
 import { canBook, seatsHeld, startMinutes } from './lib/holds.js';
 import { buildTimePool, dateAllowed, sortTimes } from './lib/schedule.js';
 
@@ -269,50 +270,12 @@ function listBlocks() {
   ).all();
 }
 
-function replaceBlocks(blocks) {
-  db.exec('BEGIN IMMEDIATE');
-  try {
-    db.prepare('DELETE FROM blocks').run();
-    const insert = db.prepare(
-      `INSERT INTO blocks (id, zone, zone_order, name, seats, pos_x, pos_y, width, height)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    for (const block of blocks) {
-      insert.run(block.id, block.zone, block.zoneOrder, block.name, block.seats, block.x, block.y, block.w, block.h);
-    }
-    db.exec('COMMIT');
-  } catch (err) {
-    try { db.exec('ROLLBACK'); } catch { /* already closed */ }
-    throw err;
-  }
+function cleanBlocks(list) {
+  return cleanFloorItems(list, { seatsMin: 0 });
 }
 
-const ZONE_ALIAS = new Map([['VIP Комната', 'VIP']]);
-const HIDDEN_ZONES = new Set(['Начальство', 'Офис']);
-
-function cleanBlocks(list) {
-  if (!Array.isArray(list) || list.length > 200) return null;
-  const blocks = [];
-  for (const item of list) {
-    const id = Number(item.id);
-    const seats = Number(item.seats);
-    const x = Number(item.x);
-    const y = Number(item.y);
-    const w = Number(item.w);
-    const h = Number(item.h);
-    const zone = String(item.zone || '').trim().slice(0, 100);
-    const name = String(item.name || '').trim().slice(0, 50);
-    const zoneOrder = Number(item.zoneOrder) || 0;
-    if (!Number.isInteger(id) || id < 1 || id > 1_000_000_000) return null;
-    if (!zone || HIDDEN_ZONES.has(zone)) continue;
-    const publicZone = ZONE_ALIAS.get(zone) || zone;
-    if (!Number.isInteger(seats) || seats < 0 || seats > 99) return null;
-    if (![x, y, w, h].every((n) => Number.isInteger(n) && n >= 0 && n <= 800)) return null;
-    if (w < 40 || h < 40 || w % 40 || h % 40 || x % 40 || y % 40) return null;
-    if (x + w > 800 || y + h > 480) return null;
-    blocks.push({ id, zone: publicZone, zoneOrder, name, seats, x, y, w, h });
-  }
-  return blocks;
+function cleanTables(list) {
+  return cleanFloorItems(list, { seatsMin: 1 });
 }
 
 function syncOk(req) {
@@ -495,13 +458,20 @@ const server = createServer(async (req, res) => {
         return;
       }
       const body = await readBody(req);
-      const blocks = cleanBlocks(body.blocks);
-      if (!blocks) {
-        json(res, 400, { error: 'Некорректные прямоугольники' });
+      const hasBlocks = Object.prototype.hasOwnProperty.call(body, 'blocks');
+      const hasTables = Object.prototype.hasOwnProperty.call(body, 'tables');
+      if (!hasBlocks && !hasTables) {
+        json(res, 400, { error: 'Нет схемы зала' });
         return;
       }
-      replaceBlocks(blocks);
-      json(res, 200, { ok: true, count: blocks.length });
+      const blocks = hasBlocks ? cleanBlocks(body.blocks) : null;
+      const tables = hasTables ? cleanTables(body.tables) : null;
+      if ((hasBlocks && !blocks) || (hasTables && !tables)) {
+        json(res, 400, { error: 'Некорректная схема зала' });
+        return;
+      }
+      applyFloorSync(db, { blocks, tables });
+      json(res, 200, { ok: true, blocks: blocks ? blocks.length : null, tables: tables ? tables.length : null });
       return;
     }
     if (req.method === 'GET' && path === '/api/floor') {
