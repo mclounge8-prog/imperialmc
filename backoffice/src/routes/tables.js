@@ -89,36 +89,52 @@ async function fetchBlock(id) {
   return rows[0] || null;
 }
 
+function floorItem(row, shown = null) {
+  const point = shown || row;
+  return {
+    id: row.id,
+    zone: row.zone,
+    zoneOrder: row.zone_order,
+    name: row.name,
+    seats: row.seats,
+    x: point.pos_x ?? row.x,
+    y: point.pos_y ?? row.y,
+    w: point.width ?? row.w,
+    h: point.height ?? row.h,
+  };
+}
+
 export async function pushRosaBlocks() {
   try {
     if (!existsSync(SYNC_TOKEN_PATH)) return;
     const token = readFileSync(SYNC_TOKEN_PATH, 'utf8').trim();
     if (!token) return;
     await ensureBlocks();
-    const { rows } = await pool.query(
+    const hidden = `z.venue_id = $1 AND z.name NOT IN ('Начальство', 'Офис')`;
+    const { rows: blockRows } = await pool.query(
       `SELECT b.id, z.name AS zone, z.sort_order AS zone_order, b.name, b.seats,
               b.pos_x AS x, b.pos_y AS y, b.width AS w, b.height AS h
        FROM floor_blocks b
        JOIN zones z ON z.id = b.zone_id
-       WHERE z.venue_id = $1 AND z.name NOT IN ('Начальство', 'Офис')
+       WHERE ${hidden}
        ORDER BY z.sort_order, b.id`,
+      [ROSA_VENUE_ID]
+    );
+    const { rows: tableRows } = await pool.query(
+      `SELECT t.id, z.name AS zone, z.sort_order AS zone_order, t.name,
+              t.capacity AS seats, t.pos_x, t.pos_y, t.width, t.height, t.size
+       FROM tables t
+       JOIN zones z ON z.id = t.zone_id
+       WHERE ${hidden}
+       ORDER BY z.sort_order, t.id`,
       [ROSA_VENUE_ID]
     );
     await fetch(SYNC_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-sync-token': token },
       body: JSON.stringify({
-        blocks: rows.map((row) => ({
-          id: row.id,
-          zone: row.zone,
-          zoneOrder: row.zone_order,
-          name: row.name,
-          seats: row.seats,
-          x: row.x,
-          y: row.y,
-          w: row.w,
-          h: row.h,
-        })),
+        blocks: blockRows.map((row) => floorItem(row)),
+        tables: tableRows.map((row) => floorItem(row, withTableDimensions(row))),
       }),
     });
   } catch {
@@ -222,11 +238,14 @@ tables.post('/zones/:id/move', async (c) => {
     }
   }
 
+  if (Number(zone.venue_id) === ROSA_VENUE_ID) await pushRosaBlocks();
   return c.html(renderZonesList(refreshed));
 });
 
 tables.delete('/zones/:id', async (c) => {
+  const { rows } = await pool.query('SELECT venue_id FROM zones WHERE id = $1', [c.req.param('id')]);
   await pool.query('DELETE FROM zones WHERE id = $1', [c.req.param('id')]);
+  if (Number(rows[0]?.venue_id) === ROSA_VENUE_ID) await pushRosaBlocks();
   return c.body(null);
 });
 
@@ -279,6 +298,11 @@ tables.post('/zones/:zoneId/tables', async (c) => {
   );
 
   const created = await fetchTable(rows[0].id);
+  const { rows: venueRows } = await pool.query(
+    'SELECT venue_id FROM zones WHERE id = $1',
+    [zoneId]
+  );
+  if (Number(venueRows[0]?.venue_id) === ROSA_VENUE_ID) await pushRosaBlocks();
   return c.html(renderTableTile(created, { oob: true, zoneId }));
 });
 
@@ -430,6 +454,11 @@ tables.put('/:id', async (c) => {
   );
 
   const updated = await fetchTable(id);
+  const { rows: venueRows } = await pool.query(
+    'SELECT z.venue_id FROM tables t JOIN zones z ON z.id = t.zone_id WHERE t.id = $1',
+    [id]
+  );
+  if (Number(venueRows[0]?.venue_id) === ROSA_VENUE_ID) await pushRosaBlocks();
   return c.html(renderTableTile(updated));
 });
 
@@ -453,12 +482,24 @@ tables.put('/:id/position', async (c) => {
 
   const { posX, posY } = clampTablePosition(rawX, rawY, current.width, current.height);
   await pool.query('UPDATE tables SET pos_x = $1, pos_y = $2 WHERE id = $3', [posX, posY, id]);
+  const { rows: venueRows } = await pool.query(
+    'SELECT z.venue_id FROM tables t JOIN zones z ON z.id = t.zone_id WHERE t.id = $1',
+    [id]
+  );
+  if (Number(venueRows[0]?.venue_id) === ROSA_VENUE_ID) await pushRosaBlocks();
   return c.body(null);
 });
 
 tables.delete('/:id', async (c) => {
+  const { rows } = await pool.query(
+    'SELECT z.venue_id FROM tables t JOIN zones z ON z.id = t.zone_id WHERE t.id = $1',
+    [c.req.param('id')]
+  );
   await pool.query('DELETE FROM tables WHERE id = $1', [c.req.param('id')]);
+  if (Number(rows[0]?.venue_id) === ROSA_VENUE_ID) await pushRosaBlocks();
   return c.body(null);
 });
+
+pushRosaBlocks();
 
 export default tables;
