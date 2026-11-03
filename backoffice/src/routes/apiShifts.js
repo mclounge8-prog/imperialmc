@@ -492,6 +492,16 @@ apiShifts.post('/cash-movements', async (c) => {
     }
   }
 
+  // Показание ящика ФН выше этого порога не проводим: дневная касса
+  // точек — десятки тысяч, а сбой getShiftTotals уже отдавал сотни тысяч.
+  const FN_WITHDRAWAL_CAP = 100000;
+  if (type === 'withdrawal' && fromFn && amount > FN_WITHDRAWAL_CAP) {
+    c.status(400);
+    return c.json({
+      error: `Сумма в ФН ${amount} ₽ не похожа на ящик. Инкассация остановлена.`,
+    });
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
