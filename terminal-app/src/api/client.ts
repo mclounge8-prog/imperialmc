@@ -820,14 +820,22 @@ export async function createCashMovement(
   token: string,
   type: CashMovementType,
   amount: number,
-  comment?: string
+  comment?: string,
+  options?: { fromFn?: boolean; declaredAmount?: number }
 ): Promise<{ movement: CashMovement; shift: Shift }> {
   return authorizedRequest<{ movement: CashMovement; shift: Shift }>(
     '/api/shifts/cash-movements',
     token,
     {
       method: 'POST',
-      body: { venue_id: venueId, type, amount, comment: comment || null },
+      body: {
+        venue_id: venueId,
+        type,
+        amount,
+        comment: comment || null,
+        from_fn: options?.fromFn === true,
+        declared_amount: options?.declaredAmount,
+      },
     }
   );
 }

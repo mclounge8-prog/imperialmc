@@ -11,8 +11,10 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import {
   createCashMovement,
+  fetchAtolSettings,
   fetchCashMovements,
   fetchCurrentShift,
+  type AtolSettings,
   type CashMovement,
   type CashMovementType,
   type Shift,
@@ -21,10 +23,29 @@ import AmountPromptModal from '../components/AmountPromptModal';
 import { useDevice } from '../context/DeviceContext';
 import { useSession } from '../context/SessionContext';
 import { runPendingFiscalJobs } from '../services/fiscalWorker';
+import { FN_CASH_DRAWER_CAP, readFnCashSum } from '../services/fnCashSum';
+import { runAtolTask, type AtolConnectionSettings } from '../native/atol';
 import { colors } from '../theme/colors';
 
 function formatMoney(value: number): string {
   return `${Math.round(value).toLocaleString('ru-RU')} ₽`;
+}
+
+function connectionOf(settings: AtolSettings): AtolConnectionSettings {
+  return {
+    ipAddress: settings.ipAddress as string,
+    ipPort: settings.ipPort ?? 5555,
+    model: settings.model,
+  };
+}
+
+async function queryFnCashSum(settings: AtolConnectionSettings): Promise<number> {
+  const response = await runAtolTask(settings, { type: 'getShiftTotals' });
+  const sum = readFnCashSum(response);
+  if (sum == null) {
+    throw new Error('Касса не вернула сумму наличных в фискальном накопителе');
+  }
+  return sum;
 }
 
 function formatWhen(value: string): string {
@@ -77,10 +98,32 @@ export default function CashScreen() {
 
   const submitMovement = async (amount: number) => {
     if (!venueId || !session?.token || !promptType) return;
+    const type = promptType;
     setBusy(true);
     setPromptType(null);
     try {
-      const result = await createCashMovement(venueId, session.token, promptType, amount);
+      let posted = amount;
+      let fromFn = false;
+      if (type === 'withdrawal') {
+        const settings = await fetchAtolSettings(venueId, session.token);
+        if (settings.enabled && settings.ipAddress) {
+          const fnCash = await queryFnCashSum(connectionOf(settings));
+          if (fnCash <= 0.009) {
+            throw new Error('В фискальном накопителе нет наличных. Инкассация не отправлена.');
+          }
+          if (fnCash > FN_CASH_DRAWER_CAP) {
+            throw new Error(
+              `Сумма в ФН ${fnCash} ₽ не похожа на ящик. Инкассация остановлена.`
+            );
+          }
+          posted = fnCash;
+          fromFn = true;
+        }
+      }
+      const result = await createCashMovement(venueId, session.token, type, posted, undefined, {
+        fromFn,
+        declaredAmount: fromFn ? amount : undefined,
+      });
       setShift(result.shift);
       runPendingFiscalJobs(venueId, session.token);
       await load();
@@ -125,18 +168,22 @@ export default function CashScreen() {
     >
       {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
 
-      <View style={styles.hero}>
-        <Text style={styles.heroLabel}>Сейчас в кассе</Text>
-        <Text style={styles.heroValue}>{formatMoney(shift.cash.expectedCash)}</Text>
-        <View style={styles.openingBlock}>
-          <Text style={styles.openingLabel}>На открытии смены</Text>
-          <Text style={styles.openingValue}>{formatMoney(shift.cash.openingCash)}</Text>
+      <View style={styles.heroRow}>
+        <View style={[styles.hero, styles.heroHalf]}>
+          <Text style={styles.heroLabel}>Сейчас в кассе</Text>
+          <Text style={styles.heroValue}>{formatMoney(shift.cash.expectedCash)}</Text>
         </View>
-        <Text style={styles.heroMeta}>
-          продажи {formatMoney(shift.cash.cashSales)} · внесения {formatMoney(shift.cash.deposits)} ·
-          инкассации {formatMoney(shift.cash.withdrawals)}
-        </Text>
+        <View style={[styles.hero, styles.heroHalf]}>
+          <Text style={styles.heroLabel}>С открытия смены</Text>
+          <Text style={styles.heroValue}>
+            {formatMoney(shift.cash.cashSales + shift.cash.deposits - shift.cash.withdrawals)}
+          </Text>
+        </View>
       </View>
+      <Text style={styles.heroMeta}>
+        на открытии в учёте {formatMoney(shift.cash.openingCash)} · продажи {formatMoney(shift.cash.cashSales)} ·
+        внесения {formatMoney(shift.cash.deposits)} · инкассации {formatMoney(shift.cash.withdrawals)}
+      </Text>
 
       <View style={styles.actions}>
         <Pressable
@@ -191,7 +238,11 @@ export default function CashScreen() {
       <AmountPromptModal
         visible={promptType != null}
         title={promptType === 'deposit' ? 'Внесение наличных' : 'Инкассация'}
-        subtitle="Сумма уйдёт в учёт смены и напечатается учётным чеком на АТОЛ."
+        subtitle={
+          promptType === 'deposit'
+            ? 'Сумма уйдёт в учёт смены и напечатается учётным чеком на АТОЛ.'
+            : 'Изымем наличность, которая сейчас в ФН, даже если введённая сумма больше учёта.'
+        }
         confirmLabel={promptType === 'deposit' ? 'Внести' : 'Изымать'}
         initialValue=""
         allowZero={false}
@@ -224,6 +275,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 13,
   },
+  heroRow: { flexDirection: 'row', gap: 10 },
   hero: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -231,17 +283,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
   },
+  heroHalf: { flex: 1 },
   heroLabel: { color: colors.textMuted, fontSize: 12 },
-  heroValue: { color: colors.accent2, fontSize: 32, fontWeight: '800', marginTop: 4 },
-  openingBlock: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  openingLabel: { color: colors.textMuted, fontSize: 12 },
-  openingValue: { color: colors.text, fontSize: 22, fontWeight: '700', marginTop: 2 },
-  heroMeta: { color: colors.textMuted, fontSize: 12, marginTop: 8, lineHeight: 18 },
+  heroValue: { color: colors.accent2, fontSize: 28, fontWeight: '800', marginTop: 4 },
+  heroMeta: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
   actions: { flexDirection: 'row', gap: 10 },
   actionBtn: {
     flex: 1,

@@ -18,6 +18,7 @@ import {
   receiptHasFiscalDoc,
   shouldAdoptLastDocument,
 } from './fiscalReconcile';
+import { FN_CASH_DRAWER_CAP, readFnCashSum } from './fnCashSum';
 
 // Настройки читаем на каждый проход очереди (раз в ~15с). Раньше кэш на
 // всю сессию ломал Карлу/новые точки: включили АТОЛ в бэкофисе, а терминал
@@ -123,7 +124,33 @@ export async function runPendingFiscalJobs(venueId: number, token: string): Prom
 
         // Сервер не отдаёт просроченный close_shift (уже открыта следующая
         // смена): closeShift на ККТ закрыл бы текущую фискальную смену.
-        const task = typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
+        let task = typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
+        if (task && task.type === 'cashOut') {
+          try {
+            const totals = await runAtolTask(connectionOf(settings), { type: 'getShiftTotals' });
+            const live = readFnCashSum(totals);
+            const asked = Number(task.cashSum);
+            if (live != null && live + 0.001 < asked) {
+              console.log(
+                `[ATOL] инкассация #${job.id}: в ФН ${live} ₽, в задании ${asked} ₽ — изымаю сумму ФН`
+              );
+              task = { ...task, cashSum: live };
+            }
+          } catch (err) {
+            console.warn(
+              `[ATOL] задание #${job.id} — не удалось сверить наличность ФН:`,
+              err instanceof Error ? err.message : err
+            );
+          }
+          if (Number(task.cashSum) <= 0.009) {
+            throw new Error('В фискальном накопителе нет наличных для инкассации');
+          }
+          if (Number(task.cashSum) > FN_CASH_DRAWER_CAP) {
+            throw new Error(
+              `Сумма в ФН ${task.cashSum} ₽ не похожа на ящик. Инкассация остановлена.`
+            );
+          }
+        }
         const response = await runAtolTask(connectionOf(settings), task);
         console.log(`[ATOL] задание #${job.id} — ответ кассы:`, JSON.stringify(response));
         const fields = extractResponseFields(response);
