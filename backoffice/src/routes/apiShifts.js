@@ -183,11 +183,14 @@ apiShifts.post('/open', async (c) => {
   const staff = c.get('staff');
   const body = await c.req.json().catch(() => null);
   const venueId = body && body.venue_id ? Number(body.venue_id) : null;
-  const openingCash = parseMoney(body?.opening_cash ?? body?.openingCash ?? 0);
-  if (openingCash == null) {
+  // Сумма, которую насчитал сотрудник. В учёт не идёт: касса смены всегда с нуля,
+  // потому что при закрытии наличные изымают. Число остаётся в уведомлении Telegram.
+  const declaredCash = parseMoney(body?.opening_cash ?? body?.openingCash ?? 0);
+  if (declaredCash == null) {
     c.status(400);
     return c.json({ error: 'Некорректный остаток наличных на открытии' });
   }
+  const openingCash = 0;
 
   if (!venueId) {
     c.status(400);
@@ -226,6 +229,8 @@ apiShifts.post('/open', async (c) => {
       fiscalShiftOpen: fiscalShiftIsOpen(shiftJobs.opens, shiftJobs.closes),
     });
 
+    // Фискальное открытие смены — да. Внесение в ККТ суммы сотрудника — нет:
+    // в учёте касса стартует с 0.
     if (enqueueFiscalOpen) {
       await enqueueShiftFiscalJob(client, {
         venueId,
@@ -233,17 +238,6 @@ apiShifts.post('/open', async (c) => {
         type: 'open_shift',
         operatorName: staff.name,
       });
-
-      // Остаток на открытии = внесение в денежный ящик ККТ (учётный чек cashIn).
-      if (openingCash > 0) {
-        await enqueueCashFiscalJob(client, {
-          venueId,
-          shiftId: shift.id,
-          type: 'cash_in',
-          amount: openingCash,
-          operatorName: staff.name,
-        });
-      }
     }
 
     await client.query('COMMIT');
@@ -253,6 +247,7 @@ apiShifts.post('/open', async (c) => {
       buildShiftOpenMessage({
         venueName,
         openingCash,
+        declaredCash,
         previousClosingCash,
         cashier: staff.name,
       }),
@@ -472,6 +467,9 @@ apiShifts.post('/cash-movements', async (c) => {
   const type = body?.type === 'withdrawal' || body?.type === 'deposit' ? body.type : null;
   const amount = parseMoney(body?.amount, { allowZero: false });
   const comment = typeof body?.comment === 'string' ? body.comment.trim().slice(0, 200) : null;
+  // Планшет уже сверил сумму с денежным ящиком ФН и прислал именно её.
+  const fromFn = body?.from_fn === true || body?.fromFn === true;
+  const declaredAmount = parseMoney(body?.declared_amount ?? body?.declaredAmount);
 
   if (!venueId || !type || amount == null) {
     c.status(400);
@@ -484,7 +482,7 @@ apiShifts.post('/cash-movements', async (c) => {
     return c.json({ error: 'Открытой смены нет — операция с наличными недоступна' });
   }
 
-  if (type === 'withdrawal') {
+  if (type === 'withdrawal' && !fromFn) {
     const stats = await fetchShiftStats(shift);
     if (amount > stats.cash.expectedCash + 0.001) {
       c.status(400);
@@ -492,6 +490,16 @@ apiShifts.post('/cash-movements', async (c) => {
         error: `Нельзя изъять ${amount} ₽: в кассе ожидается ${stats.cash.expectedCash} ₽`,
       });
     }
+  }
+
+  // Показание ящика ФН выше этого порога не проводим: дневная касса
+  // точек — десятки тысяч, а сбой getShiftTotals уже отдавал сотни тысяч.
+  const FN_WITHDRAWAL_CAP = 100000;
+  if (type === 'withdrawal' && fromFn && amount > FN_WITHDRAWAL_CAP) {
+    c.status(400);
+    return c.json({
+      error: `Сумма в ФН ${amount} ₽ не похожа на ящик. Инкассация остановлена.`,
+    });
   }
 
   const client = await pool.connect();
@@ -520,6 +528,7 @@ apiShifts.post('/cash-movements', async (c) => {
         venueName,
         type,
         amount,
+        declaredAmount: fromFn ? declaredAmount : null,
         comment,
         cashier: staff.name,
       }),
