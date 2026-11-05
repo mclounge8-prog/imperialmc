@@ -38,6 +38,10 @@ function memoryDb() {
       seat_price INTEGER NOT NULL DEFAULT 0,
       zone_open INTEGER NOT NULL DEFAULT 1
     );
+    CREATE TABLE bookings (
+      id INTEGER PRIMARY KEY,
+      table_id INTEGER NOT NULL
+    );
     CREATE TABLE blocks (
       id INTEGER PRIMARY KEY,
       zone TEXT NOT NULL,
@@ -73,4 +77,31 @@ test('a hall sync moves a table and keeps its booking price', () => {
   const added = db.prepare('SELECT name, seats, seat_price, zone_open FROM tables WHERE id = 53').get();
   assert.deepEqual({ ...added }, { name: 'Стол 16', seats: 4, seat_price: 0, zone_open: 1 });
   assert.equal(db.prepare('SELECT name FROM blocks WHERE id = 2').get().name, 'Сцена');
+});
+
+test('a table deleted in the hall leaves the booking plan', () => {
+  const db = memoryDb();
+  db.prepare(
+    `INSERT INTO tables (id, zone, zone_order, name, seats, bookable, pos_x, pos_y, width, height, bounds_w, bounds_h, seat_price, zone_open)
+     VALUES (99, 'Основной зал', 0, 'Стол 99', 4, 1, 40, 40, 80, 80, 800, 480, 0, 1)`
+  ).run();
+  db.prepare('INSERT INTO bookings (table_id) VALUES (99)').run();
+  applyFloorSync(db, {
+    tables: [
+      { id: 11, zone: 'Основной зал', zoneOrder: 0, name: 'Стол 1', seats: 4, x: 0, y: 0, w: 80, h: 80 },
+    ],
+  });
+  const kept = db.prepare('SELECT on_plan, bookable FROM tables WHERE id = 99').get();
+  assert.equal(kept.on_plan, 0);
+  assert.equal(kept.bookable, 0);
+  db.prepare(
+    `INSERT INTO tables (id, zone, zone_order, name, seats, bookable, pos_x, pos_y, width, height, bounds_w, bounds_h, seat_price, zone_open, on_plan)
+     VALUES (12, 'Основной зал', 0, 'Стол 12', 4, 1, 80, 80, 80, 80, 800, 480, 0, 1, 1)`
+  ).run();
+  applyFloorSync(db, {
+    tables: [
+      { id: 11, zone: 'Основной зал', zoneOrder: 0, name: 'Стол 1', seats: 4, x: 0, y: 0, w: 80, h: 80 },
+    ],
+  });
+  assert.equal(db.prepare('SELECT id FROM tables WHERE id = 12').get(), undefined);
 });

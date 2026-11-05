@@ -4,6 +4,27 @@ const PLAN_H = 480;
 export const ZONE_ALIAS = new Map([['VIP Комната', 'VIP']]);
 export const HIDDEN_ZONES = new Set(['Начальство', 'Офис']);
 
+function ensureOnPlan(db) {
+  const names = db.prepare('PRAGMA table_info(tables)').all().map((column) => column.name);
+  if (!names.includes('on_plan')) {
+    db.exec('ALTER TABLE tables ADD COLUMN on_plan INTEGER NOT NULL DEFAULT 1');
+  }
+}
+
+function dropTablesMissingFromHall(db, tables) {
+  const present = new Set(tables.map((table) => table.id));
+  const booked = new Set(
+    db.prepare('SELECT DISTINCT table_id AS id FROM bookings').all().map((row) => row.id)
+  );
+  const hide = db.prepare('UPDATE tables SET on_plan = 0, bookable = 0 WHERE id = ?');
+  const remove = db.prepare('DELETE FROM tables WHERE id = ?');
+  for (const row of db.prepare('SELECT id FROM tables').all()) {
+    if (present.has(row.id)) continue;
+    if (booked.has(row.id)) hide.run(row.id);
+    else remove.run(row.id);
+  }
+}
+
 function onGrid(value) {
   return Number.isInteger(value) && value >= 0 && value % 40 === 0;
 }
@@ -60,15 +81,16 @@ export function applyFloorSync(db, { tables = null, blocks = null } = {}) {
       }
     }
     if (tables) {
+      ensureOnPlan(db);
       const update = db.prepare(
         `UPDATE tables
-         SET zone = ?, zone_order = ?, name = ?, pos_x = ?, pos_y = ?, width = ?, height = ?
+         SET zone = ?, zone_order = ?, name = ?, pos_x = ?, pos_y = ?, width = ?, height = ?, on_plan = 1
          WHERE id = ?`
       );
       const insert = db.prepare(
         `INSERT INTO tables
-           (id, zone, zone_order, name, seats, bookable, pos_x, pos_y, width, height, bounds_w, bounds_h, seat_price, zone_open)
-         VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, 0, ?)`
+           (id, zone, zone_order, name, seats, bookable, pos_x, pos_y, width, height, bounds_w, bounds_h, seat_price, zone_open, on_plan)
+         VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, 0, ?, 1)`
       );
       const zoneOpen = db.prepare('SELECT zone_open FROM tables WHERE zone = ? LIMIT 1');
       for (const table of tables) {
@@ -93,6 +115,7 @@ export function applyFloorSync(db, { tables = null, blocks = null } = {}) {
           sibling ? sibling.zone_open : 1
         );
       }
+      dropTablesMissingFromHall(db, tables);
     }
     db.exec('COMMIT');
   } catch (err) {

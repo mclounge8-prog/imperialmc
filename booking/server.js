@@ -75,6 +75,9 @@ if (!columnNames('bookings').includes('seat_price')) {
 if (!columnNames('tables').includes('zone_open')) {
   db.exec('ALTER TABLE tables ADD COLUMN zone_open INTEGER NOT NULL DEFAULT 1');
 }
+if (!columnNames('tables').includes('on_plan')) {
+  db.exec('ALTER TABLE tables ADD COLUMN on_plan INTEGER NOT NULL DEFAULT 1');
+}
 
 const floor = JSON.parse(readFileSync(join(ROOT, 'data', 'floor.json'), 'utf8'));
 const existing = db.prepare('SELECT COUNT(*) AS n FROM tables').get().n;
@@ -291,7 +294,7 @@ function listTables() {
     `SELECT id, zone, zone_order AS zoneOrder, name, seats, bookable, zone_open AS zoneOpen, seat_price AS price,
             pos_x AS x, pos_y AS y, width AS w, height AS h,
             bounds_w AS boundsW, bounds_h AS boundsH
-     FROM tables ORDER BY zone_order, name`
+     FROM tables WHERE on_plan = 1 ORDER BY zone_order, name`
   ).all().map((row) => ({ ...row, bookable: !!row.bookable, zoneOpen: !!row.zoneOpen }));
 }
 
@@ -523,11 +526,14 @@ const server = createServer(async (req, res) => {
       let created;
       try {
         const table = db.prepare('SELECT * FROM tables WHERE id = ?').get(tableId);
-        if (!table || !table.zone_open) {
+        if (!table || table.on_plan === 0) {
           db.exec('ROLLBACK');
-          json(res, table ? 409 : 404, {
-            error: table ? 'Этот зал сейчас не бронируется' : 'Такого стола нет',
-          });
+          json(res, 404, { error: 'Такого стола нет' });
+          return;
+        }
+        if (!table.zone_open) {
+          db.exec('ROLLBACK');
+          json(res, 409, { error: 'Этот зал сейчас не бронируется' });
           return;
         }
         const held = seatsHeld(activeBookings(), table.id, date, time, HOLD_MINUTES);
