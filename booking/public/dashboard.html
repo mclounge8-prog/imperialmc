@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Заявки — MC Lounge Роза</title>
+  <meta name="description" content="Служебная страница заявок на бронь MC Lounge Роза.">
+  <meta name="theme-color" content="#121214">
+  <meta property="og:title" content="Заявки — MC Lounge Роза">
+  <meta property="og:description" content="Служебная страница заявок на бронь.">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css?v=8">
+</head>
+<body>
+  <div class="login-screen" id="login">
+    <form class="panel login-card form" id="loginForm">
+      <a class="brand" href="/">
+        <img src="/logo-white.webp" alt="" width="72" height="42">
+        <span><small>MC Lounge</small><strong>Заявки</strong></span>
+      </a>
+      <h1 style="font-size:40px">Вход</h1>
+      <label class="field"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" required></label>
+      <p class="error" id="loginError"></p>
+      <button class="primary" type="submit">Открыть</button>
+    </form>
+  </div>
+  <div class="wrap" id="desk" hidden>
+    <header class="top">
+      <a class="brand" href="/">
+        <img src="/logo-white.webp" alt="" width="92" height="53">
+        <span><small>MC Lounge Роза</small><strong>Заявки</strong></span>
+      </a>
+      <button class="ghost" type="button" id="logout">Выйти</button>
+    </header>
+    <div class="stats" id="stats"></div>
+    <section class="panel schedule">
+      <h2>Залы и время</h2>
+      <p class="note">Выключенный зал гости не видят. Пул времени задаётся вплоть до минуты, даты — с какого дня по какой. Пустые даты значат «без границы».</p>
+      <div class="field">
+        <span>Залы для гостей</span>
+        <div class="zones" id="zoneToggles"></div>
+      </div>
+      <div class="schedule-row">
+        <label class="field"><span>С даты</span><input id="dateFrom" type="date"></label>
+        <label class="field"><span>По дату</span><input id="dateTo" type="date"></label>
+      </div>
+      <div class="schedule-row">
+        <label class="field"><span>С</span><input id="poolFrom" type="time" value="16:00"></label>
+        <label class="field"><span>До</span><input id="poolTo" type="time" value="01:00"></label>
+        <label class="field"><span>Шаг, мин</span><input id="poolStep" type="number" min="5" max="180" step="5" value="60"></label>
+        <button class="ghost" type="button" id="poolBuild">Собрать пул</button>
+      </div>
+      <div class="field">
+        <span>Пул времени</span>
+        <div class="times" id="poolTimes"></div>
+      </div>
+      <div class="schedule-row">
+        <label class="field"><span>Своё время</span><input id="poolAdd" type="time"></label>
+        <button class="ghost" type="button" id="poolAddBtn">Добавить</button>
+        <button class="primary" type="button" id="poolSave">Сохранить расписание</button>
+      </div>
+      <p class="error" id="scheduleError"></p>
+    </section>
+    <h2 style="font-family:var(--font-display);font-weight:600">Схема зала</h2>
+    <p class="note">Схема приходит из расстановки столов Розы. Цена места и число мест к брони остаются здесь и кассу не меняют. Перетаскивание на этой странице сдвинет стол только до следующей правки в бэкофисе.</p>
+    <div class="zones" id="zones"></div>
+    <p class="note zone-paused-note" id="zonePause" hidden>Гости этот зал не видят.</p>
+    <div id="floor" class="floor"></div>
+    <form class="panel table-editor" id="tableEditor" hidden>
+      <strong id="editorTitle"></strong>
+      <label class="field"><span>Мест к брони</span>
+        <input id="editorSeats" type="number" min="1" max="30">
+      </label>
+      <label class="field"><span>Цена места, ₽</span>
+        <input id="editorPrice" type="number" min="0" max="1000000" step="1" inputmode="numeric">
+      </label>
+      <div class="field">
+        <span>Размер на сетке</span>
+        <div class="zones" id="editorSizes">
+          <button type="button" class="chip" data-size="small">2×2</button>
+          <button type="button" class="chip" data-size="medium">3×2</button>
+          <button type="button" class="chip" data-size="large">4×3</button>
+        </div>
+      </div>
+      <label><input id="editorOpen" type="checkbox"> открыт для брони</label>
+      <button class="ghost" type="submit">Сохранить стол</button>
+    </form>
+    <h2 style="font-family:var(--font-display);font-weight:600">Заявки</h2>
+    <div class="board" id="board"></div>
+  </div>
+  <script src="/plan.js?v=8"></script>
+  <script src="/dashboard.js?v=8"></script>
+</body>
+</html>
