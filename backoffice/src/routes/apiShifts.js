@@ -12,6 +12,7 @@ import {
 import {
   buildCashMovementMessage,
   buildShiftCloseMessage,
+  buildShiftEmergencyCloseMessage,
   buildShiftOpenMessage,
   buildTobaccoCountMessage,
   fetchPreviousShiftClosingCash,
@@ -410,9 +411,21 @@ apiShifts.post('/close', async (c) => {
 
     const closedStats = await fetchShiftStats(rows[0]);
     const venueName = await fetchVenueName(venueId);
-    // Сначала отчёт по выручке/кассе, затем табак — последовательно,
-    // иначе при таймаутах Telegram часто «теряется» одно из двух параллельных сообщений.
+    const forcedClose = Boolean(mismatch && forcePin === FORCE_CLOSE_PIN);
+    // Сначала аварийный трек (если был PIN), потом отчёт по выручке/кассе, затем табак.
+    // Последовательно: при таймаутах Telegram иначе теряется одно из параллельных сообщений.
     notifyTelegramSafe(async () => {
+      if (forcedClose) {
+        await sendTelegramMessage(
+          buildShiftEmergencyCloseMessage({
+            venueName,
+            closingCash: countedCash,
+            expectedCash,
+            cashier: staff.name,
+          }),
+          { venueId }
+        );
+      }
       await sendTelegramMessage(
         buildShiftCloseMessage({
           venueName,
@@ -431,6 +444,7 @@ apiShifts.post('/close', async (c) => {
           cashReceipts: cashOfd?.receipts || [],
           cashQuota: cashOfd?.quota,
           totalReceipts: cashOfd?.totalReceipts,
+          forcedClose,
         }),
         { venueId }
       );
@@ -453,7 +467,7 @@ apiShifts.post('/close', async (c) => {
     }, { venueId });
     return c.json({
       shift: serializeShift(rows[0], closedStats),
-      forcedClose: Boolean(mismatch && forcePin === FORCE_CLOSE_PIN),
+      forcedClose,
       tobaccoSkipped: Boolean(venueTobacco?.tobacco_accounting_enabled && tobaccoCount?.skipped),
     });
   } catch (err) {
