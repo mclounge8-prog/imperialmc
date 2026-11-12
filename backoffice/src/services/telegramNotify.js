@@ -469,6 +469,34 @@ export function buildShiftOpenMessage({
   return lines.join('\n');
 }
 
+/** Отдельное сообщение: смена закрыта аварийным PIN, касса не сошлась. */
+export function buildShiftEmergencyCloseMessage({
+  venueName,
+  closingCash,
+  expectedCash,
+  cashier,
+  when,
+}) {
+  const fact = Number(closingCash) || 0;
+  const expected = expectedCash == null ? null : Number(expectedCash);
+  const diff = expected == null ? null : fact - expected;
+  const lines = [
+    header('🚨 Аварийное закрытие смены', venueName, when),
+    '',
+    'Смена закрыта <b>аварийно</b>, по PIN.',
+    'Наличность с учётом не сошлась.',
+  ];
+  if (expected != null) {
+    lines.push(`По учёту: ${escapeHtml(formatMoney(expected))}`);
+    lines.push(`Факт: <b>${escapeHtml(formatMoney(fact))}</b>`);
+    lines.push(`Расхождение (факт − учёт): <b>${escapeHtml(formatMoney(diff))}</b>`);
+  } else {
+    lines.push(`Факт: <b>${escapeHtml(formatMoney(fact))}</b>`);
+  }
+  lines.push(`Кассир: ${escapeHtml(cashier || '—')}`);
+  return lines.join('\n');
+}
+
 export function buildShiftCloseMessage({
   venueName,
   closingCash,
@@ -487,10 +515,14 @@ export function buildShiftCloseMessage({
   cashReceipts = null,
   cashQuota = null,
   totalReceipts = null,
+  forcedClose = false,
 }) {
   const lines = [
-    header('🔴 Закрытие смены', venueName, when),
+    header(forcedClose ? '🔴 Закрытие смены · аварийное' : '🔴 Закрытие смены', venueName, when),
     '',
+    forcedClose
+      ? 'Режим: <b>аварийный</b>'
+      : 'Режим: обычное закрытие',
     `Наличные при закрытии: <b>${escapeHtml(formatMoney(closingCash))}</b>`,
     expectedCash != null ? `Ожидалось по учёту: ${escapeHtml(formatMoney(expectedCash))}` : null,
     `Выручка: <b>${escapeHtml(formatMoney(revenueTotal))}</b>`,
