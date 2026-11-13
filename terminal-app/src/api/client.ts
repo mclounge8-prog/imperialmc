@@ -222,6 +222,8 @@ export type OrderItem = {
   qty: number;
   lineTotal: number;
   serveIn?: string | null;
+  /** Официант отметил, что позицию уже отдали. */
+  served?: boolean;
   modifiers: OrderItemModifier[];
 };
 
@@ -248,6 +250,8 @@ export type Order = {
   status: OrderStatus;
   venueId?: number | null;
   precheckEnabled?: boolean;
+  /** Включена ли у заведения отметка «отдано» в чеке. */
+  servedMarksEnabled?: boolean;
   table: { id: number; name: string } | null;
   guests: OrderGuest[];
   total: number;
@@ -484,6 +488,20 @@ export async function printGuestPrecheck(
     `/api/orders/${orderId}/guests/${guestId}/precheck`,
     token,
     { method: 'POST', body: {} }
+  );
+  return order;
+}
+
+export async function setOrderItemServed(
+  orderId: number,
+  itemId: number,
+  served: boolean,
+  token: string
+): Promise<Order> {
+  const { order } = await authorizedRequest<OrderEnvelope>(
+    `/api/orders/${orderId}/items/${itemId}/served`,
+    token,
+    { method: 'PUT', body: { served } }
   );
   return order;
 }
