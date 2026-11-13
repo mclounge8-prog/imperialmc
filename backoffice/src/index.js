@@ -39,6 +39,7 @@ import { sections } from './views/sections.js';
 import { fetchAllVenues } from './utils/venues.js';
 import { readLastSection, readSelectedVenueId, resolveSelectedVenue } from './utils/preferences.js';
 import { ensureAtolCashHoldSchema } from './services/cashFiscalHold.js';
+import { ensureVenueFeaturesSchema } from './services/venueFeatures.js';
 import { startFiscalJobsCleanup } from './services/fiscalCleanup.js';
 import { ensureUpdatesDir } from './services/terminalUpdates.js';
 import { ensureTelegramSettingsRow } from './services/telegramNotify.js';
@@ -129,6 +130,7 @@ const port = Number(process.env.PORT || 3000);
 await ensureKitchenSchema();
 await ensureDrinkTechCards();
 await ensureAtolCashHoldSchema();
+await ensureVenueFeaturesSchema();
 
 serve({ fetch: app.fetch, port }, async (info) => {
   console.log(`Бэкофис запущен: http://localhost:${info.port}`);

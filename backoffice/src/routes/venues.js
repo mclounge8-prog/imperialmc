@@ -11,7 +11,9 @@ import {
   renderVenueAtolPanel,
   renderVenueAtolJobsRows,
   renderVenueKioskPayPanel,
+  renderVenueFeaturesPanel,
 } from '../views/venuesView.js';
+import { listVenueFeatures, setVenueFeature, isKnownVenueFeature } from '../services/venueFeatures.js';
 import { renderVenueTobaccoPanel } from '../views/tobaccoView.js';
 import { cancelIfSuperseded } from '../services/fiscalJobGuards.js';
 
@@ -72,6 +74,35 @@ venues.post('/', async (c) => {
 
   const cards = await fetchAllVenueCards();
   return c.html(renderVenueListOob(cards));
+});
+
+venues.get('/:id/features', async (c) => {
+  const venue = await fetchVenue(c.req.param('id'));
+  if (!venue) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+  const features = await listVenueFeatures(venue.id);
+  return c.html(renderVenueFeaturesPanel(venue.id, features));
+});
+
+venues.get('/:id/features/close', async (c) => c.html(''));
+
+venues.post('/:id/features/:key', async (c) => {
+  const venue = await fetchVenue(c.req.param('id'));
+  if (!venue) {
+    c.status(404);
+    return c.text('Заведение не найдено');
+  }
+  const key = c.req.param('key');
+  if (!isKnownVenueFeature(key)) {
+    c.status(404);
+    return c.text('Такой функции нет');
+  }
+  const current = await listVenueFeatures(venue.id);
+  const feature = current.find((item) => item.key === key);
+  const features = await setVenueFeature(venue.id, key, !feature?.enabled);
+  return c.html(renderVenueFeaturesPanel(venue.id, features));
 });
 
 venues.get('/:id/edit', async (c) => {

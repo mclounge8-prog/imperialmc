@@ -3,6 +3,7 @@ import { pool } from '../db.js';
 import { stockDeltasForItems } from '../services/warehouseStock.js';
 import { requireStaffToken } from '../middleware/apiAuth.js';
 import { enqueuePrecheckFiscalJob, enqueueReceiptFiscalJob } from '../services/fiscalQueue.js';
+import { isVenueFeatureEnabled } from '../services/venueFeatures.js';
 import {
   buildCashPaymentMessage,
   buildDiscountPaymentMessage,
@@ -113,7 +114,7 @@ async function fetchOrderDetail(orderId) {
   );
 
   const { rows: itemRows } = await pool.query(
-    'SELECT id, guest_id, menu_item_id, name, price, qty, serve_in FROM order_items WHERE order_id = $1 ORDER BY id',
+    'SELECT id, guest_id, menu_item_id, name, price, qty, serve_in, served FROM order_items WHERE order_id = $1 ORDER BY id',
     [orderId]
   );
 
@@ -148,6 +149,7 @@ async function fetchOrderDetail(orderId) {
       qty: item.qty,
       lineTotal: Number(item.price) * item.qty,
       serveIn: item.serve_in || null,
+      served: !!item.served,
       modifiers,
     });
   }
@@ -180,6 +182,7 @@ async function fetchOrderDetail(orderId) {
     status: order.status,
     venueId: order.venue_id,
     precheckEnabled: !!order.precheck_enabled,
+    servedMarksEnabled: await isVenueFeatureEnabled(order.venue_id, 'served_marks'),
     table: order.table_id ? { id: order.table_id, name: order.table_name } : null,
     guests,
     total,
@@ -1271,7 +1274,7 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
     }
 
     if (matchedItemId) {
-      await client.query('UPDATE order_items SET qty = qty + 1 WHERE id = $1', [matchedItemId]);
+      await client.query('UPDATE order_items SET qty = qty + 1, served = false WHERE id = $1', [matchedItemId]);
     } else {
       const { rows: inserted } = await client.query(
         'INSERT INTO order_items (order_id, guest_id, menu_item_id, name, price, qty, serve_in) VALUES ($1, $2, $3, $4, $5, 1, $6) RETURNING id',
@@ -1296,6 +1299,44 @@ apiOrders.post('/orders/:orderId/items', requireStaffToken, async (c) => {
   } finally {
     client.release();
   }
+
+  const order = await fetchOrderDetail(orderId);
+  return c.json({ order });
+});
+
+// Отметка «отдано» на строке чека. Не зависит от пречека: официант отмечает
+// выдачу и может снять её. Пока функция выключена у заведения — планшет
+// чекбокс не рисует, а запрос тоже не принимаем.
+apiOrders.put('/orders/:orderId/items/:itemId/served', requireStaffToken, async (c) => {
+  const { orderId, itemId } = c.req.param();
+  const body = await c.req.json().catch(() => null);
+  const served = body?.served === true;
+
+  const { rows } = await pool.query(
+    `SELECT o.venue_id, o.status
+     FROM order_items oi
+     JOIN orders o ON o.id = oi.order_id
+     WHERE oi.id = $1 AND o.id = $2`,
+    [itemId, orderId]
+  );
+  if (!rows[0]) {
+    c.status(404);
+    return c.json({ error: 'Позиция не найдена' });
+  }
+  if (rows[0].status !== 'open') {
+    c.status(409);
+    return c.json({ error: 'Заказ уже закрыт' });
+  }
+  if (!(await isVenueFeatureEnabled(rows[0].venue_id, 'served_marks'))) {
+    c.status(409);
+    return c.json({ error: 'Отметка «отдано» на этой точке выключена', code: 'FEATURE_DISABLED' });
+  }
+
+  await pool.query('UPDATE order_items SET served = $1 WHERE id = $2 AND order_id = $3', [
+    served,
+    itemId,
+    orderId,
+  ]);
 
   const order = await fetchOrderDetail(orderId);
   return c.json({ order });
@@ -1387,7 +1428,7 @@ apiOrders.put('/orders/:orderId/items/:itemId/modifiers', requireStaffToken, asy
       }
 
       if (matchedItemId) {
-        await client.query('UPDATE order_items SET qty = qty + $1 WHERE id = $2', [
+        await client.query('UPDATE order_items SET qty = qty + $1, served = false WHERE id = $2', [
           item.qty,
           matchedItemId,
         ]);
@@ -1461,7 +1502,7 @@ apiOrders.put('/orders/:orderId/items/:itemId/guest', requireStaffToken, async (
         }
       }
       if (matched) {
-        await pool.query('UPDATE order_items SET qty = qty + $1 WHERE id = $2', [item.qty, matched.id]);
+        await pool.query('UPDATE order_items SET qty = qty + $1, served = false WHERE id = $2', [item.qty, matched.id]);
         await pool.query('DELETE FROM order_items WHERE id = $1', [itemId]);
       } else {
         await pool.query('UPDATE order_items SET guest_id = $1 WHERE id = $2', [targetGuestId, itemId]);
@@ -1521,7 +1562,7 @@ apiOrders.delete('/orders/:orderId/items/:itemId', requireStaffToken, async (c) 
 
     const fullDelete = item.qty <= 1;
     if (item.qty > 1) {
-      await client.query('UPDATE order_items SET qty = qty - 1 WHERE id = $1', [item.id]);
+      await client.query('UPDATE order_items SET qty = qty - 1, served = false WHERE id = $1', [item.id]);
     } else {
       await client.query('DELETE FROM order_items WHERE id = $1', [item.id]);
     }
