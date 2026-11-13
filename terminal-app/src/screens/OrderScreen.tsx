@@ -32,6 +32,7 @@ import {
   addOrderItem,
   updateOrderItemModifiers,
   removeOrderItem,
+  setOrderItemServed,
   deleteOrderItemFully,
   moveOrderItem,
   transferOrderTable,
@@ -109,6 +110,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   const [menu, setMenu] = useState<MenuResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [servedPendingId, setServedPendingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [moveTarget, setMoveTarget] = useState<MoveTarget | null>(null);
   const [alertState, setAlertState] = useState<AlertState>(null);
@@ -364,6 +366,19 @@ export default function OrderScreen({ route, navigation }: Props) {
     if (removed.length > 0) parts.push(`без: ${removed.join(', ')}`);
     if (added.length > 0) parts.push(`+ ${added.join(', ')}`);
     return parts.join(' · ');
+  };
+
+  const handleToggleServed = async (item: OrderItem) => {
+    if (!session || !order?.servedMarksEnabled || servedPendingId != null) return;
+    setServedPendingId(item.id);
+    try {
+      const updated = await setOrderItemServed(order.id, item.id, !item.served, session.token);
+      setOrder(updated);
+    } catch (e) {
+      showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось отметить позицию');
+    } finally {
+      setServedPendingId(null);
+    }
   };
 
   const handleRemoveItem = async (itemId: number) => {
@@ -836,14 +851,30 @@ export default function OrderScreen({ route, navigation }: Props) {
               const summary = buildModifierSummary(item);
               const readyQty = kitchenReadyQty[item.id] || 0;
               const readyFull = readyQty >= item.qty && item.qty > 0;
+              const served = !!item.served;
               return (
               <View key={item.id} style={[styles.orderItemRow, readyQty > 0 && styles.orderItemReady]}>
+                {order.servedMarksEnabled ? (
+                  <Pressable
+                    style={[styles.servedBox, served && styles.servedBoxOn]}
+                    disabled={servedPendingId != null}
+                    hitSlop={10}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: served }}
+                    accessibilityLabel={served ? 'Снять отметку «отдано»' : 'Отметить, что отдано'}
+                    onPress={() => void handleToggleServed(item)}
+                  >
+                    {served ? <Text style={styles.servedMark}>✓</Text> : null}
+                  </Pressable>
+                ) : null}
                 <Pressable
                   style={styles.orderItemInfo}
                   disabled={!canEditModifiers}
                   onPress={() => handleOrderItemPress(item)}
                 >
-                  <Text style={styles.orderItemName}>{item.name}</Text>
+                  <Text style={[styles.orderItemName, served && order.servedMarksEnabled && styles.orderItemNameServed]}>
+                    {item.name}
+                  </Text>
                   {item.serveIn ? (
                     <Text style={styles.serveInLabel}>посуда: {item.serveIn}</Text>
                   ) : null}
@@ -1497,7 +1528,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(110, 231, 168, 0.08)',
   },
   orderItemInfo: { flex: 1 },
+  servedBox: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  servedBoxOn: {
+    borderColor: 'rgba(152, 151, 159, 0.9)',
+    backgroundColor: 'rgba(152, 151, 159, 0.18)',
+  },
+  servedMark: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
   orderItemName: { color: colors.text, fontSize: 14, fontWeight: '500' },
+  orderItemNameServed: { color: colors.textMuted },
   compositionLink: { color: colors.accent2, fontSize: 11, marginTop: 2, fontWeight: '600' },
   serveInLabel: { color: colors.accent2, fontSize: 12, fontWeight: '700', marginTop: 2 },
   modifierSummary: { color: colors.textMuted, fontSize: 11, marginTop: 2 },

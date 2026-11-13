@@ -67,6 +67,7 @@ export function renderVenueCard(venue, assignedNames) {
         </div>
         <div class="venue-staff-summary" id="venue-staff-summary-${venue.id}">${summaryText}</div>
         <div class="venue-actions">
+          <button hx-get="/venues/${venue.id}/features" hx-target="#venue-features-panel-${venue.id}" hx-swap="innerHTML">Доп. функции</button>
           <button hx-get="/venues/${venue.id}/staff" hx-target="#venue-staff-panel-${venue.id}" hx-swap="innerHTML">Сотрудники</button>
           <button hx-get="/venues/${venue.id}/atol" hx-target="#venue-atol-panel-${venue.id}" hx-swap="innerHTML">Касса АТОЛ</button>
           <button hx-get="/venues/${venue.id}/tobacco" hx-target="#venue-tobacco-panel-${venue.id}" hx-swap="innerHTML">Учёт табака</button>
@@ -75,6 +76,7 @@ export function renderVenueCard(venue, assignedNames) {
           <button class="danger" hx-delete="/venues/${venue.id}" hx-target="#venue-card-${venue.id}" hx-swap="outerHTML" hx-confirm="Удалить заведение «${safeName}»? Это затронет всё, что к нему привязано.">Удалить</button>
         </div>
       </div>
+      <div id="venue-features-panel-${venue.id}" class="venue-features-panel"></div>
       <div id="venue-staff-panel-${venue.id}" class="venue-staff-panel"></div>
       <div id="venue-atol-panel-${venue.id}" class="venue-atol-panel"></div>
       <div id="venue-tobacco-panel-${venue.id}" class="venue-tobacco-panel-host"></div>
@@ -135,6 +137,44 @@ export function renderVenueEditCard(venue, errorMsg = null) {
           <button type="button" hx-get="/venues/${venue.id}/view" hx-target="#venue-card-${venue.id}" hx-swap="outerHTML">Отмена</button>
         </div>
       </div>
+    </div>
+  `;
+}
+
+export function renderVenueFeaturesPanel(venueId, features) {
+  const rows = features
+    .map(
+      (feature) => `
+        <label class="venue-feature-row">
+          <input
+            type="checkbox"
+            ${feature.enabled ? 'checked' : ''}
+            hx-post="/venues/${venueId}/features/${encodeURIComponent(feature.key)}"
+            hx-target="#venue-features-panel-${venueId}"
+            hx-swap="innerHTML"
+          >
+          <span>
+            <strong>${escapeHtml(feature.title)}</strong>
+            <span class="venue-feature-hint">${escapeHtml(feature.hint)}</span>
+          </span>
+        </label>`
+    )
+    .join('');
+
+  return `
+    <div class="venue-features">
+      <div class="venue-features-head">
+        <h3>Дополнительные функции</h3>
+        <button
+          type="button"
+          class="venue-features-close"
+          hx-get="/venues/${venueId}/features/close"
+          hx-target="#venue-features-panel-${venueId}"
+          hx-swap="innerHTML"
+        >Закрыть</button>
+      </div>
+      <p class="venue-feature-lead">Включённая функция появляется на планшетах этой точки. Выключенная не показывается.</p>
+      ${rows || '<p class="empty-hint">Функций пока нет</p>'}
     </div>
   `;
 }

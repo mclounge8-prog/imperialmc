@@ -239,7 +239,16 @@ CREATE TABLE IF NOT EXISTS order_items (
   price         NUMERIC(10,2) NOT NULL,
   qty           INT NOT NULL DEFAULT 1,
   serve_in      VARCHAR(80), -- снапшот посуды на момент добавления
+  served        BOOLEAN NOT NULL DEFAULT false, -- официант отметил, что позицию отдали
   created_at    TIMESTAMPTZ DEFAULT now()
+);
+
+-- Дополнительные функции точки. Выключенная функция на планшете не показывается.
+CREATE TABLE IF NOT EXISTS venue_features (
+  venue_id    INT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  feature_key VARCHAR(64) NOT NULL,
+  enabled     BOOLEAN NOT NULL DEFAULT false,
+  PRIMARY KEY (venue_id, feature_key)
 );
 
 -- ============================================================
