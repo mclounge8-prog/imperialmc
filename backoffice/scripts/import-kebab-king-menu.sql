@@ -93,7 +93,6 @@ DECLARE
   c_coffee int;
   c_natakhtari int;
   c_energy int;
-  c_tusa int;
   c_cola int;
   c_juice int;
   c_water int;
@@ -112,7 +111,6 @@ BEGIN
   c_coffee     := pg_temp.kk_ensure_category('Кофе в кофемашине', c_drinks, NULL, 1, 'Напитки КК → Кофе в кофемашине');
   c_natakhtari := pg_temp.kk_ensure_category('Натахтари', c_drinks, NULL, 2, 'Напитки КК → Натахтари');
   c_energy     := pg_temp.kk_ensure_category('Энергетики', c_drinks, NULL, 3, 'Напитки КК → Энергетики');
-  c_tusa       := pg_temp.kk_ensure_category('Энергетики Tusa', c_drinks, NULL, 8, 'Напитки КК → Энергетики Tusa');
   c_cola       := pg_temp.kk_ensure_category('Кола', c_drinks, NULL, 4, 'Напитки КК → Кола');
   c_juice      := pg_temp.kk_ensure_category('Соки', c_drinks, NULL, 5, 'Напитки КК → Соки');
   c_water      := pg_temp.kk_ensure_category('Вода', c_drinks, NULL, 6, 'Напитки КК → Вода');
@@ -200,11 +198,9 @@ BEGIN
   PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Tornado', 150, true);
   PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Tornado 2', 150, true);
   PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Адреналин 0.45', 210, true);
-
-  -- Только Карла-Либкнехта. Категорию прячем у остальных ниже.
-  PERFORM pg_temp.kk_upsert_item(c_tusa, 'Энергетик 0,5л Tusa', 120, true);
-  PERFORM pg_temp.kk_upsert_item(c_tusa, 'Энергетик 1л Tusa', 180, true);
-  PERFORM pg_temp.kk_upsert_item(c_tusa, 'Энергетик Pulse Up', 130, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик 0,5л Tusa', 120, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик 1л Tusa', 180, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Pulse Up', 130, true);
 
   -- Кола
   PERFORM pg_temp.kk_upsert_item(c_cola, 'Кола Classic 0.5', 110, true);
@@ -257,14 +253,6 @@ SELECT v.id, m.id
 FROM venues v
 CROSS JOIN kk_cat_map m
 WHERE v.name NOT IN ('Kebab King Октябрьская', 'Kebab King Карла')
-ON CONFLICT DO NOTHING;
-
--- Tusa есть только на Карле. Октябрьская в списке KK, поэтому скрываем отдельно.
-INSERT INTO venue_hidden_menu_categories (venue_id, category_id)
-SELECT v.id, m.id
-FROM venues v
-JOIN kk_cat_map m ON m.path = 'Напитки КК → Энергетики Tusa'
-WHERE v.name <> 'Kebab King Карла'
 ON CONFLICT DO NOTHING;
 
 -- MC Lounge Puff: скрыть вообще все категории меню.

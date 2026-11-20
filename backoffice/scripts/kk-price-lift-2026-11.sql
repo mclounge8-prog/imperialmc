@@ -2,7 +2,7 @@
 -- Шаурма и остальные позиции — новые цены матрицы ABC.
 -- Френч-дог и луковые кольца 7шт снимаются с витрины, хот-дог остаётся.
 -- Старые комбо выключаются, вместо них три новых.
--- Энергетики Tusa видны только в «Kebab King Карла».
+-- Энергетики Tusa стоят в общей категории «Энергетики» (Октябрьская и Карла).
 -- Повторный запуск безопасен.
 
 BEGIN;
@@ -110,44 +110,43 @@ FROM (VALUES
 ) AS n(name, price)
 WHERE mi.category_id = 37 AND lower(mi.name) = lower(n.name);
 
-INSERT INTO menu_categories (name, icon, sort_order, parent_id)
-SELECT 'Энергетики Tusa', NULL, 8, 39
-WHERE NOT EXISTS (
-  SELECT 1 FROM menu_categories
-  WHERE parent_id = 39 AND lower(name) = lower('Энергетики Tusa')
-);
-
+-- Tusa в общей категории «Энергетики»: её видят и Октябрьская, и Карла.
 INSERT INTO menu_items (category_id, name, price, is_active)
-SELECT c.id, n.name, n.price, true
-FROM menu_categories c
-JOIN (VALUES
+SELECT 42, n.name, n.price, true
+FROM (VALUES
   ('Энергетик 0,5л Tusa', 120::numeric),
   ('Энергетик 1л Tusa', 180::numeric),
   ('Энергетик Pulse Up', 130::numeric)
-) AS n(name, price) ON true
-WHERE c.parent_id = 39 AND c.name = 'Энергетики Tusa'
-  AND NOT EXISTS (
-    SELECT 1 FROM menu_items mi
-    WHERE mi.category_id = c.id AND lower(mi.name) = lower(n.name)
-  );
+) AS n(name, price)
+WHERE NOT EXISTS (
+  SELECT 1 FROM menu_items mi
+  WHERE lower(mi.name) = lower(n.name)
+    AND mi.category_id IN (
+      SELECT id FROM menu_categories WHERE name IN ('Энергетики', 'Энергетики Tusa')
+    )
+);
 
 UPDATE menu_items AS mi
-SET price = n.price, is_active = true
-FROM menu_categories c,
-     (VALUES
-       ('Энергетик 0,5л Tusa', 120::numeric),
-       ('Энергетик 1л Tusa', 180::numeric),
-       ('Энергетик Pulse Up', 130::numeric)
-     ) AS n(name, price)
-WHERE c.parent_id = 39 AND c.name = 'Энергетики Tusa'
-  AND mi.category_id = c.id
-  AND lower(mi.name) = lower(n.name);
+SET category_id = 42, price = n.price, is_active = true
+FROM (VALUES
+  ('Энергетик 0,5л Tusa', 120::numeric),
+  ('Энергетик 1л Tusa', 180::numeric),
+  ('Энергетик Pulse Up', 130::numeric)
+) AS n(name, price)
+WHERE lower(mi.name) = lower(n.name)
+  AND mi.category_id IN (
+    SELECT id FROM menu_categories WHERE name IN ('Энергетики', 'Энергетики Tusa')
+  );
 
-INSERT INTO venue_hidden_menu_categories (venue_id, category_id)
-SELECT v.id, c.id
-FROM venues v
-JOIN menu_categories c ON c.parent_id = 39 AND c.name = 'Энергетики Tusa'
-WHERE v.name <> 'Kebab King Карла'
-ON CONFLICT DO NOTHING;
+DELETE FROM venue_hidden_menu_categories
+WHERE category_id IN (
+  SELECT id FROM menu_categories WHERE name = 'Энергетики Tusa'
+);
+
+DELETE FROM menu_categories
+WHERE name = 'Энергетики Tusa'
+  AND NOT EXISTS (
+    SELECT 1 FROM menu_items mi WHERE mi.category_id = menu_categories.id
+  );
 
 COMMIT;
