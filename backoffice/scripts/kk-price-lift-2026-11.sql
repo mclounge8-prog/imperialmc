@@ -149,4 +149,27 @@ WHERE name = 'Энергетики Tusa'
     SELECT 1 FROM menu_items mi WHERE mi.category_id = menu_categories.id
   );
 
+-- Сняты с витрины KK: ванильный капучино, эспрессо, Натахтари, бекон, доставка.
+UPDATE menu_items
+SET is_active = false
+WHERE id IN (146, 148, 149, 150, 151, 152, 153, 180, 192)
+  AND name IN (
+    'Кофе Капучино ванильный',
+    'Кофе Эспрессо',
+    'Натахтари виноград 0.5',
+    'Натахтари груша 0.5',
+    'Натахтари лимон-лайм',
+    'Натахтари тархун',
+    'Натахтари фейхоа',
+    'Бекон жареный (доп)',
+    'Доставка по городу'
+  );
+
+INSERT INTO venue_hidden_menu_categories (venue_id, category_id)
+SELECT v.id, c.id
+FROM venues v
+JOIN menu_categories c ON c.id IN (41, 49)
+WHERE v.name IN ('Kebab King Октябрьская', 'Kebab King Карла')
+ON CONFLICT DO NOTHING;
+
 COMMIT;

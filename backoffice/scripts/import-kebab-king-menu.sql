@@ -176,16 +176,16 @@ BEGIN
   -- Кофе в кофемашине
   PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Американо', 120, true);
   PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Капучино', 120, true);
-  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Капучино ванильный', 140, true);
+  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Капучино ванильный', 140, false);
   PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Латте', 140, true);
-  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Эспрессо', 120, true);
+  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Эспрессо', 120, false);
 
   -- Натахтари
-  PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари виноград 0.5', 130, true);
-  PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари груша 0.5', 130, true);
-  PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари лимон-лайм', 130, true);
-  PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари тархун', 130, true);
-  PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари фейхоа', 130, true);
+  PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари виноград 0.5', 130, false);
+  PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари груша 0.5', 130, false);
+  PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари лимон-лайм', 130, false);
+  PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари тархун', 130, false);
+  PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари фейхоа', 130, false);
 
   -- Энергетики
   PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Drive', 170, true);
@@ -229,7 +229,7 @@ BEGIN
   PERFORM pg_temp.kk_upsert_item(c_dip, 'Дип пот Сливочно-чесночный', 50, true);
 
   -- Дополнения
-  PERFORM pg_temp.kk_upsert_item(c_extras, 'Бекон жареный (доп)', 80, true);
+  PERFORM pg_temp.kk_upsert_item(c_extras, 'Бекон жареный (доп)', 80, false);
   PERFORM pg_temp.kk_upsert_item(c_extras, 'Жаренный лук (доп)', 35, true);
   PERFORM pg_temp.kk_upsert_item(c_extras, 'Картофель фри (доп)', 50, true);
   PERFORM pg_temp.kk_upsert_item(c_extras, 'Лук (доп)', 20, true);
@@ -244,7 +244,7 @@ BEGIN
   PERFORM pg_temp.kk_upsert_item(c_extras, 'Стаканчик с крышкой под чай', 15, true);
 
   -- Доставка
-  PERFORM pg_temp.kk_upsert_item(c_delivery, 'Доставка по городу', 200, true);
+  PERFORM pg_temp.kk_upsert_item(c_delivery, 'Доставка по городу', 200, false);
 END $$;
 
 -- Скрыть все KK-категории (корни + подкатегории) у заведений, кроме KK.
@@ -253,6 +253,13 @@ SELECT v.id, m.id
 FROM venues v
 CROSS JOIN kk_cat_map m
 WHERE v.name NOT IN ('Kebab King Октябрьская', 'Kebab King Карла')
+ON CONFLICT DO NOTHING;
+
+-- Натахтари и доставка сняты с витрины и на самих точках KK.
+INSERT INTO venue_hidden_menu_categories (venue_id, category_id)
+SELECT v.id, m.id
+FROM venues v
+JOIN kk_cat_map m ON m.path IN ('Напитки КК → Натахтари', 'Доставка')
 ON CONFLICT DO NOTHING;
 
 -- MC Lounge Puff: скрыть вообще все категории меню.
