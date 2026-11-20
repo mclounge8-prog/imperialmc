@@ -93,6 +93,7 @@ DECLARE
   c_coffee int;
   c_natakhtari int;
   c_energy int;
+  c_tusa int;
   c_cola int;
   c_juice int;
   c_water int;
@@ -111,6 +112,7 @@ BEGIN
   c_coffee     := pg_temp.kk_ensure_category('Кофе в кофемашине', c_drinks, NULL, 1, 'Напитки КК → Кофе в кофемашине');
   c_natakhtari := pg_temp.kk_ensure_category('Натахтари', c_drinks, NULL, 2, 'Напитки КК → Натахтари');
   c_energy     := pg_temp.kk_ensure_category('Энергетики', c_drinks, NULL, 3, 'Напитки КК → Энергетики');
+  c_tusa       := pg_temp.kk_ensure_category('Энергетики Tusa', c_drinks, NULL, 8, 'Напитки КК → Энергетики Tusa');
   c_cola       := pg_temp.kk_ensure_category('Кола', c_drinks, NULL, 4, 'Напитки КК → Кола');
   c_juice      := pg_temp.kk_ensure_category('Соки', c_drinks, NULL, 5, 'Напитки КК → Соки');
   c_water      := pg_temp.kk_ensure_category('Вода', c_drinks, NULL, 6, 'Напитки КК → Вода');
@@ -121,61 +123,64 @@ BEGIN
   c_delivery := pg_temp.kk_ensure_category('Доставка', NULL, '🛵', 28, 'Доставка');
 
   -- Бургеры
-  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Гамбургер', 310, true);
-  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Чизбургер', 370, true);
-  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Двойной Чизбургер', 430, true);
-  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Чикенбургер', 330, true);
-  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Кебаб Бургер', 390, true);
-  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Панини Классика', 280, true);
-  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Панини мясная с курицей', 340, true);
-  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Бургер', 250, true);
-  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Панини мясная со свининой', 340, true);
+  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Гамбургер', 360, true);
+  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Чизбургер', 440, true);
+  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Двойной Чизбургер', 510, true);
+  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Чикенбургер', 390, true);
+  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Кебаб Бургер', 470, true);
+  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Панини Классика', 330, true);
+  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Панини мясная с курицей', 400, true);
+  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Бургер', 290, true);
+  PERFORM pg_temp.kk_upsert_item(c_burgers, 'Панини мясная со свининой', 400, true);
 
   -- Роллы
-  PERFORM pg_temp.kk_upsert_item(c_rolls, 'Цезарь Ролл', 290, true);
+  PERFORM pg_temp.kk_upsert_item(c_rolls, 'Цезарь Ролл', 340, true);
   PERFORM pg_temp.kk_upsert_item(c_rolls, 'Рап', 240, false);
-  PERFORM pg_temp.kk_upsert_item(c_rolls, 'Френч-Дог', 250, true);
-  PERFORM pg_temp.kk_upsert_item(c_rolls, 'Хот-Дог', 240, true);
+  PERFORM pg_temp.kk_upsert_item(c_rolls, 'Френч-Дог', 250, false);
+  PERFORM pg_temp.kk_upsert_item(c_rolls, 'Хот-Дог', 290, true);
   PERFORM pg_temp.kk_upsert_item(c_rolls, 'Корн-Дог', 200, false);
   PERFORM pg_temp.kk_upsert_item(c_rolls, 'Корн-Дог с сыром', 200, false);
 
   -- Шаурма
-  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Большая с курицей', 350, true);
-  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Большая со свининой', 350, true);
-  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма в Пите с курицей', 360, true);
-  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Мини с курицей', 250, true);
-  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Стандарт с курицей', 310, true);
-  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Стандарт со свининой', 310, true);
-  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Мини со свининой', 250, true);
-  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма в Пите со свининой', 360, true);
+  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Большая с курицей', 400, true);
+  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Большая со свининой', 400, true);
+  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма в Пите с курицей', 450, true);
+  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Мини с курицей', 280, true);
+  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Стандарт с курицей', 350, true);
+  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Стандарт со свининой', 350, true);
+  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма Мини со свининой', 310, true);
+  PERFORM pg_temp.kk_upsert_item(c_shawarma, 'Шаурма в Пите со свининой', 450, true);
 
-  -- Комбо
-  PERFORM pg_temp.kk_upsert_item(c_combo, 'Комбо Шаурма стандарт', 550, true);
-  PERFORM pg_temp.kk_upsert_item(c_combo, 'Комбо Семейный', 999, true);
+  -- Комбо. Старые названия сняты с витрины.
+  PERFORM pg_temp.kk_upsert_item(c_combo, 'Комбо Шаурма стандарт', 550, false);
+  PERFORM pg_temp.kk_upsert_item(c_combo, 'Комбо Семейный', 999, false);
+  PERFORM pg_temp.kk_upsert_item(c_combo, 'Комбо Стандарт', 600, true);
+  PERFORM pg_temp.kk_upsert_item(c_combo, 'Комбо Большой', 710, true);
+  PERFORM pg_temp.kk_upsert_item(c_combo, 'Комбо на двоих', 1010, true);
 
   -- Закуски
-  PERFORM pg_temp.kk_upsert_item(c_sides, 'Картофель фри', 170, true);
-  PERFORM pg_temp.kk_upsert_item(c_sides, 'Крылышки 3шт', 200, true);
+  PERFORM pg_temp.kk_upsert_item(c_sides, 'Картофель фри', 200, true);
+  PERFORM pg_temp.kk_upsert_item(c_sides, 'Крылышки 3шт', 230, true);
   PERFORM pg_temp.kk_upsert_item(c_sides, 'Наггетсы 5шт', 250, false);
   PERFORM pg_temp.kk_upsert_item(c_sides, 'Медальоны сырные 5шт', 280, false);
-  PERFORM pg_temp.kk_upsert_item(c_sides, 'Крылышки 5шт', 340, true);
+  PERFORM pg_temp.kk_upsert_item(c_sides, 'Крылышки 5шт', 400, true);
   PERFORM pg_temp.kk_upsert_item(c_sides, 'Медальоны сырные 7шт', 350, false);
   PERFORM pg_temp.kk_upsert_item(c_sides, 'Наггетсы 7шт', 310, false);
-  PERFORM pg_temp.kk_upsert_item(c_sides, 'Луковые кольца 7шт', 150, true);
+  PERFORM pg_temp.kk_upsert_item(c_sides, 'Луковые кольца 7шт', 150, false);
 
   -- Напитки КК (корень)
   PERFORM pg_temp.kk_upsert_item(c_drinks, 'Кофе 3 в 1', 50, true);
   PERFORM pg_temp.kk_upsert_item(c_drinks, 'Чай', 30, true);
-  PERFORM pg_temp.kk_upsert_item(c_drinks, 'Фреш Бар', 110, true);
+  PERFORM pg_temp.kk_upsert_item(c_drinks, 'Фреш Бар', 130, true);
   PERFORM pg_temp.kk_upsert_item(c_drinks, 'Кофе черный', 40, true);
-  PERFORM pg_temp.kk_upsert_item(c_drinks, 'Согревающий чай', 120, true);
+  PERFORM pg_temp.kk_upsert_item(c_drinks, 'Согревающий чай', 140, true);
 
   -- Кофе в кофемашине
-  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Американо', 100, true);
-  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Капучино', 100, true);
-  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Капучино ванильный', 120, true);
-  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Латте', 120, true);
-  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Эспрессо', 100, true);
+  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Американо', 120, true);
+  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Капучино', 120, true);
+  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Капучино ванильный', 140, true);
+  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Латте', 140, true);
+  PERFORM pg_temp.kk_upsert_item(c_coffee, 'Кофе Эспрессо', 120, true);
 
   -- Натахтари
   PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари виноград 0.5', 130, true);
@@ -185,36 +190,41 @@ BEGIN
   PERFORM pg_temp.kk_upsert_item(c_natakhtari, 'Натахтари фейхоа', 130, true);
 
   -- Энергетики
-  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Drive', 150, true);
-  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt помело мята банан', 120, true);
-  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt Сакура Персик', 120, true);
-  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt - Сливовый пирог', 120, true);
-  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt - Оригинал', 120, true);
-  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt Гранат', 120, true);
-  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt Кокос Манго', 120, true);
-  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Tornado', 130, true);
-  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Tornado 2', 130, true);
-  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Адреналин 0.45', 180, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Drive', 170, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt помело мята банан', 140, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt Сакура Персик', 140, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt - Сливовый пирог', 140, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt - Оригинал', 140, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt Гранат', 140, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Volt Кокос Манго', 140, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Tornado', 150, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Tornado 2', 150, true);
+  PERFORM pg_temp.kk_upsert_item(c_energy, 'Энергетик Адреналин 0.45', 210, true);
+
+  -- Только Карла-Либкнехта. Категорию прячем у остальных ниже.
+  PERFORM pg_temp.kk_upsert_item(c_tusa, 'Энергетик 0,5л Tusa', 120, true);
+  PERFORM pg_temp.kk_upsert_item(c_tusa, 'Энергетик 1л Tusa', 180, true);
+  PERFORM pg_temp.kk_upsert_item(c_tusa, 'Энергетик Pulse Up', 130, true);
 
   -- Кола
-  PERFORM pg_temp.kk_upsert_item(c_cola, 'Кола Classic 0.5', 100, true);
-  PERFORM pg_temp.kk_upsert_item(c_cola, 'Кола Литр Classic', 150, true);
-  PERFORM pg_temp.kk_upsert_item(c_cola, 'Кола Два Литра Classic', 210, true);
-  PERFORM pg_temp.kk_upsert_item(c_cola, 'Кола Evervess 0.5', 100, true);
+  PERFORM pg_temp.kk_upsert_item(c_cola, 'Кола Classic 0.5', 110, true);
+  PERFORM pg_temp.kk_upsert_item(c_cola, 'Кола Литр Classic', 170, true);
+  PERFORM pg_temp.kk_upsert_item(c_cola, 'Кола Два Литра Classic', 240, true);
+  PERFORM pg_temp.kk_upsert_item(c_cola, 'Кола Evervess 0.5', 110, true);
 
   -- Соки
-  PERFORM pg_temp.kk_upsert_item(c_juice, 'Сок Любимый Яблоко 0.2', 70, true);
-  PERFORM pg_temp.kk_upsert_item(c_juice, 'Сок любимый 1л', 210, true);
-  PERFORM pg_temp.kk_upsert_item(c_juice, 'Сок Любимый Тропический микс 0.2', 70, true);
+  PERFORM pg_temp.kk_upsert_item(c_juice, 'Сок Любимый Яблоко 0.2', 80, true);
+  PERFORM pg_temp.kk_upsert_item(c_juice, 'Сок любимый 1л', 240, true);
+  PERFORM pg_temp.kk_upsert_item(c_juice, 'Сок Любимый Тропический микс 0.2', 80, true);
 
   -- Вода
-  PERFORM pg_temp.kk_upsert_item(c_water, 'Вода аква минерале', 70, true);
-  PERFORM pg_temp.kk_upsert_item(c_water, 'Вода Черноголовка 0.5', 70, true);
-  PERFORM pg_temp.kk_upsert_item(c_water, 'Вода Черноголовка 1л', 100, true);
+  PERFORM pg_temp.kk_upsert_item(c_water, 'Вода аква минерале', 80, true);
+  PERFORM pg_temp.kk_upsert_item(c_water, 'Вода Черноголовка 0.5', 80, true);
+  PERFORM pg_temp.kk_upsert_item(c_water, 'Вода Черноголовка 1л', 120, true);
 
   -- Чай бутилированный
-  PERFORM pg_temp.kk_upsert_item(c_tea_bot, 'Липтон зеленый 0.5', 150, true);
-  PERFORM pg_temp.kk_upsert_item(c_tea_bot, 'Липтон черный 0.5', 150, true);
+  PERFORM pg_temp.kk_upsert_item(c_tea_bot, 'Липтон зеленый 0.5', 170, true);
+  PERFORM pg_temp.kk_upsert_item(c_tea_bot, 'Липтон черный 0.5', 170, true);
 
   -- Дип-Пот
   PERFORM pg_temp.kk_upsert_item(c_dip, 'Дип пот Сырный', 50, true);
@@ -247,6 +257,14 @@ SELECT v.id, m.id
 FROM venues v
 CROSS JOIN kk_cat_map m
 WHERE v.name NOT IN ('Kebab King Октябрьская', 'Kebab King Карла')
+ON CONFLICT DO NOTHING;
+
+-- Tusa есть только на Карле. Октябрьская в списке KK, поэтому скрываем отдельно.
+INSERT INTO venue_hidden_menu_categories (venue_id, category_id)
+SELECT v.id, m.id
+FROM venues v
+JOIN kk_cat_map m ON m.path = 'Напитки КК → Энергетики Tusa'
+WHERE v.name <> 'Kebab King Карла'
 ON CONFLICT DO NOTHING;
 
 -- MC Lounge Puff: скрыть вообще все категории меню.
